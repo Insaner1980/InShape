@@ -1,0 +1,212 @@
+Build a complete, working Android app for my personal gym workout journal. The app's name is "InShape". All interface text must be in English. Preserve user-entered names and notes as written.
+
+I have attached eight reference images created in Claude (C:\Users\EmmaH\Downloads\Gym Journal-png). Follow these reference images as closely as possible. Treat them as the visual source of truth for this implementation, including their layout, proportions, typography, colours, spacing, cards, buttons, navigation, forms and chart styles. I am reasonably happy with this direction and will refine the appearance later. Your task now is to turn it into a coherent, functioning app.
+
+Implement the app in the repository, including persistent data, navigation, forms and integrations. Continue beyond planning and static screen mockups until the requested functionality is implemented and verified as far as the available environment allows.
+
+## Reference designs and implementation approach
+
+The app is for an adult starting a regular gym routine, with a low starting fitness level and occasional aches and stiffness. Its purpose is to remember what I did, make gym visits easier and show my recorded progress. The gym happens to be in a swimming-hall building, but I use only the gym. There must be no swimming, pool, water exercise or sauna features.
+
+Inspect the existing repository and its instructions first. Preserve its established architecture and conventions where appropriate. If the repository is empty, create a native Android project using Kotlin and Jetpack Compose, a durable local database and compatible stable dependencies. Use current official documentation for Android platform integrations. Make sensible implementation decisions yourself rather than asking me to decide every technical detail.
+
+The references show:
+
+- 16445.png: optional Before, After and Next day check-ins.
+- 16446.png: Today, including an unfinished workout, weekly activity and start actions.
+- 16447.png: exercise details, equipment photos, machine settings and personal instructions.
+- 16448.png: active workout with Done, Now and Up next sections.
+- 16449.png: exercise progress, attendance and body-observation charts.
+- 16450.png: History, calendar and expandable workout records.
+- 16451.png: Library, routine editing and the four main navigation tabs.
+- 16452.png: Settings, reminders, widget, Health Connect and data export.
+
+Match the images by their contents if the attachment filenames differ. The main tabs are Today, History, Progress and Library. Active workout, Check-in, exercise details, routine editing and Settings are secondary destinations.
+
+Reproduce the pale green-grey background, white rounded cards, subtle borders, deep green accents, pale mint surfaces, large dark headings, pill-shaped controls and restrained line icons. Preserve the reference distinction between orange pain indicators and blue stiffness indicators, with text labels as well as colour. Do not replace this with a different visual concept or an unmodified default component theme.
+
+These are tall, scrolling screen references. Implement natural vertical scrolling, sensible fixed headers or navigation where appropriate, safe system insets and keyboard handling. Do not shrink an entire tall image into one viewport or reproduce a screenshot's accidental cropping. Adapt dimensions for real phone screens while retaining the composition. Build real UI components and charts, not flattened screenshot backgrounds.
+
+For flows not pictured, extend the same design system. Limit visual deviations to what is necessary for functional correctness, accessibility and different screen sizes. Make settings discoverable from Today.
+
+The images contain example dates, names, workouts, measurements and connection states. Production screens must derive these from actual saved data. Start a normal installation with useful empty states. If sample data is needed for screenshots or previews, keep it in an explicitly enabled demo mode or preview fixture, separate from the real journal. The reference date of 13 November 2026 can be used in those fixtures only. Photo placeholders must become working add-photo controls, and every displayed count must agree with the underlying records.
+
+The following written requirements govern behaviour and scope when an illustrative detail in an image conflicts with them.
+
+## Required functionality and delivery
+
+1. Today and starting a workout
+
+Follow the Today reference, with the date, a greeting, weekly attendance, workout actions, routine shortcuts, the last completed workout and optional imported health information. A name used in the greeting should be locally editable.
+
+Support starting an empty workout, starting a saved routine, repeating the last completed workout, repeating another workout from history and resuming an unfinished session. Show the prominent unfinished-workout card only when one exists. Its progress and static started-at time must reflect the saved session.
+
+Keep a single active session as the normal workflow. If one already exists, let me resume it or explicitly resolve it before starting another, so accidental taps do not create duplicate sessions. Returning from exercise details or another tab must preserve the session.
+
+Weekly attendance must count completed workouts, not planned visits, unfinished sessions or entirely empty entries. The weekly goal is optional, adjustable and disableable. Avoid daily streak penalties or messages that frame missed visits as failure.
+
+2. Workout logging
+
+Match the active-workout reference with Done, Now and Up next sections. Show the current exercise, relevant machine settings, previous completed performance and previous personal notes without requiring a separate search.
+
+Allow adding exercises during a session, entering weight or resistance and repetitions, adding or removing sets, editing values and explicitly marking sets completed. Support decimal loads such as 27.5 kg and convenient numeric entry. Use kilograms as the initial weight unit.
+
+Also support a quick exercise-level completed entry without requiring sets, repetitions or weight. This is useful for warm-ups, mobility and days when I only want a simple record. For suitable activities, allow a manually entered duration. A completion-only entry must remain distinguishable from a detailed set record.
+
+Keep suggested values separate from performed work. Repeating a workout copies its exercises and useful values into a new editable session with completion reset. Routine defaults and copied values must never silently become completed sets.
+
+“Mark done” must not fabricate performance from unfinished suggestions. Preserve completed sets and distinguish an exercise recorded as completed without details. I must be able to correct or undo a completion.
+
+“Machine busy, later” moves an exercise later in the current session. Support reordering, skipping today and selecting a saved alternative. Preserve work already recorded when changing the remaining plan, and retain which exercise was actually performed. When switching to an alternative after completing some sets, keep those sets attached to the original exercise and add the alternative for the remaining work.
+
+Finishing a workout may leave planned exercises unfinished. Save the work actually completed, distinguish skipped and incomplete items, and do not include planned sets in history totals, charts or exports. Prevent duplicate saves from repeated taps. Offer an optional post-workout check-in without making it a condition of saving.
+
+Allow notes on each exercise within a workout and on the whole session.
+
+There must be no rest timers, countdowns, stopwatches or live elapsed-time displays. Static start timestamps, recorded session durations, routine duration estimates and manually entered activity durations are allowed. Record start and finish timestamps for live sessions and allow duration corrections. If an old unfinished session is resumed, let me correct its timing rather than silently counting a long interruption as exercise. A recorded duration is metadata, not a timer feature.
+
+3. Personal exercise and equipment library
+
+Implement both Library segments, Routines and Exercises. The exercise list must support adding, editing, searching and filtering exercises, favourites and recognisable personal names or nicknames. Support gym machines, free-weight or bodyweight exercises, warm-ups, stretching, mobility and optional home exercises.
+
+Match the exercise detail reference: title, useful category or muscle information, favourite control, Edit action, main equipment photo, photo thumbnails, machine settings, personal instructions, saved links, alternatives and exercise history.
+
+Allow multiple personal photos or reference images to be added, viewed, replaced and removed. Store them reliably in app-controlled storage or through persistent access, so they survive restarts and can be included in backup. Do not leave permanent sample placeholders after a photo is added.
+
+Machine settings must be editable, including custom labels and values. Examples include seat height, backrest, thigh or chest pad and handle choice. Distinguish different machines even when they are used for similarly named exercises. Show the relevant setup during a workout.
+
+Personal instructions, free-form notes and saved video or other instruction links must be editable. Treat the example technique text as sample personal content, not as a prescribed training programme. Saved text and photos work offline; external video links open their saved destination and handle unavailable connectivity gracefully. Downloading external videos is not required.
+
+Provide links to an exercise's previous performances and progress chart. Editing, renaming or archiving an exercise must not destroy or silently rewrite its old workout records.
+
+4. Routines and alternatives
+
+Allow creating, naming, editing, duplicating and removing personal routines. Let me add and remove exercises, change their order and save useful planned sets, repetitions, resistance or manual-duration targets where applicable.
+
+Support routines like Full body A, Full body B, Short 20 min and Mobility, while leaving their contents fully editable. Any starter examples must be clearly optional. A short routine or a mobility session should work without forcing strength-training fields.
+
+Follow the reference's expanded routine editing layout, including reordering, Add exercise and Start routine. Provide accessible ways to reorder in addition to drag gestures.
+
+Changes made during one workout should affect that workout. Do not silently change the saved routine; provide an explicit way to save routine changes when appropriate. Likewise, editing a routine must not modify past sessions.
+
+Let me define and choose my own alternative exercises. Alternatives are a practical organisational feature, not automatic coaching.
+
+5. Optional check-ins and body observations
+
+Follow the Check-in reference closely: Before, After and Next day segments, energy choices, an appropriate effort rating, a front/back body map, separate pain and stiffness fields, comparison with the earlier observation and a workout note.
+
+Every part is optional. Check-ins must never block starting or finishing a workout, and I must be able to add or edit an observation later. Provide an Add check-in action in workout details even when no observation exists. Allow clearing an individual rating back to Not recorded; zero is an intentional recorded score.
+
+Support energy, general feelings, workout effort and personal notes. Keep workout effort distinct from pain and stiffness. Effort describes the performed workout; do not require a retrospective effort score before the workout starts.
+
+Allow pain and stiffness scores from 0 to 10 for selected body areas, stored separately. Provide clear endpoint labels. Support relevant regions and left/right distinctions where useful, such as lower back and right knee.
+
+The body map must have real selectable regions and an accessible text-based selection alternative. Labels must make the selected region unambiguous. Use the same orange and blue distinction as the references without relying on colour alone.
+
+Associate each observation with its workout, phase and actual observation time. Before-and-after comparisons must use the correct matching observations. A missing answer is missing data, never zero. Displaying a default slider position must not silently save a score.
+
+Exercise-specific notes or a simple discomfort flag should let me remember that a movement felt unpleasant. Record my observations without diagnosing symptoms, guaranteeing improvement or automatically choosing exercises and loads.
+
+6. History and calendar
+
+Match the History reference with a month calendar, previous and next month controls, recorded workout days, a distinct today indicator, summary figures and expandable session cards. Use Monday as the first day of the week.
+
+Support browsing by date, opening a workout, viewing all its exercises and actual completed values, and reading its notes and linked check-ins. Include workout duration and effort where recorded.
+
+Allow manually adding a past workout and editing or deleting existing records. Past entries need their actual workout date, with optional time and duration as appropriate. Do not require fictitious measurements to save an otherwise useful entry.
+
+Calculate calendar markers, workout counts, duration totals and average effort from the relevant actual records. Exclude missing effort ratings from the average. Derive labels such as “4 more” from the real exercise count rather than copying inconsistent sample text.
+
+Historical corrections must update Today, History, Progress, personal records and other dependent summaries. Handle local dates and week boundaries consistently. Changing the time zone must not arbitrarily shift date-only historical entries.
+
+7. Progress and graphs
+
+Make this a genuinely visual part of the app, closely following the Progress reference. Implement real charts driven by completed records, with exercise selection, useful period controls, readable dates, units, legends and details for selected data points.
+
+Include exercise-specific weight or resistance trends, repetition trends and useful set-count information. Support comparisons such as repetitions at a fixed weight and weight at a specified repetition count.
+
+Define each metric precisely. For example, the general Weight chart can show the heaviest completed set in each session. If a comparison includes sets with at least 10 repetitions, label it “10+ reps” rather than implying exactly 10. Compare the same exercise, machine and measurement basis.
+
+Provide personal records with an understandable basis, such as the most repetitions at a given weight or the heaviest completed set with a specified minimum repetition count. Show the previous best when available. Recalculate records after edits, deletions or restoration.
+
+Include workouts per week with the optional goal line, following the bar-chart reference. Include pain and stiffness trends by body region and phase, with before-and-after paired observations like the reference. Support next-day observations where available.
+
+Missing observations must remain missing. Do not invent connecting observations, treat missing pain as zero or manufacture an uninterrupted improvement curve. Summary changes must state what is being compared and over which period.
+
+Keep the charts understandable and useful with a small history. Provide thoughtful empty and insufficient-data states. Show user observations without claiming that a workout caused a health change. Do not invent an overall health or readiness score.
+
+8. Goals, reminders and the Android widget
+
+Match the relevant Settings controls. Allow changing or disabling the weekly attendance goal and optionally selecting reminder days and a reminder time.
+
+Implement actual local notifications, respecting notification permission and the selected local schedule. Changing or disabling reminders must update or cancel the scheduled reminders. Denied notification permission must not affect workout logging.
+
+Implement an actual Android home-screen widget, not an in-app imitation. It should show weekly activity and a Start or Resume shortcut, with the most recent workout if appropriate. Update it when relevant workout data or the goal changes, and open the correct app destination when tapped. Refresh date-dependent Today and widget content when the local date or week changes, even without a new workout entry.
+
+Keep optional reminders and goals supportive rather than judgmental.
+
+9. Optional Health Connect integration
+
+Implement optional Android Health Connect integration using current supported APIs and official documentation. Keep the entire personal journal usable when Health Connect is unavailable, disconnected or denied permission.
+
+Provide clear controls for sharing completed workout summaries and separately enabling steps, sleep and heart-rate context. The references show steps and sleep; include the agreed optional heart-rate capability in the same visual style.
+
+Write supported workout session information from completed workouts, such as their type and actual timing. Keep personal equipment photos, machine setup, private notes and detailed journal content local unless a requirement explicitly calls for sharing it.
+
+Read only the health data enabled by the user and covered by granted permissions. Present the source and relevant date or period. Missing data is not zero, and unavailable permissions must not produce fabricated values. Use appropriate aggregation to avoid double-counting overlapping sources.
+
+Connection badges and toggles must reflect actual availability, permissions and preferences. Handle initial setup, denied or revoked access, no available records and retryable sync failures. A toggle must not claim success before the requested operation succeeds.
+
+Prevent duplicate exported workouts on retries. Handle edits and deletions of this app's own exported records appropriately without modifying records owned by other apps. Restoring a backup must not blindly upload all workouts as duplicates.
+
+If a local workout lacks information required for export, retain it and explain what is needed to share it. Health sharing must not block local saving.
+
+Use accurate wording about sharing through Health Connect. Do not guarantee that a particular other app has received or displayed the workout. Imported sleep and heart rate provide context only; do not generate training prescriptions from them.
+
+10. Offline storage, automatic saving and recovery
+
+Core features must work offline, including logging, photos, routine editing, history, charts and check-ins. Do not require an account, server or cloud subscription for normal use.
+
+Save changes automatically and persist the active session promptly. Recover unfinished work after navigating away, backgrounding, process termination, app reopening and a device restart. Do not rely only on screen state or in-memory lists.
+
+Use stable identities and clear separation between exercises, machines, routine templates, planned session items, completed work and observations. Preserve historical meaning when names, templates or machine settings change. Use database migrations where necessary.
+
+Handle storage or file errors visibly and preserve recoverable work. Do not show “Saved” when a write has failed.
+
+11. Backup, restore and exports
+
+Implement user-controlled backup and restore so I can move the complete journal to another phone. Include workouts, completed set records, check-ins, exercise definitions, photos, machine settings, personal instructions, links, favourites, alternatives, routines and applicable preferences. Include actual image files and rebuild their local references during restoration; old-device paths or photo URIs alone are not a portable backup.
+
+Use a versioned backup format. Validate a backup before changing current data and make replacement or merge behaviour clear. Require confirmation before destructive replacement. A damaged or incompatible backup must leave the current journal intact.
+
+Do not treat Android-granted permissions or device-specific notification and widget state as transferable permissions. Re-establish integrations and scheduling appropriately on the destination device.
+
+Provide CSV export of actual workout data, using a documented, usable structure. Preserve enough identifiers and fields to relate workouts, exercises and observations; do not export planned sets as completed.
+
+Provide readable PDF export with a selection of workouts and personal notes, suitable for my own records or for sharing with a professional if I choose. Include relevant dates, exercises, recorded values and selected check-ins. Preview or clearly describe the selected content before export.
+
+Use Android's normal file selection and sharing mechanisms. Do not automatically send exports anywhere. Settings should report actual backup status, not a hardcoded example date.
+
+Describe data storage accurately: the journal is stored locally, while optional Health Connect sharing, explicit exports and backup destinations are separate choices. Do not claim that data never leaves the phone when those choices are enabled.
+
+12. Accessibility, scope and verification
+
+Use legible text, comfortable touch targets, accessible names for controls, good contrast and support for larger font sizes. Keep numeric inputs usable when the keyboard is open. Make charts and the body map understandable without relying solely on colour. Avoid flashing effects and unnecessary motion.
+
+Provide functional empty, loading, validation and error states. Every displayed button, menu, segment and toggle must have a real purpose. Keep user-facing text concise; implementation details belong in developer documentation.
+
+Do not add swimming, pool or sauna features, timers, stopwatches, live workout clocks, membership-pass balances, visit credits, payments or cost tracking. Do not add social feeds, calorie or nutrition tracking, subscriptions, automatic load increases or sleep-based workout prescriptions.
+
+A previous note saying “try 27.5 kg” is the user's saved note, not permission to implement automatic progression advice.
+
+Do not silently remove features to call this an MVP. You may implement in sensible internal stages, but work towards the complete scope above. If an external dependency or unavailable environment capability blocks part of the work, complete the independent parts and report the exact remaining limitation. Do not disguise a placeholder or mock integration as finished functionality.
+
+Build and run the app where the environment allows. Add focused tests for meaningful risks: planned versus completed work, repeat-workout behaviour, session recovery, finish idempotency, historical corrections, chart and record calculations, missing observations, backup restoration and Health Connect duplicate prevention.
+
+Exercise the main flows end to end: create an exercise with a photo and setup, create a routine, start and partially complete it, resume after interruption, finish, add optional check-ins, inspect history and graphs, correct an old entry, back up and restore, and generate exports.
+
+Compare actual rendered screens with all eight reference images. Use controlled demo data for this comparison and fix material differences while retaining responsive layouts. Check at least a compact phone layout and larger text. Clearly state which build, automated, emulator or device checks were actually executed and which could not be run.
+
+Work locally. Do not push, publish, deploy, create or merge a pull request unless I explicitly request it.
+
+When finished, briefly explain what was implemented, where to find the app or APK if generated, how to run it, what was verified and any specific remaining limitations. Keep the reference design intact so I can refine its appearance in a later iteration.

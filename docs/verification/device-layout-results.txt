@@ -1,0 +1,86 @@
+layout-320-100.txt
+TodayWithActiveWorkout: root=640x1920, scroll=48..1664, decor=640x1920, systemInsets=48/96, font=1.0, widthDp=320
+ActiveWorkoutPartiallyDone: root=640x1920, scroll=176..1824, decor=640x1920, systemInsets=48/96, font=1.0, widthDp=320
+ExerciseWithSetup: root=640x1920, scroll=48..1824, decor=640x1920, systemInsets=48/96, font=1.0, widthDp=320
+CheckInAfter: root=640x1920, scroll=176..1824, decor=640x1920, systemInsets=48/96, font=1.0, widthDp=320
+ProgressWithHistory: root=640x1920, scroll=48..1664, decor=640x1920, systemInsets=48/96, font=1.0, widthDp=320
+HistoryNovember: root=640x1920, scroll=48..1664, decor=640x1920, systemInsets=48/96, font=1.0, widthDp=320
+LibraryRoutineExpanded: root=640x1920, scroll=48..1664, decor=640x1920, systemInsets=48/96, font=1.0, widthDp=320
+SettingsConfigured: root=640x1920, scroll=176..1824, decor=640x1920, systemInsets=48/96, font=1.0, widthDp=320
+All eight screens traversed. No text extends beyond raster bounds by more than one pixel.
+
+layout-320-200.txt
+TodayWithActiveWorkout: root=640x1920, scroll=48..1616, decor=640x1920, systemInsets=48/96, font=2.0, widthDp=320
+ActiveWorkoutPartiallyDone: root=640x1920, scroll=418..1824, decor=640x1920, systemInsets=48/96, font=2.0, widthDp=320
+ExerciseWithSetup: root=640x1920, scroll=48..1824, decor=640x1920, systemInsets=48/96, font=2.0, widthDp=320
+CheckInAfter: root=640x1920, scroll=329..1824, decor=640x1920, systemInsets=48/96, font=2.0, widthDp=320
+ProgressWithHistory: root=640x1920, scroll=48..1616, decor=640x1920, systemInsets=48/96, font=2.0, widthDp=320
+HistoryNovember: root=640x1920, scroll=48..1616, decor=640x1920, systemInsets=48/96, font=2.0, widthDp=320
+LibraryRoutineExpanded: root=640x1920, scroll=48..1616, decor=640x1920, systemInsets=48/96, font=2.0, widthDp=320
+SettingsConfigured: root=640x1920, scroll=272..1824, decor=640x1920, systemInsets=48/96, font=2.0, widthDp=320
+All eight screens traversed. No text extends beyond raster bounds by more than one pixel.
+
+layout-390-100.txt
+TodayWithActiveWorkout: root=780x1920, scroll=48..1664, decor=780x1920, systemInsets=48/96, font=1.0, widthDp=390
+ActiveWorkoutPartiallyDone: root=780x1920, scroll=176..1824, decor=780x1920, systemInsets=48/96, font=1.0, widthDp=390
+ExerciseWithSetup: root=780x1920, scroll=48..1824, decor=780x1920, systemInsets=48/96, font=1.0, widthDp=390
+CheckInAfter: root=780x1920, scroll=176..1824, decor=780x1920, systemInsets=48/96, font=1.0, widthDp=390
+ProgressWithHistory: root=780x1920, scroll=48..1664, decor=780x1920, systemInsets=48/96, font=1.0, widthDp=390
+HistoryNovember: root=780x1920, scroll=48..1664, decor=780x1920, systemInsets=48/96, font=1.0, widthDp=390
+LibraryRoutineExpanded: root=780x1920, scroll=48..1664, decor=780x1920, systemInsets=48/96, font=1.0, widthDp=390
+SettingsConfigured: root=780x1920, scroll=176..1824, decor=780x1920, systemInsets=48/96, font=1.0, widthDp=390
+All eight screens traversed. No text extends beyond raster bounds by more than one pixel.
+
+layout-390-200.txt
+TodayWithActiveWorkout: root=780x1920, scroll=48..1616, decor=780x1920, systemInsets=48/96, font=2.0, widthDp=390
+ActiveWorkoutPartiallyDone: root=780x1920, scroll=272..1824, decor=780x1920, systemInsets=48/96, font=2.0, widthDp=390
+ExerciseWithSetup: root=780x1920, scroll=48..1824, decor=780x1920, systemInsets=48/96, font=2.0, widthDp=390
+CheckInAfter: root=780x1920, scroll=272..1824, decor=780x1920, systemInsets=48/96, font=2.0, widthDp=390
+ProgressWithHistory: root=780x1920, scroll=48..1616, decor=780x1920, systemInsets=48/96, font=2.0, widthDp=390
+HistoryNovember: root=780x1920, scroll=48..1616, decor=780x1920, systemInsets=48/96, font=2.0, widthDp=390
+LibraryRoutineExpanded: root=780x1920, scroll=48..1616, decor=780x1920, systemInsets=48/96, font=2.0, widthDp=390
+SettingsConfigured: root=780x1920, scroll=272..1824, decor=780x1920, systemInsets=48/96, font=2.0, widthDp=390
+All eight screens traversed. No text extends beyond raster bounds by more than one pixel.
+
+layout-600-100.txt
+TodayWithActiveWorkout: root=1200x1920, scroll=48..1664, decor=1200x1920, systemInsets=48/96, font=1.0, widthDp=600
+ActiveWorkoutPartiallyDone: root=1200x1920, scroll=176..1824, decor=1200x1920, systemInsets=48/96, font=1.0, widthDp=600
+ExerciseWithSetup: root=1200x1920, scroll=48..1824, decor=1200x1920, systemInsets=48/96, font=1.0, widthDp=600
+CheckInAfter: root=1200x1920, scroll=176..1824, decor=1200x1920, systemInsets=48/96, font=1.0, widthDp=600
+ProgressWithHistory: root=1200x1920, scroll=48..1664, decor=1200x1920, systemInsets=48/96, font=1.0, widthDp=600
+HistoryNovember: root=1200x1920, scroll=48..1664, decor=1200x1920, systemInsets=48/96, font=1.0, widthDp=600
+LibraryRoutineExpanded: root=1200x1920, scroll=48..1664, decor=1200x1920, systemInsets=48/96, font=1.0, widthDp=600
+SettingsConfigured: root=1200x1920, scroll=176..1824, decor=1200x1920, systemInsets=48/96, font=1.0, widthDp=600
+All eight screens traversed. No text extends beyond raster bounds by more than one pixel.
+
+layout-landscape-100.txt
+TodayWithActiveWorkout: root=1280x720, scroll=48..560, decor=1280x720, systemInsets=48/0, font=1.0, widthDp=592
+ActiveWorkoutPartiallyDone: root=1280x720, scroll=176..720, decor=1280x720, systemInsets=48/0, font=1.0, widthDp=592
+ExerciseWithSetup: root=1280x720, scroll=48..720, decor=1280x720, systemInsets=48/0, font=1.0, widthDp=592
+CheckInAfter: root=1280x720, scroll=176..720, decor=1280x720, systemInsets=48/0, font=1.0, widthDp=592
+ProgressWithHistory: root=1280x720, scroll=48..560, decor=1280x720, systemInsets=48/0, font=1.0, widthDp=592
+HistoryNovember: root=1280x720, scroll=48..560, decor=1280x720, systemInsets=48/0, font=1.0, widthDp=592
+LibraryRoutineExpanded: root=1280x720, scroll=48..560, decor=1280x720, systemInsets=48/0, font=1.0, widthDp=592
+SettingsConfigured: root=1280x720, scroll=176..720, decor=1280x720, systemInsets=48/0, font=1.0, widthDp=592
+All eight screens traversed. No text extends beyond raster bounds by more than one pixel.
+layout-modern-cutout.txt
+TodayWithActiveWorkout: root=780x1680, scroll=96..1472, decor=780x1680, systemInsets=96/48, font=1.0, widthDp=390
+ActiveWorkoutPartiallyDone: root=780x1680, scroll=224..1632, decor=780x1680, systemInsets=96/48, font=1.0, widthDp=390
+ExerciseWithSetup: root=780x1680, scroll=96..1632, decor=780x1680, systemInsets=96/48, font=1.0, widthDp=390
+CheckInAfter: root=780x1680, scroll=224..1632, decor=780x1680, systemInsets=96/48, font=1.0, widthDp=390
+ProgressWithHistory: root=780x1680, scroll=96..1472, decor=780x1680, systemInsets=96/48, font=1.0, widthDp=390
+HistoryNovember: root=780x1680, scroll=96..1472, decor=780x1680, systemInsets=96/48, font=1.0, widthDp=390
+LibraryRoutineExpanded: root=780x1680, scroll=96..1472, decor=780x1680, systemInsets=96/48, font=1.0, widthDp=390
+SettingsConfigured: root=780x1680, scroll=224..1632, decor=780x1680, systemInsets=96/48, font=1.0, widthDp=390
+All eight screens traversed. No text extends beyond raster bounds by more than one pixel.
+
+layout-final-insets.txt
+TodayWithActiveWorkout: root=780x1680, scroll=48..1472, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+ActiveWorkoutPartiallyDone: root=780x1680, scroll=176..1632, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+ExerciseWithSetup: root=780x1680, scroll=48..1632, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+CheckInAfter: root=780x1680, scroll=176..1632, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+ProgressWithHistory: root=780x1680, scroll=48..1472, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+HistoryNovember: root=780x1680, scroll=48..1472, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+LibraryRoutineExpanded: root=780x1680, scroll=48..1472, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+SettingsConfigured: root=780x1680, scroll=176..1632, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+All eight screens traversed. No text extends beyond raster bounds by more than one pixel.

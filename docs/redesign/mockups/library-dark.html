@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Library</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+button,input{font:inherit}
+a{color:inherit}a:hover{color:inherit}
+</style>
+</helmet>
+<div style="--bg:#0E1114;--s1:#171B20;--s2:#20262D;--sel:#39424D;--mute:#39424D;--line:#2A313A;--tx:#F2F4F5;--tx2:#A3ADB8;--ac:#C5F25A;--onac:#141A05;--acs:#26330F;--act:#D4F77F;--mark:#C5F25A;--pain:#FF9A62;--stiff:#7FB2FF;--sh:none;--fd:'Space Grotesk',Inter,sans-serif; width:390px; height:844px; box-sizing:border-box; background:var(--bg); color:var(--tx); font-family:Inter,system-ui,sans-serif; display:flex; flex-direction:column">
+
+<header style="display:flex; justify-content:space-between; align-items:center; padding:44px 20px 0">
+<h1 style="margin:0; font-family:var(--fd); font-size:32px; line-height:38px; font-weight:700; letter-spacing:-.02em">Library</h1>
+<button type="button" aria-label="Add exercise" style="width:44px; height:44px; border-radius:22px; border:0; background:var(--ac); color:var(--onac); display:flex; align-items:center; justify-content:center">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+</button>
+</header>
+
+<main style="display:flex; flex-direction:column; gap:12px; padding:16px 20px 0">
+
+<div role="group" aria-label="Library section" style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:4px; padding:4px; border-radius:26px; background:var(--s2)">
+<button type="button" aria-pressed="false" style="height:44px; border-radius:22px; border:0; background:transparent; color:var(--tx2); font-size:14px; font-weight:600">Routines</button>
+<button type="button" aria-pressed="true" style="height:44px; border-radius:22px; border:0; background:var(--sel); color:var(--tx); font-size:14px; font-weight:600">Exercises</button>
+</div>
+
+<div style="display:flex; gap:8px">
+<label style="flex-grow:1; height:48px; border-radius:14px; background:var(--s1); box-shadow:var(--sh); display:flex; align-items:center; gap:10px; padding:0 14px; color:var(--tx2)">
+<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>
+<input type="search" aria-label="Search exercises" placeholder="Search exercises" style="flex-grow:1; min-width:0; height:44px; border:0; background:transparent; color:var(--tx); font-size:15px">
+</label>
+<button type="button" aria-label="Favorites only" aria-pressed="false" style="width:48px; height:48px; border-radius:14px; border:0; background:var(--s1); box-shadow:var(--sh); color:var(--tx2); display:flex; align-items:center; justify-content:center">
+<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l2.5 5 5.5.8-4 3.9.9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-3.9 5.5-.8z"/></svg>
+</button>
+</div>
+
+<div role="group" aria-label="Category" style="display:flex; gap:8px">
+<button type="button" aria-pressed="true" style="height:44px; padding:0 16px; border-radius:22px; border:0; background:var(--tx); color:var(--bg); font-size:14px; font-weight:600">All</button>
+<button type="button" aria-pressed="false" style="height:44px; padding:0 16px; border-radius:22px; border:0; background:var(--s1); box-shadow:var(--sh); color:var(--tx); font-size:14px; font-weight:500">Machine</button>
+<button type="button" aria-pressed="false" style="height:44px; padding:0 16px; border-radius:22px; border:0; background:var(--s1); box-shadow:var(--sh); color:var(--tx); font-size:14px; font-weight:500">Cardio</button>
+<button type="button" aria-pressed="false" style="height:44px; padding:0 16px; border-radius:22px; border:0; background:var(--s1); box-shadow:var(--sh); color:var(--tx); font-size:14px; font-weight:500">Mobility</button>
+</div>
+
+<section style="background:var(--s1); box-shadow:var(--sh); border-radius:24px; padding:0 16px; display:flex; flex-direction:column">
+<sc-for list="{{exercises}}" as="ex" hint-placeholder-count="6">
+<a href="Workout.dc.html" style="display:flex; align-items:center; gap:12px; min-height:68px; text-decoration:none; color:var(--tx); border-bottom:1px solid var(--line)">
+<span style="width:44px; height:44px; border-radius:12px; background:var(--s2); color:var(--tx2); display:flex; align-items:center; justify-content:center; font-family:var(--fd); font-size:15px; font-weight:700">{{ex.tag}}</span>
+<div style="display:flex; flex-direction:column; gap:2px; flex-grow:1">
+<span style="font-size:16px; font-weight:600">{{ex.name}}</span>
+<span style="font-size:13px; color:var(--tx2)">{{ex.meta}}</span>
+</div>
+<div style="display:flex; flex-direction:column; align-items:flex-end; gap:2px">
+<span style="font-family:var(--fd); font-size:16px; font-weight:700">{{ex.last}}</span>
+<span style="font-size:12px; color:var(--tx2)">{{ex.when}}</span>
+</div>
+</a>
+</sc-for>
+</section>
+</main>
+
+<nav aria-label="Main" style="margin-top:auto; display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); padding:8px 12px 20px; background:var(--s1); border-top:1px solid var(--line)">
+<a href="Main.dc.html" style="display:flex; flex-direction:column; align-items:center; gap:4px; padding:4px 0; text-decoration:none; color:var(--tx2); font-size:12px; font-weight:500">
+<span style="width:56px; height:30px; display:flex; align-items:center; justify-content:center"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg></span>
+Today
+</a>
+<a href="History.dc.html" style="display:flex; flex-direction:column; align-items:center; gap:4px; padding:4px 0; text-decoration:none; color:var(--tx2); font-size:12px; font-weight:500">
+<span style="width:56px; height:30px; display:flex; align-items:center; justify-content:center"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M8 3v4M16 3v4"/></svg></span>
+History
+</a>
+<a href="Progress.dc.html" style="display:flex; flex-direction:column; align-items:center; gap:4px; padding:4px 0; text-decoration:none; color:var(--tx2); font-size:12px; font-weight:500">
+<span style="width:56px; height:30px; display:flex; align-items:center; justify-content:center"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V10M12 20V4M19 20v-7"/></svg></span>
+Progress
+</a>
+<a href="Library.dc.html" aria-current="page" style="display:flex; flex-direction:column; align-items:center; gap:4px; padding:4px 0; text-decoration:none; color:var(--tx); font-size:12px; font-weight:700">
+<span style="width:56px; height:30px; border-radius:15px; background:var(--acs); color:var(--act); display:flex; align-items:center; justify-content:center"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M6 7v10M18 7v10M3 9.5v5M21 9.5v5"/></svg></span>
+Library
+</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+var exercises = [
+{ tag: 'LP', name: 'Lat pulldown', meta: 'Machine, seat 4', last: '27.5 kg', when: 'Wed' },
+{ tag: 'LE', name: 'Leg press', meta: 'Machine, seat 6', last: '30 kg', when: 'Wed' },
+{ tag: 'SR', name: 'Seated row', meta: 'Machine, chest pad 3', last: '20 kg', when: 'Wed' },
+{ tag: 'CP', name: 'Chest press', meta: 'Machine, seat 5', last: '15 kg', when: 'Mon' },
+{ tag: 'LC', name: 'Leg curl', meta: 'Machine, pad 2', last: '15 kg', when: 'Mon' },
+{ tag: 'SB', name: 'Stationary bike', meta: 'Cardio, level 4', last: '10 min', when: 'Mon' }
+];
+return { exercises: exercises };
+}
+}
+</script>
+</body>
+</html>

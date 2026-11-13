@@ -1,0 +1,131 @@
+light-390-100: system night=no, app theme=System
+TodayWithActiveWorkout: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+ActiveWorkoutPartiallyDone: root=780x1680, scroll=176..1464, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+ExerciseWithSetup: root=780x1680, scroll=48..1632, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+CheckInAfter: root=780x1680, scroll=176..1464, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+ProgressWithHistory: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+HistoryNovember: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+LibraryRoutineExpanded: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+SettingsConfigured: root=780x1680, scroll=176..1632, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+All eight screens traversed. No text extends beyond raster bounds by more than one pixel.
+
+dark-390-100: system night=yes, app theme=System
+TodayWithActiveWorkout: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+ActiveWorkoutPartiallyDone: root=780x1680, scroll=176..1464, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+ExerciseWithSetup: root=780x1680, scroll=48..1632, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+CheckInAfter: root=780x1680, scroll=176..1464, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+ProgressWithHistory: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+HistoryNovember: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+LibraryRoutineExpanded: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+SettingsConfigured: root=780x1680, scroll=176..1632, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+All eight screens traversed. No text extends beyond raster bounds by more than one pixel.
+
+forced-dark-390-100: system night=no, app theme=Dark
+TodayWithActiveWorkout: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+ActiveWorkoutPartiallyDone: root=780x1680, scroll=176..1464, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+ExerciseWithSetup: root=780x1680, scroll=48..1632, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+CheckInAfter: root=780x1680, scroll=176..1464, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+ProgressWithHistory: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+HistoryNovember: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+LibraryRoutineExpanded: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+SettingsConfigured: root=780x1680, scroll=176..1632, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+All eight screens traversed. No text extends beyond raster bounds by more than one pixel.
+
+forced-light-390-100: system night=yes, app theme=Light
+TodayWithActiveWorkout: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+ActiveWorkoutPartiallyDone: root=780x1680, scroll=176..1464, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+ExerciseWithSetup: root=780x1680, scroll=48..1632, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+CheckInAfter: root=780x1680, scroll=176..1464, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+ProgressWithHistory: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+HistoryNovember: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+LibraryRoutineExpanded: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+SettingsConfigured: root=780x1680, scroll=176..1632, decor=780x1680, systemInsets=48/48, font=1.0, widthDp=390
+All eight screens traversed. No text extends beyond raster bounds by more than one pixel.
+
+light-320-100: system night=no, app theme=System
+TodayWithActiveWorkout: root=640x1680, scroll=48..1470, decor=640x1680, systemInsets=48/48, font=1.0, widthDp=320
+ActiveWorkoutPartiallyDone: root=640x1680, scroll=176..1464, decor=640x1680, systemInsets=48/48, font=1.0, widthDp=320
+ExerciseWithSetup: root=640x1680, scroll=48..1632, decor=640x1680, systemInsets=48/48, font=1.0, widthDp=320
+CheckInAfter: root=640x1680, scroll=176..1464, decor=640x1680, systemInsets=48/48, font=1.0, widthDp=320
+ProgressWithHistory: root=640x1680, scroll=48..1470, decor=640x1680, systemInsets=48/48, font=1.0, widthDp=320
+HistoryNovember: root=640x1680, scroll=48..1470, decor=640x1680, systemInsets=48/48, font=1.0, widthDp=320
+LibraryRoutineExpanded: root=640x1680, scroll=48..1470, decor=640x1680, systemInsets=48/48, font=1.0, widthDp=320
+SettingsConfigured: root=640x1680, scroll=176..1632, decor=640x1680, systemInsets=48/48, font=1.0, widthDp=320
+All eight screens traversed. No text extends beyond raster bounds by more than one pixel.
+
+dark-320-100: system night=yes, app theme=System
+TodayWithActiveWorkout: root=640x1680, scroll=48..1470, decor=640x1680, systemInsets=48/48, font=1.0, widthDp=320
+ActiveWorkoutPartiallyDone: root=640x1680, scroll=176..1464, decor=640x1680, systemInsets=48/48, font=1.0, widthDp=320
+ExerciseWithSetup: root=640x1680, scroll=48..1632, decor=640x1680, systemInsets=48/48, font=1.0, widthDp=320
+CheckInAfter: root=640x1680, scroll=176..1464, decor=640x1680, systemInsets=48/48, font=1.0, widthDp=320
+ProgressWithHistory: root=640x1680, scroll=48..1470, decor=640x1680, systemInsets=48/48, font=1.0, widthDp=320
+HistoryNovember: root=640x1680, scroll=48..1470, decor=640x1680, systemInsets=48/48, font=1.0, widthDp=320
+LibraryRoutineExpanded: root=640x1680, scroll=48..1470, decor=640x1680, systemInsets=48/48, font=1.0, widthDp=320
+SettingsConfigured: root=640x1680, scroll=176..1632, decor=640x1680, systemInsets=48/48, font=1.0, widthDp=320
+All eight screens traversed. No text extends beyond raster bounds by more than one pixel.
+
+light-390-130: system night=no, app theme=System
+TodayWithActiveWorkout: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.3, widthDp=390
+ActiveWorkoutPartiallyDone: root=780x1680, scroll=176..1464, decor=780x1680, systemInsets=48/48, font=1.3, widthDp=390
+ExerciseWithSetup: root=780x1680, scroll=48..1632, decor=780x1680, systemInsets=48/48, font=1.3, widthDp=390
+CheckInAfter: root=780x1680, scroll=272..1464, decor=780x1680, systemInsets=48/48, font=1.3, widthDp=390
+ProgressWithHistory: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.3, widthDp=390
+HistoryNovember: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.3, widthDp=390
+LibraryRoutineExpanded: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.3, widthDp=390
+SettingsConfigured: root=780x1680, scroll=176..1632, decor=780x1680, systemInsets=48/48, font=1.3, widthDp=390
+All eight screens traversed. No text extends beyond raster bounds by more than one pixel.
+
+dark-390-130: system night=yes, app theme=System
+TodayWithActiveWorkout: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.3, widthDp=390
+ActiveWorkoutPartiallyDone: root=780x1680, scroll=176..1464, decor=780x1680, systemInsets=48/48, font=1.3, widthDp=390
+ExerciseWithSetup: root=780x1680, scroll=48..1632, decor=780x1680, systemInsets=48/48, font=1.3, widthDp=390
+CheckInAfter: root=780x1680, scroll=272..1464, decor=780x1680, systemInsets=48/48, font=1.3, widthDp=390
+ProgressWithHistory: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.3, widthDp=390
+HistoryNovember: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.3, widthDp=390
+LibraryRoutineExpanded: root=780x1680, scroll=48..1470, decor=780x1680, systemInsets=48/48, font=1.3, widthDp=390
+SettingsConfigured: root=780x1680, scroll=176..1632, decor=780x1680, systemInsets=48/48, font=1.3, widthDp=390
+All eight screens traversed. No text extends beyond raster bounds by more than one pixel.
+
+light-390-200: system night=no, app theme=System
+TodayWithActiveWorkout: root=780x1680, scroll=48..1429, decor=780x1680, systemInsets=48/48, font=2.0, widthDp=390
+ActiveWorkoutPartiallyDone: root=780x1680, scroll=272..1464, decor=780x1680, systemInsets=48/48, font=2.0, widthDp=390
+ExerciseWithSetup: root=780x1680, scroll=48..1632, decor=780x1680, systemInsets=48/48, font=2.0, widthDp=390
+CheckInAfter: root=780x1680, scroll=272..1464, decor=780x1680, systemInsets=48/48, font=2.0, widthDp=390
+ProgressWithHistory: root=780x1680, scroll=48..1429, decor=780x1680, systemInsets=48/48, font=2.0, widthDp=390
+HistoryNovember: root=780x1680, scroll=48..1429, decor=780x1680, systemInsets=48/48, font=2.0, widthDp=390
+LibraryRoutineExpanded: root=780x1680, scroll=48..1429, decor=780x1680, systemInsets=48/48, font=2.0, widthDp=390
+SettingsConfigured: root=780x1680, scroll=272..1632, decor=780x1680, systemInsets=48/48, font=2.0, widthDp=390
+All eight screens traversed. No text extends beyond raster bounds by more than one pixel.
+
+dark-390-200: system night=yes, app theme=System
+TodayWithActiveWorkout: root=780x1680, scroll=48..1429, decor=780x1680, systemInsets=48/48, font=2.0, widthDp=390
+ActiveWorkoutPartiallyDone: root=780x1680, scroll=272..1464, decor=780x1680, systemInsets=48/48, font=2.0, widthDp=390
+ExerciseWithSetup: root=780x1680, scroll=48..1632, decor=780x1680, systemInsets=48/48, font=2.0, widthDp=390
+CheckInAfter: root=780x1680, scroll=272..1464, decor=780x1680, systemInsets=48/48, font=2.0, widthDp=390
+ProgressWithHistory: root=780x1680, scroll=48..1429, decor=780x1680, systemInsets=48/48, font=2.0, widthDp=390
+HistoryNovember: root=780x1680, scroll=48..1429, decor=780x1680, systemInsets=48/48, font=2.0, widthDp=390
+LibraryRoutineExpanded: root=780x1680, scroll=48..1429, decor=780x1680, systemInsets=48/48, font=2.0, widthDp=390
+SettingsConfigured: root=780x1680, scroll=272..1632, decor=780x1680, systemInsets=48/48, font=2.0, widthDp=390
+All eight screens traversed. No text extends beyond raster bounds by more than one pixel.
+
+light-320-200: system night=no, app theme=System
+TodayWithActiveWorkout: root=640x1680, scroll=48..1429, decor=640x1680, systemInsets=48/48, font=2.0, widthDp=320
+ActiveWorkoutPartiallyDone: root=640x1680, scroll=345..1464, decor=640x1680, systemInsets=48/48, font=2.0, widthDp=320
+ExerciseWithSetup: root=640x1680, scroll=48..1632, decor=640x1680, systemInsets=48/48, font=2.0, widthDp=320
+CheckInAfter: root=640x1680, scroll=272..1464, decor=640x1680, systemInsets=48/48, font=2.0, widthDp=320
+ProgressWithHistory: root=640x1680, scroll=48..1429, decor=640x1680, systemInsets=48/48, font=2.0, widthDp=320
+HistoryNovember: root=640x1680, scroll=48..1429, decor=640x1680, systemInsets=48/48, font=2.0, widthDp=320
+LibraryRoutineExpanded: root=640x1680, scroll=48..1429, decor=640x1680, systemInsets=48/48, font=2.0, widthDp=320
+SettingsConfigured: root=640x1680, scroll=272..1632, decor=640x1680, systemInsets=48/48, font=2.0, widthDp=320
+All eight screens traversed. No text extends beyond raster bounds by more than one pixel.
+
+dark-320-200: system night=yes, app theme=System
+TodayWithActiveWorkout: root=640x1680, scroll=48..1429, decor=640x1680, systemInsets=48/48, font=2.0, widthDp=320
+ActiveWorkoutPartiallyDone: root=640x1680, scroll=345..1464, decor=640x1680, systemInsets=48/48, font=2.0, widthDp=320
+ExerciseWithSetup: root=640x1680, scroll=48..1632, decor=640x1680, systemInsets=48/48, font=2.0, widthDp=320
+CheckInAfter: root=640x1680, scroll=272..1464, decor=640x1680, systemInsets=48/48, font=2.0, widthDp=320
+ProgressWithHistory: root=640x1680, scroll=48..1429, decor=640x1680, systemInsets=48/48, font=2.0, widthDp=320
+HistoryNovember: root=640x1680, scroll=48..1429, decor=640x1680, systemInsets=48/48, font=2.0, widthDp=320
+LibraryRoutineExpanded: root=640x1680, scroll=48..1429, decor=640x1680, systemInsets=48/48, font=2.0, widthDp=320
+SettingsConfigured: root=640x1680, scroll=272..1632, decor=640x1680, systemInsets=48/48, font=2.0, widthDp=320
+All eight screens traversed. No text extends beyond raster bounds by more than one pixel.

@@ -1,0 +1,120 @@
+{
+  "unitTests": [
+    {
+      "name": "com.emmah.inshape.data.ExerciseLibraryTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0"
+    },
+    {
+      "name": "com.emmah.inshape.data.JournalDateRulesTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0"
+    },
+    {
+      "name": "com.emmah.inshape.data.JournalRepositoryTest",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0"
+    },
+    {
+      "name": "com.emmah.inshape.data.NumericInputTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0"
+    },
+    {
+      "name": "com.emmah.inshape.data.RecordedTimingTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0"
+    },
+    {
+      "name": "com.emmah.inshape.feature.progress.ProgressCalculatorTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0"
+    },
+    {
+      "name": "com.emmah.inshape.health.HealthContextTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0"
+    },
+    {
+      "name": "com.emmah.inshape.health.HealthSharingTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0"
+    },
+    {
+      "name": "com.emmah.inshape.reminders.ReminderSchedulerTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0"
+    },
+    {
+      "name": "com.emmah.inshape.SaveRecoveryTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0"
+    },
+    {
+      "name": "com.emmah.inshape.SystemLocalClockTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0"
+    },
+    {
+      "name": "com.emmah.inshape.transfer.BackupRestoreTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0"
+    },
+    {
+      "name": "com.emmah.inshape.transfer.ExportTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0"
+    },
+    {
+      "name": "com.emmah.inshape.widget.WidgetStateTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0"
+    }
+  ],
+  "api26": {
+    "frontAndBackKeepAnatomicalRightKnee": 0,
+    "createExerciseRecordDecimalSetFinishWithinMinuteAndRepeatWithoutCountingTargets": 0,
+    "aDeniedHealthPermissionLeavesLocalJournalUsable": -4,
+    "bRealProviderStoresUpdatesAndDeletesOneIdentity": -4,
+    "launcherPlacesWidgetAndBothActionsResumeTheSameSession": 0,
+    "mainTabsAndSettingsRemainReachable": 0,
+    "allEightReferenceScreensScrollWithoutTextClipping": 0,
+    "deliveredNotificationSurvivesRescheduleAndDisabledReminderRemovesIt": 0,
+    "databaseRejectsSecondActiveButAllowsPastDraft": 0,
+    "committedSessionAndDraftSurviveFileDatabaseReopen": 0,
+    "importedBytesSurviveSourceDeletionAndInvalidReplacement": 0,
+    "multipageUnicodePdfAndCsvCanBeReadThroughNormalContentUris": 0,
+    "restoreToDifferentStoragePreservesPhotosDraftsAndHoldsWithoutTransferringBackupDate": 0,
+    "archiveFromAnotherInstallationRestoresOriginalPhotoBytesAndDrafts": 0,
+    "transactionFailureLeavesOriginalJournalAndAllowsFreshValidationRetry": 0
+  },
+  "api36_integration": {
+    "archiveFromAnotherInstallationRestoresOriginalPhotoBytesAndDrafts": 0,
+    "bRealProviderStoresUpdatesAndDeletesOneIdentity": 0
+  },
+  "api36_platform": {
+    "aDeniedHealthPermissionLeavesLocalJournalUsable": 0,
+    "allEightReferenceScreensScrollWithoutTextClipping": 0,
+    "createExerciseRecordDecimalSetFinishWithinMinuteAndRepeatWithoutCountingTargets": 0,
+    "deliveredNotificationSurvivesRescheduleAndDisabledReminderRemovesIt": 0,
+    "multipageUnicodePdfAndCsvCanBeReadThroughNormalContentUris": 0
+  },
+  "api36_final_insets": {
+    "mainTabsAndSettingsRemainReachable": 0,
+    "allEightReferenceScreensScrollWithoutTextClipping": 0
+  }
+}

@@ -86,20 +86,6 @@
       "findingSelectors": [
         "Activity exported, targetSdk<29 and launchMode != singleInstance or taskAffinity is not empty"
       ]
-    },
-    {
-      "id": "inshape-validated-backup-path",
-      "tool": "codeql",
-      "rule": "java/zipslip",
-      "scope": "app/src/main/java/com/emmah/inshape/transfer/BackupArchive.kt",
-      "reason": "False positive: readManifest permits only three fixed metadata names or a photos/UUID.extension allowlist; every ZIP entry must be declared there. readEntry additionally requires the canonical file path to start with the canonical staging path plus the platform separator before any write. BackupRestoreTest verifies both undeclared traversal and malicious paths declared in the manifest are rejected before writing.",
-      "owner": "InShape maintainers",
-      "added": "2026-11-14",
-      "expires": "2027-11-14",
-      "tracking": "Android script setup: CodeQL review and BackupRestoreTest",
-      "sourcePath": "app/src/main/java/com/emmah/inshape/transfer/BackupArchive.kt",
-      "selector": "require(file.path.startsWith(directory.canonicalPath + File.separator))",
-      "findingPath": "app/src/main/java/com/emmah/inshape/transfer/BackupArchive.kt"
     }
   ]
 }

@@ -250,10 +250,12 @@ object BackupArchive {
     private fun readEntry(zip: ZipInputStream, directory: File, name: String, declared: BackupEntry) {
         val stagingRoot = directory.canonicalFile.toPath()
         val destination = File(directory, name).canonicalFile.toPath()
-        if (!destination.startsWith(stagingRoot) || destination == stagingRoot) {
-            throw IllegalArgumentException("Unsafe backup path")
+        val file = if (destination.startsWith(stagingRoot) && destination != stagingRoot) {
+            destination.toFile()
+        } else {
+            null
         }
-        val file = destination.toFile()
+        requireNotNull(file) { "Unsafe backup path" }
         check(file.parentFile!!.isDirectory || file.parentFile!!.mkdirs())
         val hash = digest()
         var written = 0L

@@ -2,7 +2,7 @@ package com.emmah.inshape.ui.theme
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -21,9 +21,13 @@ class ThemeSettingsTest {
             assertEquals(mode, ThemeSettings(context).mode.value)
         }
     }
+
     @Test fun unknownStoredChoiceUsesSystem() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        context.getSharedPreferences("ui_settings", Context.MODE_PRIVATE).edit().putString("theme_mode", "unknown").commit()
+        context.getSharedPreferences(
+            "ui_settings",
+            Context.MODE_PRIVATE
+        ).edit().putString("theme_mode", "unknown").commit()
         assertEquals(ThemeMode.System, ThemeSettings(context).mode.value)
     }
 }

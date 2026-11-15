@@ -2,7 +2,8 @@ package com.emmah.inshape
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.emmah.inshape.feature.checkin.bodyRegionAt
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 

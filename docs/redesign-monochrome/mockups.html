@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InShape monochrome mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=block" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=block" rel="stylesheet">
+<style>
+:root{
+  --bg:#FFFFFF;--surface:#F4F4F4;--surface2:#EBEBEB;--line:#E3E3E3;--strong:#0B0B0B;
+  --text:#0B0B0B;--text2:#5E5E5E;--text3:#8E8E8E;--ink:#0B0B0B;--onink:#FFFFFF;--error:#B3261E;
+  --scrim:rgba(11,11,11,.32);
+}
+.dark{
+  --bg:#0B0B0B;--surface:#1A1A1A;--surface2:#242424;--line:#2A2A2A;--strong:#F5F5F5;
+  --text:#F5F5F5;--text2:#A3A3A3;--text3:#6F6F6F;--ink:#F5F5F5;--onink:#0B0B0B;--error:#F2B8B5;
+  --scrim:rgba(0,0,0,.6);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#D9D9D9;font-family:Inter,system-ui,sans-serif;font-feature-settings:"tnum" 1,"cv11" 1;-webkit-font-smoothing:antialiased;padding:32px;display:flex;flex-wrap:wrap;gap:32px}
+body.single{padding:0;background:transparent;display:block}
+.ms{font-family:'Material Symbols Outlined';font-size:24px;line-height:1;font-weight:400;font-style:normal;display:inline-block;-webkit-font-feature-settings:'liga';font-feature-settings:'liga'}
+figure{display:flex;flex-direction:column;gap:12px}
+figcaption{font-size:14px;color:#333;font-weight:500}
+body.single figcaption{display:none}
+.screen{width:360px;height:760px;background:var(--bg);color:var(--text);position:relative;overflow:hidden;display:flex;flex-direction:column}
+.status{height:32px;padding:0 20px;display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:500;color:var(--text)}
+.content{padding:0 20px;display:flex;flex-direction:column;flex:1;min-height:0}
+.bar{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 8px 0 4px}
+.iconbtn{width:48px;height:48px;display:flex;align-items:center;justify-content:center;color:var(--text)}
+.t-display{font-size:56px;line-height:60px;font-weight:500;letter-spacing:-.03em}
+.t-display-s{font-size:40px;line-height:44px;font-weight:500;letter-spacing:-.03em}
+.t-headline{font-size:28px;line-height:34px;font-weight:600;letter-spacing:-.02em}
+.t-title{font-size:20px;line-height:26px;font-weight:600;letter-spacing:-.01em}
+.t-title-s{font-size:16px;line-height:22px;font-weight:600}
+.t-body{font-size:15px;line-height:22px}
+.t-body-s{font-size:13px;line-height:18px}
+.t-label{font-size:12px;line-height:16px;font-weight:500;letter-spacing:.01em}
+.c2{color:var(--text2)}.c3{color:var(--text3)}
+.btn{height:56px;border-radius:14px;background:var(--ink);color:var(--onink);display:flex;align-items:center;justify-content:center;gap:8px;font-size:15px;font-weight:600}
+.btn .ms{font-size:20px}
+.btn-o{height:40px;border-radius:12px;border:1px solid var(--strong);display:flex;align-items:center;justify-content:center;padding:0 16px;font-size:14px;font-weight:600}
+.link{font-size:15px;font-weight:600;color:var(--text)}
+.row{display:flex;align-items:center;justify-content:space-between}
+.list .item{min-height:52px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding:14px 0;gap:12px}
+.list .item:last-child{border-bottom:none}
+.card{border:1px solid var(--strong);border-radius:20px;padding:20px}
+.inset{background:var(--surface);border-radius:12px;padding:12px 14px}
+.seg{display:flex;background:var(--surface);border-radius:12px;padding:4px;height:44px}
+.seg span{flex:1;display:flex;align-items:center;justify-content:center;border-radius:9px;font-size:14px;font-weight:500;color:var(--text2)}
+.seg span.on{background:var(--ink);color:var(--onink);font-weight:600}
+.nav{height:72px;border-top:1px solid var(--line);display:flex;justify-content:space-around;align-items:center;margin-top:auto;background:var(--bg)}
+.nav div{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:var(--text3);width:96px}
+.nav div.on{color:var(--text);font-weight:600}
+.dots{display:flex;justify-content:space-between}
+.dot{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:var(--text3);width:36px}
+.dot i{width:32px;height:32px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;font-style:normal}
+.dot.done i{background:var(--ink);color:var(--onink)}
+.dot.today{color:var(--text);font-weight:600}
+.dot.today i{background:var(--bg);box-shadow:inset 0 0 0 2px var(--strong)}
+.segbar{display:flex;gap:4px}
+.segbar b{flex:1;height:4px;border-radius:2px;background:var(--surface2)}
+.segbar b.d{background:var(--ink)}
+.segbar b.c{background:var(--text3)}
+.sets{display:grid;grid-template-columns:28px 1fr 1fr 48px;gap:8px;align-items:center}
+.cell{height:52px;border-radius:12px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600}
+.cell.cur{background:var(--bg);box-shadow:inset 0 0 0 1.5px var(--strong)}
+.chk{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;justify-self:center}
+.chk.d{background:var(--ink);color:var(--onink)}
+.chk.e{box-shadow:inset 0 0 0 1.5px var(--line);color:var(--text3)}
+.metric{background:var(--surface);border-radius:12px;padding:14px}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--bg);border-radius:20px 20px 0 0;padding:12px 20px 24px}
+.grab{width:32px;height:4px;border-radius:2px;background:var(--surface2);margin:0 auto 16px}
+.scrim{position:absolute;inset:0;background:var(--scrim)}
+.menu{position:absolute;right:20px;background:var(--bg);border-radius:14px;box-shadow:0 0 0 1px var(--line),0 12px 32px rgba(0,0,0,.14);padding:6px 0;width:220px}
+.menu div{height:48px;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:15px}
+.menu .sep{height:1px;background:var(--line);padding:0;margin:6px 0}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);row-gap:4px;text-align:center}
+.cal span{width:36px;height:36px;margin:0 auto;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px}
+.cal .h{font-size:12px;color:var(--text3);height:24px}
+.cal .w{background:var(--ink);color:var(--onink);font-weight:600}
+.cal .t{box-shadow:inset 0 0 0 1.5px var(--strong);font-weight:600}
+.switch{width:44px;height:26px;border-radius:13px;background:var(--ink);position:relative}
+.switch:after{content:"";position:absolute;right:3px;top:3px;width:20px;height:20px;border-radius:50%;background:var(--onink)}
+.switch.off{background:var(--surface2)}
+.switch.off:after{left:3px;right:auto;background:var(--bg)}
+.chip{height:32px;padding:0 12px;border-radius:8px;background:var(--surface);display:inline-flex;align-items:center;font-size:13px;font-weight:500}
+.sec{font-size:12px;line-height:16px;font-weight:500;color:var(--text2);margin:32px 0 4px}
+</style>
+</head>
+<body>
+
+<!-- 01 Today, no active workout -->
+<figure id="01-today"><figcaption>01 Today</figcaption>
+<div class="screen">
+  <div class="status"><span>9:41</span><span class="ms" style="font-size:16px">battery_full</span></div>
+  <div class="content">
+    <div class="row" style="margin-top:16px">
+      <div><div class="t-label c2">Friday 13 November</div><div class="t-headline" style="margin-top:4px">Hi Emma</div></div>
+      <span class="iconbtn ms">settings</span>
+    </div>
+    <div class="card" style="margin-top:24px">
+      <div class="t-label c2">Next up</div>
+      <div class="t-title" style="margin-top:6px">Full body A</div>
+      <div class="t-body-s c2" style="margin-top:4px">7 exercises, last time 52 min</div>
+      <div class="btn" style="margin-top:20px"><span class="ms">play_arrow</span>Start workout</div>
+    </div>
+    <div class="row" style="margin-top:12px;justify-content:center"><span class="link" style="font-size:14px">Start empty workout</span></div>
+    <div class="row" style="margin-top:28px"><span class="t-title-s">This week</span><span class="t-body-s c2">2 of 3</span></div>
+    <div class="dots" style="margin-top:14px">
+      <div class="dot done"><i><span class="ms" style="font-size:18px">check</span></i>Mon</div>
+      <div class="dot"><i></i>Tue</div>
+      <div class="dot done"><i><span class="ms" style="font-size:18px">check</span></i>Wed</div>
+      <div class="dot"><i></i>Thu</div>
+      <div class="dot today"><i></i>Fri</div>
+      <div class="dot"><i></i>Sat</div>
+      <div class="dot"><i></i>Sun</div>
+    </div>
+    <div class="row" style="margin-top:32px"><span class="t-title-s">Routines</span><span class="t-body-s" style="font-weight:600">See all</span></div>
+    <div class="list" style="margin-top:4px">
+      <div class="item"><span class="t-body">Mobility at home</span><span class="t-body-s c2">6 exercises</span></div>
+      <div class="item"><span class="t-body">Short 20 min</span><span class="t-body-s c2">4 exercises</span></div>
+    </div>
+  </div>
+  <div class="nav"><div class="on"><span class="ms">home</span>Today</div><div><span class="ms">calendar_month</span>History</div><div><span class="ms">fitness_center</span>Library</div></div>
+</div></figure>
+
+<!-- 02 Today, workout running -->
+<figure id="02-today-active"><figcaption>02 Today, workout running</figcaption>
+<div class="screen">
+  <div class="status"><span>11:14</span><span class="ms" style="font-size:16px">battery_full</span></div>
+  <div class="content">
+    <div class="row" style="margin-top:16px">
+      <div><div class="t-label c2">Friday 13 November</div><div class="t-headline" style="margin-top:4px">Hi Emma</div></div>
+      <span class="iconbtn ms">settings</span>
+    </div>
+    <div class="card" style="margin-top:24px;background:var(--ink);color:var(--onink);border-color:var(--ink)">
+      <div class="row"><span class="t-label" style="opacity:.72">In progress</span><span class="t-label" style="opacity:.72">Started 10:42</span></div>
+      <div class="t-title" style="margin-top:6px">Full body A</div>
+      <div class="t-display-s" style="margin-top:12px">32:15</div>
+      <div class="segbar" style="margin-top:16px"><b style="background:var(--onink)"></b><b style="background:var(--onink)"></b><b style="background:var(--onink)"></b><b style="background:var(--onink)"></b><b style="background:rgba(127,127,127,.5)"></b><b style="background:rgba(127,127,127,.35)"></b><b style="background:rgba(127,127,127,.35)"></b><b style="background:rgba(127,127,127,.35)"></b></div>
+      <div class="t-body-s" style="margin-top:8px;opacity:.72">4 of 8 exercises done</div>
+      <div class="btn" style="margin-top:20px;background:var(--onink);color:var(--ink)">Resume workout</div>
+    </div>
+    <div class="row" style="margin-top:32px"><span class="t-title-s">This week</span><span class="t-body-s c2">2 of 3</span></div>
+    <div class="dots" style="margin-top:14px">
+      <div class="dot done"><i><span class="ms" style="font-size:18px">check</span></i>Mon</div>
+      <div class="dot"><i></i>Tue</div>
+      <div class="dot done"><i><span class="ms" style="font-size:18px">check</span></i>Wed</div>
+      <div class="dot"><i></i>Thu</div>
+      <div class="dot today"><i></i>Fri</div>
+      <div class="dot"><i></i>Sat</div>
+      <div class="dot"><i></i>Sun</div>
+    </div>
+  </div>
+  <div class="nav"><div class="on"><span class="ms">home</span>Today</div><div><span class="ms">calendar_month</span>History</div><div><span class="ms">fitness_center</span>Library</div></div>
+</div></figure>
+
+<!-- 03 Workout in progress -->
+<figure id="03-workout"><figcaption>03 Workout in progress</figcaption>
+<div class="screen">
+  <div class="status"><span>11:14</span><span class="ms" style="font-size:16px">battery_full</span></div>
+  <div class="bar"><span class="iconbtn ms">arrow_back</span><div style="display:flex;align-items:center;gap:4px"><span class="btn-o">Finish</span><span class="iconbtn ms">more_vert</span></div></div>
+  <div class="content">
+    <div style="text-align:center;margin-top:4px">
+      <div class="t-body-s c2">Full body A</div>
+      <div class="t-display" style="margin-top:2px">32:15</div>
+      <div class="t-label c2" style="margin-top:2px">Started 10:42</div>
+    </div>
+    <div class="segbar" style="margin-top:20px"><b class="d"></b><b class="d"></b><b class="d"></b><b class="d"></b><b class="c"></b><b></b><b></b><b></b></div>
+    <div class="t-label c2" style="margin-top:8px">Exercise 5 of 8</div>
+    <div class="row" style="margin-top:20px"><span class="t-title">Lat pulldown</span><span class="ms c2" style="margin-right:-4px">more_vert</span></div>
+    <div class="t-body-s c2" style="margin-top:4px">Seat height 4, thigh pad 2, wide bar</div>
+    <div class="inset" style="margin-top:12px">
+      <div class="t-label c2">Last time, Wed 11 Nov</div>
+      <div class="t-body" style="font-weight:600;margin-top:2px">3 sets, 10 reps, 25 kg</div>
+      <div class="t-body-s c2" style="margin-top:4px">Keep shoulders down.</div>
+    </div>
+    <div class="sets t-label c3" style="margin-top:16px;height:16px"><span>Set</span><span style="text-align:center">kg</span><span style="text-align:center">Reps</span><span></span></div>
+    <div class="sets" style="margin-top:8px"><span class="t-body c2" style="text-align:center">1</span><div class="cell">27.5</div><div class="cell">10</div><div class="chk d"><span class="ms" style="font-size:22px">check</span></div></div>
+    <div class="sets" style="margin-top:8px"><span class="t-body c2" style="text-align:center">2</span><div class="cell">27.5</div><div class="cell">9</div><div class="chk d"><span class="ms" style="font-size:22px">check</span></div></div>
+    <div class="sets" style="margin-top:8px"><span class="t-body c2" style="text-align:center">3</span><div class="cell cur">27.5</div><div class="cell cur">10</div><div class="chk e"><span class="ms" style="font-size:22px">check</span></div></div>
+    <div class="row" style="margin-top:14px;justify-content:flex-start;gap:6px"><span class="ms" style="font-size:20px">add</span><span class="link" style="font-size:14px">Add set</span></div>
+    <div class="btn" style="margin-top:auto;margin-bottom:16px">Exercise done</div>
+  </div>
+</div></figure>
+
+<!-- 04 Workout menus -->
+<figure id="04-workout-menus"><figcaption>04 Exercise menu (the old buttons live here)</figcaption>
+<div class="screen">
+  <div class="status"><span>11:14</span><span class="ms" style="font-size:16px">battery_full</span></div>
+  <div class="bar"><span class="iconbtn ms">arrow_back</span><div style="display:flex;align-items:center;gap:4px"><span class="btn-o">Finish</span><span class="iconbtn ms">more_vert</span></div></div>
+  <div class="content">
+    <div style="text-align:center;margin-top:4px">
+      <div class="t-body-s c2">Full body A</div>
+      <div class="t-display" style="margin-top:2px">32:15</div>
+      <div class="t-label c2" style="margin-top:2px">Started 10:42</div>
+    </div>
+    <div class="segbar" style="margin-top:20px"><b class="d"></b><b class="d"></b><b class="d"></b><b class="d"></b><b class="c"></b><b></b><b></b><b></b></div>
+    <div class="row" style="margin-top:44px"><span class="t-title">Lat pulldown</span><span class="ms c2">more_vert</span></div>
+  </div>
+  <div class="scrim"></div>
+  <div class="menu" style="top:318px">
+    <div><span class="ms c2">info</span>Exercise details</div>
+    <div><span class="ms c2">edit_note</span>Add note</div>
+    <div><span class="ms c2">swap_horiz</span>Swap exercise</div>
+    <div><span class="ms c2">schedule</span>Do later</div>
+    <div><span class="ms c2">skip_next</span>Skip today</div>
+    <div class="sep"></div>
+    <div><span class="ms c2">arrow_upward</span>Move up</div>
+    <div><span class="ms c2">arrow_downward</span>Move down</div>
+    <div style="color:var(--error)"><span class="ms">delete</span>Remove exercise</div>
+  </div>
+  <div class="menu" style="top:88px;width:230px">
+    <div><span class="ms c2">add</span>Add exercise</div>
+    <div><span class="ms c2">wb_twilight</span>Before check-in</div>
+    <div><span class="ms c2">save</span>Save changes to routine</div>
+    <div class="sep"></div>
+    <div style="color:var(--error)"><span class="ms">delete</span>Discard workout</div>
+  </div>
+</div></figure>
+
+<!-- 05 Lock screen and widget -->
+<figure id="05-lockscreen-widget"><figcaption>05 Lock screen notification and widget</figcaption>
+<div class="screen dark" style="background:#111">
+  <div class="status" style="color:#fff"><span></span><span class="ms" style="font-size:16px">battery_full</span></div>
+  <div style="text-align:center;margin-top:36px;color:#fff"><div style="font-size:72px;line-height:76px;font-weight:400;letter-spacing:-.03em">11:14</div><div class="t-body-s" style="color:#A3A3A3;margin-top:4px">Friday 13 November</div></div>
+  <div style="margin:40px 16px 0;background:#1F1F1F;border-radius:20px;padding:16px;color:#fff">
+    <div class="row"><span class="t-label" style="color:#A3A3A3;display:flex;align-items:center;gap:6px"><span class="ms" style="font-size:16px">fitness_center</span>InShape</span><span class="t-label" style="color:#A3A3A3">32:15</span></div>
+    <div class="t-title-s" style="margin-top:10px">Workout in progress</div>
+    <div class="t-body-s" style="color:#A3A3A3;margin-top:2px">Full body A, started 10:42</div>
+    <div class="row" style="margin-top:14px;gap:8px"><div class="btn-o" style="flex:1;border-color:#5E5E5E">Open</div><div class="btn-o" style="flex:1;background:#F5F5F5;color:#0B0B0B;border-color:#F5F5F5">Finish</div></div>
+  </div>
+  <div style="margin:32px 16px 0;color:#A3A3A3" class="t-label">Home screen widget, light and dark</div>
+  <div style="margin:10px 16px 0;background:#FFFFFF;color:#0B0B0B;border-radius:20px;padding:16px">
+    <div class="row"><span class="t-label" style="color:#5E5E5E">In progress</span><span class="t-label" style="color:#5E5E5E">Started 10:42</span></div>
+    <div class="row" style="margin-top:6px"><span class="t-title-s">Full body A</span><span style="font-size:28px;line-height:32px;font-weight:500;letter-spacing:-.02em">32:15</span></div>
+  </div>
+  <div style="margin:10px 16px 0;background:#1F1F1F;color:#F5F5F5;border-radius:20px;padding:16px">
+    <div class="row"><span class="t-label" style="color:#A3A3A3">This week</span><span class="t-label" style="color:#A3A3A3">2 of 3</span></div>
+    <div class="row" style="margin-top:10px"><span class="t-title-s">No workout running</span><span class="btn-o" style="background:#F5F5F5;color:#0B0B0B;border-color:#F5F5F5;height:36px">Start</span></div>
+  </div>
+</div></figure>
+
+<!-- 06 Finish summary -->
+<figure id="06-finish"><figcaption>06 Finish summary</figcaption>
+<div class="screen">
+  <div class="status"><span>11:15</span><span class="ms" style="font-size:16px">battery_full</span></div>
+  <div class="bar"><span class="iconbtn ms">arrow_back</span></div>
+  <div class="content">
+    <div style="width:48px;height:48px;border-radius:50%;background:var(--ink);color:var(--onink);display:flex;align-items:center;justify-content:center;margin-top:8px"><span class="ms">check</span></div>
+    <div class="t-headline" style="margin-top:16px">Workout done</div>
+    <div class="t-body-s c2" style="margin-top:4px">Full body A, Friday 13 November</div>
+    <div style="margin-top:24px;display:flex;align-items:baseline;gap:6px"><span class="t-display">33</span><span class="t-title">min</span></div>
+    <div class="t-body-s c2" style="margin-top:2px">10:42 to 11:15</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:24px">
+      <div class="metric"><div class="t-title">5</div><div class="t-label c2" style="margin-top:2px">exercises</div></div>
+      <div class="metric"><div class="t-title">14</div><div class="t-label c2" style="margin-top:2px">sets</div></div>
+    </div>
+    <div class="list" style="margin-top:16px">
+      <div class="item"><span class="t-body">Fix time</span><span class="ms c3">chevron_right</span></div>
+      <div class="item"><span class="t-body">Add note</span><span class="ms c3">chevron_right</span></div>
+      <div class="item"><span class="t-body">Share to Google Health</span><span class="t-body-s c2">On</span></div>
+    </div>
+    <div class="btn" style="margin-top:auto;margin-bottom:16px">Save workout</div>
+  </div>
+</div></figure>
+
+<!-- 07 Fix time sheet -->
+<figure id="07-fix-time"><figcaption>07 Fix time (bottom sheet)</figcaption>
+<div class="screen">
+  <div class="status"><span>11:15</span><span class="ms" style="font-size:16px">battery_full</span></div>
+  <div class="bar"><span class="iconbtn ms">arrow_back</span></div>
+  <div class="content">
+    <div class="t-headline" style="margin-top:72px">Workout done</div>
+    <div style="margin-top:24px;display:flex;align-items:baseline;gap:6px"><span class="t-display">33</span><span class="t-title">min</span></div>
+  </div>
+  <div class="scrim"></div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <div class="t-title">Fix time</div>
+    <div class="t-body-s c2" style="margin-top:4px">Change when you started or finished.</div>
+    <div class="list" style="margin-top:12px">
+      <div class="item"><span class="t-body">Started</span><span class="t-body" style="font-weight:600">10:42</span></div>
+      <div class="item"><span class="t-body">Finished</span><span class="t-body" style="font-weight:600">11:15</span></div>
+      <div class="item"><span class="t-body">Duration</span><span class="t-body c2">33 min</span></div>
+    </div>
+    <div class="row" style="margin-top:8px;justify-content:flex-start"><span class="t-body-s" style="font-weight:600">I don't know the times</span></div>
+    <div class="btn" style="margin-top:20px">Done</div>
+  </div>
+</div></figure>
+
+<!-- 08 Check-in after -->
+<figure id="08-check-in"><figcaption>08 Check-in after the workout</figcaption>
+<div class="screen">
+  <div class="status"><span>11:16</span><span class="ms" style="font-size:16px">battery_full</span></div>
+  <div class="bar"><span class="iconbtn ms">close</span><span class="link" style="padding-right:12px">Skip</span></div>
+  <div class="content">
+    <div class="t-headline">How did it feel?</div>
+    <div class="seg" style="margin-top:16px"><span>Easy</span><span class="on">Just right</span><span>Hard</span></div>
+    <div class="t-title-s" style="margin-top:28px">Any pain or stiffness?</div>
+    <div class="seg" style="margin-top:10px"><span>No</span><span class="on">Yes</span></div>
+    <div style="display:flex;gap:20px;margin-top:16px;align-items:center">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+        <svg width="62" height="130" viewBox="0 0 84 176" aria-hidden="true">
+          <circle cx="42" cy="14" r="12" fill="var(--surface2)"/>
+          <rect x="24" y="30" width="36" height="58" rx="10" fill="var(--surface2)"/>
+          <rect x="9" y="33" width="11" height="54" rx="5.5" fill="var(--surface2)"/>
+          <rect x="64" y="33" width="11" height="54" rx="5.5" fill="var(--surface2)"/>
+          <rect x="26" y="92" width="15" height="80" rx="7" fill="var(--surface2)"/>
+          <rect x="43" y="92" width="15" height="80" rx="7" fill="var(--surface2)"/>
+          <circle cx="33.5" cy="132" r="7" fill="var(--ink)"/>
+        </svg>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:10px">
+        <div class="seg" style="height:36px;padding:3px"><span class="on" style="font-size:13px">Front</span><span style="font-size:13px">Back</span></div>
+        <div class="t-body-s c2">Tap the body to add an area. A filled dot means pain, a ring means stiffness only.</div>
+      </div>
+    </div>
+    <div style="border:1px solid var(--strong);border-radius:12px;padding:12px 14px;margin-top:14px">
+      <div class="row"><span class="t-title-s">Left knee</span><span class="ms c3" style="font-size:20px">close</span></div>
+      <div class="row" style="margin-top:10px"><span class="t-body-s c2" style="width:64px">Pain</span>
+        <div class="seg" style="height:32px;padding:2px;flex:1"><span style="font-size:12px">None</span><span class="on" style="font-size:12px">Mild</span><span style="font-size:12px">Medium</span><span style="font-size:12px">Strong</span></div></div>
+      <div class="row" style="margin-top:8px"><span class="t-body-s c2" style="width:64px">Stiffness</span>
+        <div class="seg" style="height:32px;padding:2px;flex:1"><span class="on" style="font-size:12px">None</span><span style="font-size:12px">Mild</span><span style="font-size:12px">Medium</span><span style="font-size:12px">Strong</span></div></div>
+    </div>
+    <div style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:8px">
+      <div class="row"><span class="t-title-s">Lower back</span><span class="t-body-s c2">Stiffness, mild</span></div>
+    </div>
+    <div class="row" style="margin-top:16px;justify-content:flex-start;gap:6px"><span class="ms" style="font-size:20px">add</span><span class="link" style="font-size:14px">Add energy and notes</span></div>
+    <div class="btn" style="margin-top:auto;margin-bottom:16px">Save</div>
+  </div>
+</div></figure>
+
+<!-- 09 History calendar -->
+<figure id="09-history"><figcaption>09 History, calendar view</figcaption>
+<div class="screen">
+  <div class="status"><span>9:41</span><span class="ms" style="font-size:16px">battery_full</span></div>
+  <div class="content">
+    <div class="row" style="margin-top:16px"><span class="t-headline">History</span><span class="btn-o" style="height:36px;padding:0 12px;font-size:13px"><span class="ms" style="font-size:18px;margin-right:4px">add</span>Past workout</span></div>
+    <div class="seg" style="margin-top:16px"><span class="on">Calendar</span><span>Progress</span></div>
+    <div class="row" style="margin-top:20px"><span class="ms c2">chevron_left</span><span class="t-title-s">November 2026</span><span class="ms c2">chevron_right</span></div>
+    <div class="cal" style="margin-top:10px">
+      <span class="h">M</span><span class="h">T</span><span class="h">W</span><span class="h">T</span><span class="h">F</span><span class="h">S</span><span class="h">S</span>
+      <span></span><span></span><span></span><span></span><span></span><span></span><span>1</span>
+      <span class="w">2</span><span>3</span><span class="w">4</span><span>5</span><span class="w">6</span><span>7</span><span>8</span>
+      <span class="w">9</span><span>10</span><span class="w">11</span><span>12</span><span class="t">13</span><span>14</span><span>15</span>
+      <span>16</span><span>17</span><span>18</span><span>19</span><span>20</span><span>21</span><span>22</span>
+      <span>23</span><span>24</span><span>25</span><span>26</span><span>27</span><span>28</span><span>29</span>
+      <span>30</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:16px">
+      <div><div class="t-title">5</div><div class="t-label c2">workouts</div></div>
+      <div><div class="t-title">3 h 50</div><div class="t-label c2">total time</div></div>
+      <div><div class="t-title">46 min</div><div class="t-label c2">average</div></div>
+    </div>
+    <div class="sec" style="margin-top:24px">November</div>
+    <div class="list">
+      <div class="item"><div><div class="t-body" style="font-weight:600">Full body A</div><div class="t-body-s c2">Wed 11 Nov, 7 exercises</div></div><span class="t-body">52 min</span></div>
+      <div class="item"><div><div class="t-body" style="font-weight:600">Mobility at home</div><div class="t-body-s c2">Mon 9 Nov, 6 exercises</div></div><span class="t-body">31 min</span></div>
+    </div>
+  </div>
+  <div class="nav"><div><span class="ms">home</span>Today</div><div class="on"><span class="ms">calendar_month</span>History</div><div><span class="ms">fitness_center</span>Library</div></div>
+</div></figure>
+
+<!-- 10 History progress -->
+<figure id="10-progress"><figcaption>10 History, progress view</figcaption>
+<div class="screen">
+  <div class="status"><span>9:41</span><span class="ms" style="font-size:16px">battery_full</span></div>
+  <div class="content">
+    <div class="row" style="margin-top:16px"><span class="t-headline">History</span><span class="btn-o" style="height:36px;padding:0 12px;font-size:13px"><span class="ms" style="font-size:18px;margin-right:4px">add</span>Past workout</span></div>
+    <div class="seg" style="margin-top:16px"><span>Calendar</span><span class="on">Progress</span></div>
+    <div class="row" style="margin-top:20px;justify-content:flex-start;gap:8px"><span class="chip">4 weeks</span><span class="chip" style="background:var(--ink);color:var(--onink)">12 weeks</span><span class="chip">All</span></div>
+    <div class="row" style="margin-top:20px"><span class="t-title-s">Workouts per week</span><span class="t-body-s c2">Goal 3</span></div>
+    <div style="display:flex;align-items:baseline;gap:6px;margin-top:4px"><span class="t-display-s">1.2</span><span class="t-body-s c2">on average</span></div>
+    <svg width="320" height="84" viewBox="0 0 320 84" style="margin-top:8px" aria-hidden="true">
+      <line x1="0" y1="8" x2="320" y2="8" stroke="var(--line)" stroke-dasharray="4 4"/>
+      <g fill="var(--surface2)"><rect x="0" y="80" width="20" height="4" rx="2"/><rect x="27" y="80" width="20" height="4" rx="2"/><rect x="54" y="80" width="20" height="4" rx="2"/><rect x="81" y="80" width="20" height="4" rx="2"/><rect x="108" y="58" width="20" height="26" rx="4"/><rect x="135" y="36" width="20" height="48" rx="4"/><rect x="162" y="36" width="20" height="48" rx="4"/><rect x="189" y="58" width="20" height="26" rx="4"/><rect x="243" y="36" width="20" height="48" rx="4"/><rect x="270" y="36" width="20" height="48" rx="4"/></g>
+      <rect x="216" y="8" width="20" height="76" rx="4" fill="var(--ink)"/>
+      <rect x="298" y="36" width="20" height="48" rx="4" fill="none" stroke="var(--text3)" stroke-dasharray="3 3"/>
+    </svg>
+    <div class="sec">Exercises</div>
+    <div class="list">
+      <div class="item"><div><div class="t-body" style="font-weight:600">Lat pulldown</div><div class="t-body-s c2">27.5 kg, up 7.5 kg</div></div><svg width="72" height="28" viewBox="0 0 72 28" aria-hidden="true"><polyline points="0,24 12,22 24,22 36,16 48,14 60,9 72,5" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></div>
+      <div class="item"><div><div class="t-body" style="font-weight:600">Leg press</div><div class="t-body-s c2">60 kg, up 10 kg</div></div><svg width="72" height="28" viewBox="0 0 72 28" aria-hidden="true"><polyline points="0,22 12,22 24,18 36,18 48,12 60,12 72,8" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></div>
+      <div class="item"><div><div class="t-body" style="font-weight:600">Pain and stiffness</div><div class="t-body-s c2">Left knee, lower back</div></div><span class="ms c3">chevron_right</span></div>
+    </div>
+  </div>
+  <div class="nav"><div><span class="ms">home</span>Today</div><div class="on"><span class="ms">calendar_month</span>History</div><div><span class="ms">fitness_center</span>Library</div></div>
+</div></figure>
+
+<!-- 11 Settings -->
+<figure id="11-settings"><figcaption>11 Settings</figcaption>
+<div class="screen">
+  <div class="status"><span>9:41</span><span class="ms" style="font-size:16px">battery_full</span></div>
+  <div class="bar"><span class="iconbtn ms">arrow_back</span></div>
+  <div class="content">
+    <div class="t-headline">Settings</div>
+    <div class="sec" style="margin-top:20px">Google Health</div>
+    <div class="list">
+      <div class="item"><span class="t-body">Share completed workouts</span><span class="switch"></span></div>
+      <div class="item"><span class="t-body">Steps today</span><span class="switch off"></span></div>
+      <div class="item"><span class="t-body">Sleep last night</span><span class="switch off"></span></div>
+      <div class="item"><span class="t-body">Privacy and permissions</span><span class="ms c3">chevron_right</span></div>
+    </div>
+    <div class="sec">Workouts</div>
+    <div class="list">
+      <div class="item"><span class="t-body">Weekly goal</span><span class="t-body c2">3 workouts</span></div>
+      <div class="item"><span class="t-body">Reminders</span><span class="t-body c2">Mon, Wed, Fri</span></div>
+      <div class="item"><span class="t-body">Appearance</span><span class="t-body c2">System</span></div>
+    </div>
+    <div class="sec">Your data</div>
+    <div class="list">
+      <div class="item"><div><div class="t-body">Back up</div><div class="t-body-s c2">Last backup 2 Nov</div></div><span class="ms c3">chevron_right</span></div>
+      <div class="item"><span class="t-body">Restore</span><span class="ms c3">chevron_right</span></div>
+      <div class="item"><span class="t-body">Export CSV or PDF</span><span class="ms c3">chevron_right</span></div>
+    </div>
+  </div>
+</div></figure>
+
+<!-- 12 Workout dark -->
+<figure id="12-workout-dark"><figcaption>12 Workout in progress, dark theme</figcaption>
+<div class="screen dark">
+  <div class="status"><span>11:14</span><span class="ms" style="font-size:16px">battery_full</span></div>
+  <div class="bar"><span class="iconbtn ms">arrow_back</span><div style="display:flex;align-items:center;gap:4px"><span class="btn-o">Finish</span><span class="iconbtn ms">more_vert</span></div></div>
+  <div class="content">
+    <div style="text-align:center;margin-top:4px">
+      <div class="t-body-s c2">Full body A</div>
+      <div class="t-display" style="margin-top:2px">32:15</div>
+      <div class="t-label c2" style="margin-top:2px">Started 10:42</div>
+    </div>
+    <div class="segbar" style="margin-top:20px"><b class="d"></b><b class="d"></b><b class="d"></b><b class="d"></b><b class="c"></b><b></b><b></b><b></b></div>
+    <div class="t-label c2" style="margin-top:8px">Exercise 5 of 8</div>
+    <div class="row" style="margin-top:20px"><span class="t-title">Lat pulldown</span><span class="ms c2" style="margin-right:-4px">more_vert</span></div>
+    <div class="t-body-s c2" style="margin-top:4px">Seat height 4, thigh pad 2, wide bar</div>
+    <div class="inset" style="margin-top:12px">
+      <div class="t-label c2">Last time, Wed 11 Nov</div>
+      <div class="t-body" style="font-weight:600;margin-top:2px">3 sets, 10 reps, 25 kg</div>
+    </div>
+    <div class="sets t-label c3" style="margin-top:16px;height:16px"><span>Set</span><span style="text-align:center">kg</span><span style="text-align:center">Reps</span><span></span></div>
+    <div class="sets" style="margin-top:8px"><span class="t-body c2" style="text-align:center">1</span><div class="cell">27.5</div><div class="cell">10</div><div class="chk d"><span class="ms" style="font-size:22px">check</span></div></div>
+    <div class="sets" style="margin-top:8px"><span class="t-body c2" style="text-align:center">2</span><div class="cell">27.5</div><div class="cell">9</div><div class="chk d"><span class="ms" style="font-size:22px">check</span></div></div>
+    <div class="sets" style="margin-top:8px"><span class="t-body c2" style="text-align:center">3</span><div class="cell cur">27.5</div><div class="cell cur">10</div><div class="chk e"><span class="ms" style="font-size:22px">check</span></div></div>
+    <div class="btn" style="margin-top:auto;margin-bottom:16px">Exercise done</div>
+  </div>
+</div></figure>
+
+<script>
+const only = new URLSearchParams(location.search).get('screen');
+if (only) {
+  document.body.classList.add('single');
+  document.querySelectorAll('figure').forEach(f => { if (f.id !== only) f.remove(); });
+}
+</script>
+</body>
+</html>

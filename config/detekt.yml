@@ -1,0 +1,104 @@
+# Compose uses PascalCase for Unit-returning composables.
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
+
+# Match the existing dBcheck size policy using Detekt 1.x option names.
+complexity:
+  LongMethod:
+    threshold: 80
+    ignoreAnnotated: ['Composable']
+    excludes: ['**/test/**', '**/androidTest/**', '**/debug/**']
+  CyclomaticComplexMethod:
+    ignoreAnnotated: ['Composable']
+    ignoreNestingFunctions: true
+    excludes: ['**/test/**', '**/androidTest/**', '**/debug/**']
+  NestedBlockDepth:
+    ignoreAnnotated: ['Composable']
+    excludes: ['**/test/**', '**/androidTest/**', '**/debug/**']
+  LongParameterList:
+    functionThreshold: 10
+    constructorThreshold: 10
+  TooManyFunctions:
+    thresholdInFiles: 30
+    thresholdInClasses: 25
+    thresholdInObjects: 25
+
+style:
+  UnusedPrivateMember:
+    ignoreAnnotated: ['Preview']
+  MagicNumber:
+    active: false
+  MaxLineLength:
+    maxLineLength: 140
+  ReturnCount:
+    excludeGuardClauses: true
+
+Compose:
+  ComposableAnnotationNaming:
+    active: true
+  ComposableNaming:
+    active: true
+  ComposableParamOrder:
+    active: true
+  CompositionLocalAllowlist:
+    active: true
+  CompositionLocalNaming:
+    active: true
+  ContentEmitterReturningValues:
+    active: true
+  ContentSlotReused:
+    active: true
+  ContentTrailingLambda:
+    active: true
+  DefaultsVisibility:
+    active: true
+  LambdaParameterEventTrailing:
+    active: true
+  LambdaParameterInRestartableEffect:
+    active: true
+  Material2:
+    active: false
+  ModifierClickableOrder:
+    active: true
+  ModifierComposed:
+    active: true
+  ModifierMissing:
+    active: true
+  ModifierNaming:
+    active: true
+  ModifierNotUsedAtRoot:
+    active: true
+  ModifierReused:
+    active: true
+  ModifierWithoutDefault:
+    active: true
+  MultipleEmitters:
+    active: true
+  MutableParams:
+    active: true
+  MutableStateAutoboxing:
+    active: true
+  MutableStateParam:
+    active: true
+  ParameterNaming:
+    active: true
+  PreviewAnnotationNaming:
+    active: true
+  PreviewNaming:
+    active: false
+  PreviewPublic:
+    active: true
+  RememberContentMissing:
+    active: true
+  RememberMissing:
+    active: true
+  UnstableCollections:
+    active: false
+  ViewModelForwarding:
+    active: true
+    # Preserve the app's existing shared journal coordinator.
+    allowedForwardingOfTypes: JournalViewModel
+  ViewModelInjection:
+    active: true
+

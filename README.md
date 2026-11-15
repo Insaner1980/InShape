@@ -1,6 +1,6 @@
 # InShape
 
-Offline personal workout journal for Android, Kotlin and Jetpack Compose. The journal follows the [implementation plan](docs/superpowers/plans/2026-11-13-inshape-implementation-plan.md), with the [visual redesign](docs/redesign/implementation-plan.md). See the [verification report](docs/verification/implementation-verification.md) for checks and platform limitations.
+Offline personal workout journal for Android, Kotlin and Jetpack Compose. The journal follows the [implementation plan](docs/superpowers/plans/2026-11-13-inshape-implementation-plan.md), with the [visual redesign](docs/redesign/implementation-plan.md) and [monochrome redesign and workout clock](docs/redesign-monochrome/implementation-plan.md). See the [implementation verification](docs/verification/implementation-verification.md) and [monochrome verification](docs/verification/monochrome-verification.md) for checks and platform limitations.
 
 Build with Android Studio or JDK 17+ and Android SDK 37: `./gradlew.bat :app:assembleDebug`. The output is `app/build/outputs/apk/debug/app-debug.apk`. Unit tests: `./gradlew.bat :app:testDebugUnitTest`. Lint: `./gradlew.bat :app:lintDebug`.
 
@@ -16,7 +16,7 @@ Debug-only reference fixtures use a separate database and asset root, a fixed cl
 adb -s <device> shell am start -n com.emmah.inshape/.demo.DemoActivity --es state TodayWithActiveWorkout
 ```
 
-Other states: `ActiveWorkoutPartiallyDone`, `ExerciseWithSetup`, `CheckInAfter`, `ProgressWithHistory`, `HistoryNovember`, `LibraryRoutineExpanded`, `SettingsConfigured`, `Empty`, `SparseHistory`, `FailedSave`. DemoActivity is excluded from release builds. The ordinary launcher always opens the user's journal.
+Other states: `ActiveWorkoutPartiallyDone`, `FinishSummary`, `ExerciseWithSetup`, `CheckInAfter`, `ProgressWithHistory`, `HistoryNovember`, `LibraryRoutineExpanded`, `SettingsConfigured`, `Empty`, `SparseHistory`, `FailedSave`. DemoActivity is excluded from release builds. The ordinary launcher always opens the user's journal.
 
 Device tests: build `:app:assembleDebugAndroidTest`, install both APKs on an isolated emulator, then run `adb -s <device> shell am instrument -w -r com.emmah.inshape.test/androidx.test.runner.AndroidJUnitRunner`. The provider test grants exercise access only on a supported test device; the notification test requires notification permission. Never run destructive fixture/recovery checks against a personal journal.
 
@@ -30,6 +30,8 @@ Version and compatibility sources: [AGP](https://developer.android.com/build/rel
 
 The app supports System, Light and Dark appearance in Settings. The choice applies immediately, persists on this phone, and is deliberately excluded from journal backups. The launcher widget follows the system theme. Android forced dark is disabled.
 
-`ui/theme/InShapeColors.kt`, `Type.kt`, `Dimens.kt`, `Shapes.kt` and `ui/components/` define the shared colours, typography, spacing, shapes and controls. Space Grotesk is bundled from the [official Google Fonts distribution](https://github.com/google/fonts/tree/main/ofl/spacegrotesk), under the [SIL Open Font License](docs/redesign/OFL-SpaceGrotesk.txt); body text uses the system font. The light card shadow uses Compose's [dropShadow API](https://developer.android.com/develop/ui/compose/graphics/draw/shadows).
+`ui/theme/InShapeColors.kt`, `Type.kt`, `Dimens.kt`, `Shapes.kt` and `ui/components/` define the shared colours, typography, spacing, shapes and controls. Inter is bundled from the [official Google Fonts distribution](https://github.com/google/fonts/tree/main/ofl/inter), under the [SIL Open Font License](docs/redesign-monochrome/OFL-Inter.txt). All type uses tabular figures. Both themes use black, white and greys, with muted red reserved for errors and destructive actions. Outlines, inset fills and hairlines replace shadows.
+
+Today, History and Library are the three bottom tabs; Progress is a view inside History. The active workout clock derives from its recorded start and appears in the workout, Today, the ongoing system notification and the home-screen widget. Finish captures the end instant into a persistent draft, then Save workout confirms the timing and opens the optional After check-in. Notification dismissal is remembered for that workout.
 
 Today offers the active workout or the least recently completed routine. Workout logging keeps its main action pinned below the scrollable content. History uses a calendar date picker and compact records. Progress separates recorded work from planned targets, draws missing observations as gaps, and distinguishes pain and stiffness with solid and dashed lines. Appearance, backup/restore formats, and journal data remain separate.

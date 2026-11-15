@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "exceptions": [
+    {
+      "id": "inshape-draft-identity",
+      "tool": "mobsfscan",
+      "rule": "android_kotlin_hardcoded",
+      "scope": "app/src/main/java/com/emmah/inshape/feature/workout/WorkoutTimingEditor.kt",
+      "reason": "The value is a local editor-draft identity derived from the workout ID, not a credential. It is used to preserve and remove the timing draft.",
+      "owner": "InShape maintainers",
+      "added": "2026-11-14",
+      "expires": "2027-11-14",
+      "tracking": "Android script setup: reviewed against source and merged debug manifest",
+      "sourcePath": "app/src/main/java/com/emmah/inshape/feature/workout/WorkoutTimingEditor.kt",
+      "selector": "val key = \"timing:$id\"",
+      "findingPath": "app/src/main/java/com/emmah/inshape/feature/workout/WorkoutTimingEditor.kt",
+      "findingSelectors": [
+        "key = \"timing:$id\""
+      ]
+    },
+    {
+      "id": "inshape-finish-draft-identity",
+      "tool": "mobsfscan",
+      "rule": "android_kotlin_hardcoded",
+      "scope": "app/src/main/java/com/emmah/inshape/feature/workout/FinishScreen.kt",
+      "reason": "The local finish-draft ID is derived from the workout ID and identifies the draft to load and save.",
+      "owner": "InShape maintainers",
+      "added": "2026-11-14",
+      "expires": "2027-11-14",
+      "tracking": "Android script rerun: reviewed against FinishScreen draft handling",
+      "sourcePath": "app/src/main/java/com/emmah/inshape/feature/workout/FinishScreen.kt",
+      "selector": "val key = \"finish:$id\"",
+      "findingPath": "app/src/main/java/com/emmah/inshape/feature/workout/FinishScreen.kt",
+      "findingSelectors": [
+        "key = \"finish:$id\""
+      ]
+    },
+    {
+      "id": "inshape-restore-failure-fixture",
+      "tool": "mobsfscan",
+      "rule": "android_kotlin_sql_raw_query",
+      "scope": "app/src/androidTest/java/com/emmah/inshape/transfer/RestoreRecoveryTest.kt",
+      "reason": "Instrumentation-only fault injection uses constant CREATE TRIGGER and DROP TRIGGER statements with no external or interpolated SQL input. The test proves transaction rollback preserves the original journal.",
+      "owner": "InShape maintainers",
+      "added": "2026-11-14",
+      "expires": "2027-11-14",
+      "tracking": "Android script setup: reviewed against source and merged debug manifest",
+      "sourcePath": "app/src/androidTest/java/com/emmah/inshape/transfer/RestoreRecoveryTest.kt",
+      "selector": "CREATE TRIGGER fail_restore",
+      "findingPath": "app/src/androidTest/java/com/emmah/inshape/transfer/RestoreRecoveryTest.kt",
+      "findingSelectors": [
+        "android.database.sqlite",
+        "execSQL("
+      ]
+    },
+    {
+      "id": "inshape-main-gradle-target-sdk",
+      "tool": "mobsfscan",
+      "rule": "android_task_hijacking2",
+      "scope": "app/src/main/AndroidManifest.xml",
+      "reason": "mobsfscan 0.4.5 defaults absent source-manifest targetSdkVersion to 26 and does not read Gradle SDK configuration. InShape declares targetSdk 37; the merged debug manifest confirms 37. Preserve the existing task and launcher behavior.",
+      "owner": "InShape maintainers",
+      "added": "2026-11-14",
+      "expires": "2027-11-14",
+      "tracking": "Android script setup: reviewed against source and merged debug manifest",
+      "sourcePath": "app/build.gradle.kts",
+      "selector": "targetSdk = 37",
+      "findingPath": "app/src/main/AndroidManifest.xml",
+      "findingSelectors": [
+        "Activity exported, targetSdk<29 and launchMode != singleInstance or taskAffinity is not empty"
+      ]
+    },
+    {
+      "id": "inshape-debug-gradle-target-sdk",
+      "tool": "mobsfscan",
+      "rule": "android_task_hijacking2",
+      "scope": "app/src/debug/AndroidManifest.xml",
+      "reason": "mobsfscan 0.4.5 defaults absent source-manifest targetSdkVersion to 26 and does not read Gradle SDK configuration. InShape declares targetSdk 37; the merged debug manifest confirms 37. Preserve the existing task and launcher behavior.",
+      "owner": "InShape maintainers",
+      "added": "2026-11-14",
+      "expires": "2027-11-14",
+      "tracking": "Android script setup: reviewed against source and merged debug manifest",
+      "sourcePath": "app/build.gradle.kts",
+      "selector": "targetSdk = 37",
+      "findingPath": "app/src/debug/AndroidManifest.xml",
+      "findingSelectors": [
+        "Activity exported, targetSdk<29 and launchMode != singleInstance or taskAffinity is not empty"
+      ]
+    }
+  ]
+}

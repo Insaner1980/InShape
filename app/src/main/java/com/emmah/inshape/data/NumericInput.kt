@@ -1,3 +1,6 @@
+// This file is named for its functions or UI role; its accompanying model is secondary.
+@file:Suppress("MatchingDeclarationName")
+
 package com.emmah.inshape.data
 
 import java.math.BigDecimal
@@ -10,11 +13,18 @@ sealed interface NumericInputResult {
 }
 fun parseDecimalInput(raw: String): NumericInputResult {
     val value = raw.trim()
-    if (value.isEmpty()) return NumericInputResult.Missing
-    if (value.length > 32) return NumericInputResult.Invalid("Enter a shorter number")
-    if (value.matches(Regex("[0-9]+[.,]"))) return NumericInputResult.Incomplete
-    if (!value.matches(Regex("[0-9]+([.,][0-9]+)?"))) return NumericInputResult.Invalid("Enter a non-negative decimal number")
-    return NumericInputResult.Valid(value.replace(',', '.').toBigDecimal())
+    return when {
+        value.isEmpty() -> NumericInputResult.Missing
+
+        value.length > 32 -> NumericInputResult.Invalid("Enter a shorter number")
+
+        value.matches(Regex("[0-9]+[.,]")) -> NumericInputResult.Incomplete
+
+        !value.matches(Regex("[0-9]+([.,][0-9]+)?")) ->
+            NumericInputResult.Invalid("Enter a non-negative decimal number")
+
+        else -> NumericInputResult.Valid(value.replace(',', '.').toBigDecimal())
+    }
 }
 
 fun validatedSetValues(load: String, reps: String): Pair<String?, Int?> {
@@ -23,8 +33,14 @@ fun validatedSetValues(load: String, reps: String): Pair<String?, Int?> {
         is NumericInputResult.Valid -> parsed.value.stripTrailingZeros().toPlainString()
         else -> throw IllegalArgumentException("Finish entering a valid load")
     }
-    val repetitions = if (reps.isBlank()) null else reps.trim().toIntOrNull()?.takeIf { it > 0 }
-        ?: throw IllegalArgumentException("Reps must be a positive whole number")
-    require(weight != null || repetitions != null) { "Enter load or reps, or use Mark done without sets" }
+    val repetitions = if (reps.isBlank()) {
+        null
+    } else {
+        reps.trim().toIntOrNull()?.takeIf { it > 0 }
+            ?: throw IllegalArgumentException("Reps must be a positive whole number")
+    }
+    require(weight != null || repetitions != null) {
+        "Enter load or reps, or use Mark done without sets"
+    }
     return weight to repetitions
 }

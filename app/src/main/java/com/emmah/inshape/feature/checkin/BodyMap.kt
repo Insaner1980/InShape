@@ -5,7 +5,15 @@ import android.graphics.RectF
 import android.graphics.Region
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -15,15 +23,35 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import com.emmah.inshape.data.BodyObservation
 import com.emmah.inshape.ui.components.SelectField
-import com.emmah.inshape.ui.theme.*
+import com.emmah.inshape.ui.theme.Dimens
+import com.emmah.inshape.ui.theme.InShapeTheme
 
 data class BodyRegion(val id: String, val label: String)
-val bodyRegions: List<BodyRegion> = listOf("neck", "upper_back", "lower_back", "chest", "abdomen").map { BodyRegion(it, it.replace('_', ' ').replaceFirstChar(Char::titlecase)) } +
-    listOf("shoulder", "upper_arm", "elbow", "forearm_wrist", "hip", "thigh", "knee", "calf_shin", "ankle_foot").flatMap { part -> listOf("left", "right").map { side -> BodyRegion("${side}_$part", "$side ${part.replace('_', ' ')}".replaceFirstChar(Char::titlecase)) } }
+val bodyRegions: List<BodyRegion> =
+    listOf("neck", "upper_back", "lower_back", "chest", "abdomen").map {
+        BodyRegion(it, it.replace('_', ' ').replaceFirstChar(Char::titlecase))
+    } +
+        listOf("shoulder", "upper_arm", "elbow", "forearm_wrist", "hip", "thigh", "knee", "calf_shin", "ankle_foot").flatMap { part ->
+            listOf("left", "right").map { side ->
+                BodyRegion(
+                    "${side}_$part",
+                    "$side ${part.replace('_', ' ')}".replaceFirstChar(Char::titlecase)
+                )
+            }
+        }
 
 data class RegionShape(val id: String, val path: Path)
 fun bodyShapes(back: Boolean): List<RegionShape> = buildList {
-    fun shape(id: String, left: Float, top: Float, right: Float, bottom: Float) { add(RegionShape(id, Path().apply { addRoundRect(RectF(left, top, right, bottom), 3f, 3f, Path.Direction.CW) })) }
+    fun shape(id: String, left: Float, top: Float, right: Float, bottom: Float) {
+        add(
+            RegionShape(
+                id,
+                Path().apply {
+                    addRoundRect(RectF(left, top, right, bottom), 3f, 3f, Path.Direction.CW)
+                }
+            )
+        )
+    }
     shape("neck", 45f, 30f, 55f, 44f)
     shape(if (back) "upper_back" else "chest", 36f, 44f, 64f, 73f)
     shape(if (back) "lower_back" else "abdomen", 36f, 73f, 64f, 104f)
@@ -43,48 +71,84 @@ fun bodyShapes(back: Boolean): List<RegionShape> = buildList {
     }
 }
 fun bodyRegionAt(x: Float, y: Float, back: Boolean): String? = bodyShapes(back).firstOrNull { shape ->
-    Region().apply { setPath(shape.path, Region(0, 0, 100, 240)) }.contains(x.toInt(), y.toInt())
+    Region().apply {
+        setPath(shape.path, Region(0, 0, 100, 240))
+    }.contains(x.toInt(), y.toInt())
 }?.id
 
 @Composable
-fun BodyMap(back: Boolean, observations: List<BodyObservation>, onSelect: (String) -> Unit) {
+fun BodyMap(
+    back: Boolean,
+    observations: List<BodyObservation>,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    controls: @Composable () -> Unit = {}
+) {
     val colors = InShapeTheme.colors
-    Row(Modifier.fillMaxWidth().padding(vertical = Dimens.inner), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-    Canvas(Modifier.width(Dimens.bodyWidth).height(Dimens.bodyHeight).pointerInput(back) {
-        detectTapGestures { point ->
-            val scale = minOf(size.width / 100f, size.height / 240f)
-            bodyRegionAt((point.x - (size.width - 100f * scale) / 2f) / scale, point.y / scale, back)?.let(onSelect)
-        }
-    }) {
-        val scale = minOf(size.width / 100f, size.height / 240f)
-        withTransform({ translate((size.width - 100f * scale) / 2f, 0f); scale(scale, scale, pivot = androidx.compose.ui.geometry.Offset.Zero) }) {
-            drawCircle(colors.surfaceInset, 10f, androidx.compose.ui.geometry.Offset(50f, 20f))
-            val silhouette = Path().apply {
-                addRoundRect(RectF(45f, 29f, 55f, 47f), 2f, 2f, Path.Direction.CW)
-                addRoundRect(RectF(36f, 43f, 64f, 124f), 10f, 10f, Path.Direction.CW)
-                addRoundRect(RectF(25f, 44f, 34f, 120f), 4f, 4f, Path.Direction.CW)
-                addRoundRect(RectF(66f, 44f, 75f, 120f), 4f, 4f, Path.Direction.CW)
-                addRoundRect(RectF(36f, 121f, 49f, 224f), 6f, 6f, Path.Direction.CW)
-                addRoundRect(RectF(51f, 121f, 64f, 224f), 6f, 6f, Path.Direction.CW)
+    Row(
+        modifier.fillMaxWidth().padding(vertical = Dimens.inner),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+    ) {
+        Canvas(
+            Modifier.width(Dimens.bodyWidth).height(Dimens.bodyHeight).pointerInput(back) {
+                detectTapGestures { point ->
+                    val scale = minOf(size.width / 100f, size.height / 240f)
+                    bodyRegionAt(
+                        (point.x - (size.width - 100f * scale) / 2f) / scale,
+                        point.y / scale,
+                        back
+                    )?.let(onSelect)
+                }
             }
-            drawPath(silhouette.asComposePath(), colors.surfaceInset)
-            drawPath(silhouette.asComposePath(), colors.muted, style = Stroke(.7f))
-            bodyShapes(back).forEach { region ->
-                val observation = observations.find { it.region == region.id }
-                if (observation != null) {
-                    drawPath(region.path.asComposePath(), colors.accentContainer)
-                    drawPath(region.path.asComposePath(), colors.mark, style = Stroke(.7f))
-                    val bounds = RectF().also { region.path.computeBounds(it, true) }
-                    if (observation.pain != null) drawCircle(colors.pain, 2f, androidx.compose.ui.geometry.Offset(bounds.centerX() - 2f, bounds.centerY()))
-                    if (observation.stiffness != null) drawRect(colors.stiffness, androidx.compose.ui.geometry.Offset(bounds.centerX() + 1f, bounds.centerY() - 2f), androidx.compose.ui.geometry.Size(4f, 4f))
+        ) {
+            val scale = minOf(size.width / 100f, size.height / 240f)
+            withTransform({
+                translate((size.width - 100f * scale) / 2f, 0f)
+                scale(scale, scale, pivot = androidx.compose.ui.geometry.Offset.Zero)
+            }) {
+                drawCircle(colors.surfaceStrong, 10f, androidx.compose.ui.geometry.Offset(50f, 20f))
+                val silhouette = Path().apply {
+                    addRoundRect(RectF(45f, 29f, 55f, 47f), 2f, 2f, Path.Direction.CW)
+                    addRoundRect(RectF(36f, 43f, 64f, 124f), 10f, 10f, Path.Direction.CW)
+                    addRoundRect(RectF(25f, 44f, 34f, 120f), 4f, 4f, Path.Direction.CW)
+                    addRoundRect(RectF(66f, 44f, 75f, 120f), 4f, 4f, Path.Direction.CW)
+                    addRoundRect(RectF(36f, 121f, 49f, 224f), 6f, 6f, Path.Direction.CW)
+                    addRoundRect(RectF(51f, 121f, 64f, 224f), 6f, 6f, Path.Direction.CW)
+                }
+                drawPath(silhouette.asComposePath(), colors.surfaceStrong)
+                drawPath(silhouette.asComposePath(), colors.surfaceStrong, style = Stroke(.7f))
+                bodyShapes(back).forEach { region ->
+                    val observation = observations.find { it.region == region.id }
+                    when {
+                        (observation?.pain ?: 0) > 0 -> drawPath(region.path.asComposePath(), colors.ink)
+
+                        (observation?.stiffness ?: 0) > 0 -> drawPath(
+                            region.path.asComposePath(),
+                            colors.ink,
+                            style = Stroke(Dimens.chartOutline.toPx() / scale)
+                        )
+                    }
                 }
             }
         }
+        Column(
+            Modifier.weight(1f).padding(start = Dimens.innerSmall),
+            verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)
+        ) {
+            controls()
+            Text(
+                "Tap the body to add an area. A filled dot means pain, a ring means stiffness only.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.textSecondary
+            )
+        }
     }
-    Column(Modifier.weight(1f).padding(start = Dimens.innerSmall), verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)) {
-        Text("Pain, circle", color = colors.pain)
-        Text("Stiffness, square", color = colors.stiffness)
-        Text("Tap an area to add it. Pain and stiffness are scored separately.", style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
-    } }
-    SelectField("Add body area", "Choose area", bodyRegions.map { it.label }, { label -> onSelect(bodyRegions.first { it.label == label }.id) })
+    SelectField("Add body area", "Choose area", bodyRegions.map { it.label }, { label ->
+        onSelect(
+            bodyRegions.first {
+                it.label ==
+                    label
+            }.id
+        )
+    })
 }

@@ -1,5 +1,13 @@
+import io.gitlab.arturbosch.detekt.Detekt
+import org.jlleitschuh.gradle.ktlint.reporter.ReporterType
+
 plugins {
+    jacoco
+    alias(libs.plugins.dependency.check)
+    alias(libs.plugins.ktlint)
+    alias(libs.plugins.detekt)
     alias(libs.plugins.android.application)
+    alias(libs.plugins.stability.analyzer)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
@@ -15,20 +23,119 @@ android {
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
-    buildFeatures { compose = true; buildConfig = true }
-    compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+    buildTypes {
+        debug { enableUnitTestCoverage = true }
+    }
+    testCoverage { jacocoVersion = "0.8.16" }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
     testOptions { unitTests.isIncludeAndroidResources = true }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
 }
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
+// AGP Compose preview tasks require a host test component for every Compose variant.
+androidComponents {
+    beforeVariants(selector().withBuildType("release")) { variant ->
+        variant.hostTests[com.android.build.api.variant.HostTestBuilder.UNIT_TEST_TYPE]?.enable = true
+    }
+}
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
+
+jacoco { toolVersion = "0.8.16" }
+tasks.withType<Test>().configureEach {
+    extensions.configure<JacocoTaskExtension> {
+        isIncludeNoLocationClasses = true
+        excludes = listOf("jdk.internal.*")
+    }
+}
+
+ktlint {
+    version.set(libs.versions.ktlint)
+    android.set(true)
+    reporters {
+        reporter(ReporterType.PLAIN)
+        reporter(ReporterType.CHECKSTYLE)
+    }
+    filter {
+        exclude("**/generated/**")
+        exclude("**/build/**")
+    }
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(rootProject.file("config/detekt.yml"))
+    source.setFrom("src/main/java", "src/debug/java", "src/test/java", "src/androidTest/java")
+}
+
+tasks.withType<Detekt>().configureEach {
+    jvmTarget = "17"
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        sarif.required.set(true)
+    }
+}
+dependencyCheck {
+    suppressionFiles = listOf(rootProject.file("config/dependency-check-suppressions.xml").absolutePath)
+    formats = listOf("HTML", "JSON")
+    outputDirectory = rootProject.layout.projectDirectory.dir("reports")
+    scanConfigurations = listOf("debugRuntimeClasspath", "releaseRuntimeClasspath")
+    failBuildOnCVSS = 7f
+    failOnError = true
+    autoUpdate = providers.environmentVariable("DEPENDENCY_CHECK_AUTO_UPDATE")
+        .map { it.lowercase() in listOf("1", "true", "yes", "on") }.getOrElse(true)
+    analyzers {
+        // OSS Index requires credentials; the NVD analyzer remains enabled.
+        ossIndex { enabled = false }
+    }
+    nvd {
+        providers.environmentVariable("NVD_API_KEY").orNull
+            ?.trim()?.takeIf { it.isNotEmpty() }?.let { apiKey = it }
+    }
+}
+
+tasks.withType<org.owasp.dependencycheck.gradle.tasks.ConfiguredTask>().configureEach {
+    data.directory.set(
+        providers.environmentVariable("DEPENDENCY_CHECK_DATA_DIRECTORY")
+            .orElse(rootProject.layout.projectDirectory.dir(".gradle/dependency-check-data").asFile.absolutePath)
+    )
+}
+
 dependencies {
+    lintChecks(libs.android.security.lints)
+    detektPlugins(libs.compose.rules.detekt)
+    ktlintRuleset(libs.compose.rules.ktlint)
+    constraints {
+        // Health Connect and Robolectric request older Guava releases.
+        implementation(libs.guava.android)
+        // Glance 1.2 requests DataStore 1.0, which bundles vulnerable Protobuf code.
+        implementation(libs.datastore.preferences)
+        testImplementation("com.google.guava:guava:33.8.0-jre")
+        add("ksp", "com.google.guava:guava:33.8.0-jre")
+        androidTestImplementation("com.google.code.gson:gson:2.15.0")
+        add("ktlint", "ch.qos.logback:logback-classic:1.6.6")
+        add("ktlint", "ch.qos.logback:logback-core:1.6.6")
+        // Android Lint resolves a separate copy of the build-tool libraries.
+        add("androidLintTool", "com.google.guava:guava:33.8.0-jre")
+        add("androidLintTool", "org.apache.commons:commons-lang3:3.22.0")
+        add("androidLintTool", "org.apache.httpcomponents:httpclient:4.5.14")
+        add("androidLintTool", "org.bouncycastle:bcpkix-jdk18on:1.87")
+        add("androidLintTool", "org.bouncycastle:bcprov-jdk18on:1.87")
+    }
     implementation(platform(libs.compose.bom))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended:1.7.8")
-    debugImplementation("androidx.compose.ui:ui-tooling")
+    implementation(libs.compose.ui)
+    implementation(libs.compose.tooling.preview)
+    implementation(libs.compose.material3)
+    implementation(libs.compose.material.icons)
+    implementation(libs.exifinterface)
+    debugImplementation(libs.compose.tooling)
     implementation(libs.activity)
     implementation(libs.lifecycle)
     implementation(libs.viewmodel)
@@ -43,10 +150,11 @@ dependencies {
     implementation(libs.health)
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
-    testImplementation("androidx.test:core:1.7.0")
+    testImplementation(libs.work.testing)
+    testImplementation(libs.test.core)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.test.runner)
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
-    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    androidTestImplementation(libs.compose.test.junit)
+    debugImplementation(libs.compose.test.manifest)
 }

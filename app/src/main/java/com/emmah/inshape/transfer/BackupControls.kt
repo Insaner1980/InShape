@@ -2,33 +2,100 @@ package com.emmah.inshape.transfer
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.emmah.inshape.JournalViewModel
-import com.emmah.inshape.ui.components.*
-import com.emmah.inshape.ui.theme.*
+import com.emmah.inshape.ui.components.ConfirmDialog
+import com.emmah.inshape.ui.components.ListCard
+import com.emmah.inshape.ui.components.ListCardScope
+import com.emmah.inshape.ui.components.ListRow
+import com.emmah.inshape.ui.theme.InShapeTheme
+import com.emmah.inshape.ui.theme.InShapeType
+import com.emmah.inshape.ui.theme.instantLabel
 
+// Slot content: siblings use the caller's layout and spacing, so there is no single modifier root.
+@Suppress("ModifierMissing", "ktlint:compose:modifier-missing-check")
 @Composable
-fun BackupControls(vm: JournalViewModel, lastBackupAt: String?, additionalRows: ListCardScope.() -> Unit) {
+fun ColumnScope.BackupControls(vm: JournalViewModel, lastBackupAt: String?, additionalRows: ListCardScope.() -> Unit) {
     val transfer = vm.transfers
     val state by transfer.state.collectAsStateWithLifecycle()
-    val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri -> if (uri != null) transfer.backup(uri) else transfer.pickerCancelled() }
-    val restore = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) transfer.validate(uri) else transfer.pickerCancelled() }
+    val save =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.CreateDocument("application/octet-stream")
+        ) { uri ->
+            if (uri !=
+                null
+            ) {
+                transfer.backup(uri)
+            } else {
+                transfer.pickerCancelled()
+            }
+        }
+    val restore =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri !=
+                null
+            ) {
+                transfer.validate(uri)
+            } else {
+                transfer.pickerCancelled()
+            }
+        }
     ListCard {
-        item { ListRow("Create full backup", titleStyle = InShapeType.settingsRow, subtitle = lastBackupAt?.let { "Last backup ${it.instantLabel()}" } ?: "No backup yet", onClick = { save.launch("InShape.inshape-backup") }, enabled = !state.busy) }
-        item { ListRow("Restore backup", titleStyle = InShapeType.settingsRow, onClick = { restore.launch(arrayOf("*/*")) }, enabled = !state.busy) }
+        item {
+            ListRow(
+                "Create full backup",
+                titleStyle = MaterialTheme.typography.bodyLarge,
+                subtitle =
+                    lastBackupAt?.let {
+                        "Last backup ${it.instantLabel()}"
+                    } ?: "No backup yet",
+                onClick = {
+                    save.launch("InShape.inshape-backup")
+                },
+                enabled = !state.busy
+            )
+        }
+        item {
+            ListRow("Restore backup", titleStyle = MaterialTheme.typography.bodyLarge, onClick = {
+                restore.launch(arrayOf("*/*"))
+            }, enabled = !state.busy)
+        }
         additionalRows()
     }
     if (state.busy) LinearProgressIndicator()
-    if (state.message.isNotBlank()) Text(state.message, style = MaterialTheme.typography.bodySmall, color = if (state.isError) InShapeTheme.colors.error else InShapeTheme.colors.textSecondary)
+    if (state.message.isNotBlank()) {
+        Text(
+            state.message,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (state.isError) InShapeTheme.colors.error else InShapeTheme.colors.textSecondary
+        )
+    }
     val backup = state.backup
     if (backup != null && !state.busy) {
         val data = backup.staged.data
-        ConfirmDialog("Replace the current journal?",
-            "Backup created ${backup.staged.manifest.createdAt.instantLabel()}. It contains ${data.workouts.size} workout records, ${data.exercises.size} exercises, ${data.routines.size} routines and ${data.photos.size} photos.\n\n" +
-                "All current journal records and drafts will be replaced. ${if (data.active == null) "The backup has no active workout." else "The backup's unfinished workout will become active."}\n\n" +
-                "Health sharing and read capabilities will be off. Restored reminders will stay paused until activated. Existing pending Health Connect deletions remain pending.",
-            "Replace journal", { transfer.restore(backup) }, transfer::cancelRestore)
+        val activeMessage = if (data.active == null) {
+            "The backup has no active workout."
+        } else {
+            "The backup's unfinished workout will become active."
+        }
+        ConfirmDialog(
+            "Replace the current journal?",
+            "Backup created ${backup.staged.manifest.createdAt.instantLabel()}. " +
+                "It contains ${data.workouts.size} workout records, ${data.exercises.size} exercises, " +
+                "${data.routines.size} routines and ${data.photos.size} photos.\n\n" +
+                "All current journal records and drafts will be replaced. $activeMessage\n\n" +
+                "Health sharing and read capabilities will be off. Restored reminders will stay paused " +
+                "until activated. Existing pending Health Connect deletions remain pending.",
+            "Replace journal",
+            { transfer.restore(backup) },
+            transfer::cancelRestore
+        )
     }
 }

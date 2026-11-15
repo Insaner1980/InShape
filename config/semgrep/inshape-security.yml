@@ -1,0 +1,40 @@
+rules:
+  - id: inshape-system-backup-enabled
+    languages: [xml]
+    severity: ERROR
+    message: The private journal uses explicit user-controlled backups; automatic Android backup must remain disabled.
+    paths:
+      include:
+        - /app/src/main/AndroidManifest.xml
+        - /app/src/release/AndroidManifest.xml
+    pattern: |
+      <application ... android:allowBackup="true" ...>
+
+  - id: inshape-cleartext-enabled
+    languages: [xml]
+    severity: ERROR
+    message: The offline journal must not enable global cleartext traffic.
+    paths:
+      include:
+        - /app/src/main/AndroidManifest.xml
+        - /app/src/release/AndroidManifest.xml
+    pattern: |
+      <application ... android:usesCleartextTraffic="true" ...>
+
+  - id: inshape-exported-provider
+    languages: [xml]
+    severity: ERROR
+    message: Journal providers must remain private; selected exports use temporary URI grants.
+    pattern: |
+      <provider ... android:exported="true" ...>
+
+  - id: inshape-release-debuggable
+    languages: [xml]
+    severity: ERROR
+    message: Debugging must not be enabled in the main or release manifest.
+    paths:
+      include:
+        - /app/src/main/AndroidManifest.xml
+        - /app/src/release/AndroidManifest.xml
+    pattern: |
+      <application ... android:debuggable="true" ...>

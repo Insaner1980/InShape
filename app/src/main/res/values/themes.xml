@@ -1,10 +1,9 @@
 <resources>
     <style name="Theme.InShape" parent="android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:fontFamily">sans</item>
+        <item name="android:fontFamily">@font/inter</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowActionModeOverlay">true</item>
-        <item name="android:forceDarkAllowed">false</item>
-        <item name="android:colorAccent">#5E8C00</item>
-        <item name="android:windowBackground">#F3F4F6</item>
+        <item name="android:colorAccent">#0B0B0B</item>
+        <item name="android:windowBackground">#FFFFFF</item>
     </style>
 </resources>

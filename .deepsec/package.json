@@ -1,0 +1,24 @@
+{
+  "name": "inshape-deepsec-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DeepSec scanning workspace for InShape",
+  "type": "module",
+  "workspaces": [],
+  "packageManager": "pnpm@11.20.0",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "deepsec": "deepsec",
+    "deepsec:scan": "deepsec scan --project-id inshape",
+    "deepsec:process": "deepsec process --project-id inshape --agent codex --model gpt-6.1-sol --thinking-level medium --concurrency 1",
+    "deepsec:revalidate": "deepsec revalidate --project-id inshape --agent codex --model gpt-6.1-sol --thinking-level medium --concurrency 1 --force",
+    "deepsec:export": "deepsec export --project-id inshape --format md-dir --out ./findings",
+    "deepsec:report": "pnpm run deepsec:scan && pnpm run deepsec:process && pnpm run deepsec:export",
+    "deepsec:report:custom": "pnpm run deepsec:report"
+  },
+  "dependencies": {
+    "deepsec": "2.3.9"
+  }
+}

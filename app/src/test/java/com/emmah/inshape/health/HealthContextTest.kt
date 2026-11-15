@@ -1,8 +1,10 @@
 package com.emmah.inshape.health
 
-import org.junit.Assert.*
+import java.time.Instant
+import java.time.ZonedDateTime
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
-import java.time.*
 
 class HealthContextTest {
     @Test fun windowsUseLocalDatesAcrossDaylightSavingAndClipSleepToNow() {
@@ -12,6 +14,7 @@ class HealthContextTest {
         assertEquals(Instant.parse("2026-03-28T16:00:00Z"), windows.sleepStart)
         assertEquals(now.toInstant(), windows.sleepEnd)
     }
+
     @Test fun heartRateNeedsSourceChoiceAndNeverCombinesMeasurements() {
         val first = HeartSample(70, Instant.parse("2026-11-13T08:00:00Z"), "a")
         val second = HeartSample(90, Instant.parse("2026-11-13T09:00:00Z"), "b")

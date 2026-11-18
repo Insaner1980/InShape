@@ -1,6 +1,9 @@
 package com.emmah.inshape
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.net.Uri
+import android.view.KeyEvent
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.toArgb
@@ -15,12 +18,17 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isNotEnabled
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onLast
@@ -29,25 +37,35 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.platform.app.InstrumentationRegistry
+import com.emmah.inshape.data.BodyObservation
+import com.emmah.inshape.data.CheckIn
 import com.emmah.inshape.data.EditorDraft
 import com.emmah.inshape.data.newId
 import com.emmah.inshape.demo.DemoFixtures
+import com.emmah.inshape.feature.checkin.CheckInDraft
 import com.emmah.inshape.feature.library.RoutineDraft
 import com.emmah.inshape.feature.library.RoutineItemDraft
 import com.emmah.inshape.feature.workout.TimingDraft
+import com.emmah.inshape.health.HealthCapability
 import com.emmah.inshape.navigation.AppNavigation
+import com.emmah.inshape.ui.components.RecordedDatePicker
+import com.emmah.inshape.ui.components.RecordedDateRangePicker
 import com.emmah.inshape.ui.components.SelectField
 import com.emmah.inshape.ui.theme.DarkColors
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.LightColors
 import com.emmah.inshape.ui.theme.ThemeMode
 import com.emmah.inshape.ui.theme.ThemeSettings
+import java.io.File
+import java.time.LocalDate
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -105,11 +123,74 @@ class RedesignInteractionTest {
         compose.waitUntil(10_000) { drained.isCompleted }
     }
 
+    @Test fun emptyWorkoutOffersToAddAnExercise() {
+        launch("Empty", "Today") { app ->
+            app.repository.startWorkout(com.emmah.inshape.data.StartSource.Empty)
+        }
+        click("Resume workout")
+        compose.onNodeWithText("No exercises yet").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Your plan is complete").assertDoesNotExist()
+        compose.onNodeWithText("Saved automatically").assertDoesNotExist()
+        click("Add exercise")
+        compose.onNodeWithText("Find exercise").assertExists()
+    }
+
+    @Test fun repeatedSaveFailureKeepsRetryAvailable() {
+        launch("Empty", "Today")
+        val attempts = java.util.concurrent.atomic.AtomicInteger()
+        journalViewModel.write {
+            if (attempts.incrementAndGet() <= 2) throw java.io.IOException("Storage is full.")
+        }
+        repeat(2) { failure ->
+            compose.waitUntil(10_000) {
+                attempts.get() == failure + 1 && compose.onAllNodesWithText("Retry").fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onNodeWithText("Could not save. Storage is full.").assertIsDisplayed()
+            click("Retry")
+        }
+        compose.waitUntil(10_000) { journalViewModel.saveState.value == SaveState.Saved }
+        compose.onNodeWithText("Retry").assertDoesNotExist()
+        compose.onNodeWithText("Saved automatically").assertDoesNotExist()
+    }
+
     @Test fun narrowTimeInputPreservesEveningTime() = assertCompactTimeInput(width = 320, fontScale = 1f)
 
     @Test fun largeTextTimeInputPreservesEveningTime() = assertCompactTimeInput(width = 390, fontScale = 2f)
 
     @Test fun narrowLargeTextTimeInputPreservesEveningTime() = assertCompactTimeInput(width = 320, fontScale = 2f)
+
+    @Test fun calendarRestoresSelectedDayAndDisplayedMonth() {
+        var selected: String? = null
+        val restoration = StateRestorationTester(compose)
+        restoration.setContent {
+            InShapeTheme { RecordedDatePicker("Choose day", "2026-11-13", "", { selected = it }, {}) }
+        }
+        compose.onNode(hasClickAction() and hasText("Wednesday, 4 November 2026")).performClick()
+        compose.onNodeWithContentDescription("Change to next month").performScrollTo().performClick()
+        val decemberDay = compose.onNode(hasClickAction() and hasText("Friday, 4 December 2026"))
+        decemberDay.performScrollTo().assertIsDisplayed()
+        restoration.emulateSavedInstanceStateRestore()
+        decemberDay.performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Done").performClick()
+        compose.runOnIdle { assertEquals("2026-11-04", selected) }
+    }
+
+    @Test fun periodCalendarRestoresAnUnconfirmedStartDay() {
+        var selected: Pair<LocalDate, LocalDate>? = null
+        val restoration = StateRestorationTester(compose)
+        restoration.setContent {
+            InShapeTheme {
+                RecordedDateRangePicker("", "", LocalDate.of(2026, 11, 13), { from, to -> selected = from to to }, {})
+            }
+        }
+        compose.onNode(hasClickAction() and hasText("Wednesday, 4 November 2026")).performClick()
+        restoration.emulateSavedInstanceStateRestore()
+        val confirm = compose.onNode(hasClickAction() and hasText("Select period"))
+        confirm.assertIsNotEnabled()
+        compose.onNode(hasClickAction() and hasText("Monday, 9 November 2026")).performClick()
+        confirm.performClick()
+        compose.runOnIdle { assertEquals(LocalDate.of(2026, 11, 4) to LocalDate.of(2026, 11, 9), selected) }
+    }
 
     private fun assertCompactTimeInput(width: Int, fontScale: Float) {
         var selected: String? = null
@@ -127,28 +208,40 @@ class RedesignInteractionTest {
                 }
             }
         }
-        compose.onNodeWithText("22").assertIsDisplayed()
-        compose.onNodeWithText("AM").assertDoesNotExist()
-        compose.onNodeWithText("PM").assertDoesNotExist()
+        val uses24Hours = android.text.format.DateFormat.is24HourFormat(context)
+        compose.onNodeWithText(if (uses24Hours) "22" else "10").assertIsDisplayed()
+        if (uses24Hours) {
+            compose.onNodeWithText("PM").assertDoesNotExist()
+        } else {
+            compose.onNodeWithText("PM").assertIsDisplayed()
+        }
         compose.onNodeWithText("Done").performClick()
         compose.runOnIdle { assertEquals("22:42", selected) }
     }
 
-    @Test fun exportSelectionAndOptionsProducePdfAndCsv() {
+    @Test fun exportSelectionEnablesSaveAndShareForBothFormats() {
         launch("HistoryNovember", "Export")
-        compose.onNodeWithText("Prepare PDF").performScrollTo().assertIsNotEnabled()
-        click("Select period")
+        compose.onNodeWithText("Save").assertIsNotEnabled()
+        click("Select all")
         compose.onNodeWithContentDescription("Include private notes").performScrollTo().performClick()
         compose.onNodeWithContentDescription("Include check-ins and body observations").performScrollTo().performClick()
-        compose.onNodeWithText("Notes included. Check-ins included.").assertExists()
-        click("Prepare PDF")
-        compose.waitUntil(30_000) { compose.onAllNodesWithText("Save PDF").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Save PDF").performScrollTo().assertIsEnabled()
-        click("Prepare CSV")
-        compose.waitUntil(30_000) { compose.onAllNodesWithText("Save CSV").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Save CSV").performScrollTo().assertIsEnabled()
+        click("CSV")
+        compose.onNodeWithText("Save").assertIsEnabled()
+        compose.onNodeWithText("Share").assertIsEnabled()
         click("Clear selection")
-        compose.onNodeWithText("Prepare PDF").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("Save").assertIsNotEnabled()
+    }
+
+    @Test fun exportCancellationIsShownOnlyOnceWhenReturningToExport() {
+        launch("HistoryNovember", "Settings")
+        click("Export CSV or PDF")
+        compose.onNodeWithText("Select period").assertExists()
+        compose.runOnIdle { journalViewModel.transfers.exportCancelled() }
+        compose.onNodeWithText("Export cancelled.").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Back").performClick()
+        click("Export CSV or PDF")
+        compose.onNodeWithText("Select period").assertExists()
+        compose.onNodeWithText("Export cancelled.").assertDoesNotExist()
     }
 
     @Test fun duplicateLabelsStillSelectTheRequestedIdentity() {
@@ -263,11 +356,46 @@ class RedesignInteractionTest {
         compose.onNodeWithContentDescription(
             "Enable workout reminders"
         ).performScrollTo().performClick()
-        compose.waitUntil { !snapshot().preferences.remindersEnabled }
-        compose.onNodeWithText("Time").assertDoesNotExist()
+        compose.waitUntil(10_000) {
+            !snapshot().preferences.remindersEnabled && compose.onAllNodesWithText("Time").fetchSemanticsNodes().isEmpty()
+        }
         compose.onNodeWithContentDescription("Enable workout reminders").performClick()
-        compose.waitUntil { snapshot().preferences.remindersEnabled }
-        compose.onNodeWithText("Time").assertExists()
+        compose.waitUntil(10_000) {
+            snapshot().preferences.remindersEnabled && compose.onAllNodesWithText("Time").fetchSemanticsNodes().size == 1
+        }
+    }
+
+    @Test fun delayedNameSaveDoesNotCloseAReopenedEditor() {
+        launch("Empty", "Settings")
+        val release = CompletableDeferred<Unit>()
+        journalViewModel.write { release.await() }
+        try {
+            click("Name")
+            compose.onNode(hasSetTextAction()).performTextReplacement("First name")
+            click("Save")
+            click("Cancel")
+            click("Name")
+            compose.onNode(hasSetTextAction()).performTextReplacement("Second name")
+            releaseWrites(release)
+
+            assertEquals("First name", snapshot().preferences.name)
+            compose.onNode(hasSetTextAction() and hasText("Second name")).assertIsDisplayed()
+            click("Save")
+            compose.waitUntil(10_000) { snapshot().preferences.name == "Second name" }
+            compose.onNode(hasSetTextAction()).assertDoesNotExist()
+        } finally {
+            release.complete(Unit)
+        }
+    }
+
+    @Test fun optedInHealthSettingCanBeDisabledWithoutAProvider() {
+        launch("Empty", "Settings") { app ->
+            app.repository.updatePreferences(app.repository.snapshot().preferences.copy(readHeartRate = true))
+        }
+        val heartRate = compose.onNodeWithContentDescription(HealthCapability.HEART.label)
+        heartRate.performScrollTo().assertIsEnabled().performClick()
+        compose.waitUntil(10_000) { !snapshot().preferences.readHeartRate }
+        heartRate.assertIsNotEnabled()
     }
 
     @Test fun workoutNoteSetCompletionReopeningSwapDeferAndSkipStayConnected() {
@@ -284,6 +412,10 @@ class RedesignInteractionTest {
             "Note for this exercise"
         ).performScrollTo().performTextReplacement("Keep shoulders down")
         compose.onNodeWithContentDescription("Complete set 3").performScrollTo().performClick()
+        if (compose.onAllNodesWithText("Exercise done").fetchSemanticsNodes().isEmpty()) {
+            InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+            compose.waitUntil(5_000) { compose.onAllNodesWithText("Exercise done").fetchSemanticsNodes().isNotEmpty() }
+        }
         click("Exercise done")
         val original = DemoFixtures.id("active:item:4")
         compose.waitUntil { snapshot().items.find { it.id == original }?.disposition == "DONE" }
@@ -300,6 +432,7 @@ class RedesignInteractionTest {
         exerciseMenu("Skip today")
         compose.waitUntil { snapshot().items.find { it.id == skipped }?.disposition == "SKIPPED" }
         click("Finish")
+        compose.waitUntil(10_000) { snapshot().drafts.any { it.id == "finish:${DemoFixtures.activeId}" } }
         compose.onNodeWithText("Save workout").assertIsDisplayed()
     }
 
@@ -324,7 +457,7 @@ class RedesignInteractionTest {
         if (compose.onAllNodesWithText("Add energy and notes").fetchSemanticsNodes().isNotEmpty()) {
             click("Add energy and notes")
         }
-        compose.onNodeWithText("Note for this check-in").performScrollTo().performTextReplacement("After stretching")
+        compose.onNodeWithText("Note").performScrollTo().performTextReplacement("After stretching")
         click("Save")
         compose.waitUntil(10_000) { snapshot().checkIns.any { it.workoutId == id && it.note == "After stretching" } }
         val check = snapshot().checkIns.first { it.workoutId == id && it.phase == "AFTER" }
@@ -335,12 +468,175 @@ class RedesignInteractionTest {
         assertEquals(null, area.stiffness)
     }
 
+    @Test fun afterCheckInSavesIndependentSymptomsAndEnergy() {
+        val id = DemoFixtures.activeId
+        launch("CheckInAfter", "checkin/$id/AFTER") { app ->
+            val data = app.repository.snapshot()
+            val before = data.checkIns.single { it.workoutId == id && it.phase == "BEFORE" }
+            val after = data.checkIns.single { it.workoutId == id && it.phase == "AFTER" }
+            app.repository.saveCheckIn(before, listOf(BodyObservation(before.id, "left_knee", pain = 2)))
+            app.repository.saveCheckIn(after.copy(energy = null), emptyList())
+        }
+        click("Hard")
+        click("Yes")
+        click("Back")
+        click("Choose area")
+        compose.onNode(hasScrollAction() and hasAnyAncestor(isDialog())).performScrollToNode(hasText("Left knee"))
+        click("Left knee")
+        compose.onNodeWithText("Before").assertExists()
+        fun selectLevel(kind: String, level: String) {
+            val group = hasContentDescription("$kind for left_knee")
+            compose.onNode(hasText(level) and hasClickAction() and hasAnyAncestor(group))
+                .performScrollTo()
+                .performClick()
+        }
+        selectLevel("Pain", "Medium")
+        selectLevel("Stiffness", "Mild")
+        click("Left knee")
+        compose.onNodeWithText("Pain medium").assertExists()
+        compose.onNodeWithText("Stiffness mild").assertExists()
+
+        click("Add energy and notes")
+        click("Low")
+        compose.onNodeWithText("Low").assertIsSelected()
+        click("Low")
+        click("Good")
+        click("Save")
+        compose.waitUntil(10_000) {
+            snapshot().checkIns.any { it.workoutId == id && it.phase == "AFTER" && it.effort == 8 && it.energy == "GOOD" }
+        }
+        val data = snapshot()
+        val checkIn = data.checkIns.single { it.workoutId == id && it.phase == "AFTER" }
+        val area = data.observations.single { it.checkInId == checkIn.id }
+        assertEquals("left_knee", area.region)
+        assertEquals(5, area.pain)
+        assertEquals(2, area.stiffness)
+    }
+
+    @Test fun removingCheckInAreasRequiresConfirmationAndPreservesOtherPhases() {
+        val id = DemoFixtures.activeId
+        launch("CheckInAfter", "checkin/$id/AFTER") { app ->
+            val data = app.repository.snapshot()
+            val before = data.checkIns.single { it.workoutId == id && it.phase == "BEFORE" }
+            val after = data.checkIns.single { it.workoutId == id && it.phase == "AFTER" }
+            app.repository.saveCheckIn(before, listOf(BodyObservation(before.id, "neck", pain = 2)))
+            app.repository.saveCheckIn(
+                after,
+                listOf(BodyObservation(after.id, "left_knee", pain = 3), BodyObservation(after.id, "right_knee", stiffness = 2))
+            )
+        }
+        click("No")
+        click("Cancel")
+        compose.onNodeWithText("Right knee").assertExists()
+        if (compose.onAllNodesWithContentDescription("Remove Right knee").fetchSemanticsNodes().isEmpty()) click("Right knee")
+        compose.onNodeWithContentDescription("Remove Right knee").performScrollTo().performClick()
+        click("No")
+        compose.onNodeWithText("Remove 1 areas?").assertExists()
+        click("Remove")
+        click("Save")
+        compose.waitUntil(10_000) {
+            val data = snapshot()
+            val after = data.checkIns.single { it.workoutId == id && it.phase == "AFTER" }
+            data.observations.none { it.checkInId == after.id }
+        }
+        val data = snapshot()
+        val before = data.checkIns.single { it.workoutId == id && it.phase == "BEFORE" }
+        assertEquals(2, data.observations.single { it.checkInId == before.id }.pain)
+    }
+
+    @Test fun checkInCanKeepLegacyDraftTextWithoutOverwritingTheWorkoutNote() {
+        val id = DemoFixtures.activeId
+        launch("CheckInAfter", "checkin/$id/AFTER") { app ->
+            val checkIn: CheckIn = app.repository.snapshot().checkIns.single { it.workoutId == id && it.phase == "AFTER" }
+            val draft = CheckInDraft(checkIn, emptyList(), "Older draft text", "13 Nov 2026")
+            app.repository.saveWorkoutNote(id, "Current workout note")
+            app.repository.saveEditorDraft(EditorDraft("checkin:$id:AFTER", "checkin", Json.encodeToString(draft), checkIn.observedAt))
+        }
+        compose.onNodeWithText("Save").assertIsNotEnabled()
+        click("Keep draft text as check-in note")
+        click("Save")
+        compose.waitUntil(10_000) { snapshot().checkIns.any { it.workoutId == id && it.note.contains("Older draft text") } }
+        assertEquals("Current workout note", snapshot().workout(id)?.row?.note)
+    }
+
+    @Test fun exercisePhotoCanBeOpenedAndRemovedAfterCancellation() {
+        val id = DemoFixtures.pulldownId
+        launch("ExerciseWithSetup", "exercise/$id") { app ->
+            val source = File.createTempFile("exercise-photo", ".png", context.cacheDir)
+            val bitmap = Bitmap.createBitmap(24, 30, Bitmap.Config.ARGB_8888)
+            try {
+                source.outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+                app.photos.importPhoto(id, Uri.fromFile(source))
+            } finally {
+                bitmap.recycle()
+                source.delete()
+            }
+        }
+        compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("Exercise photo").fetchSemanticsNodes().size >= 2 }
+        compose.onAllNodesWithContentDescription("Exercise photo").onFirst().performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Close photo").assertIsDisplayed().performClick()
+        compose.onNodeWithContentDescription("Photo options").performScrollTo().performClick()
+        click("Remove photo")
+        click("Cancel")
+        assertEquals(1, snapshot().photos.count { it.exerciseId == id })
+        compose.onNodeWithContentDescription("Photo options").performScrollTo().performClick()
+        click("Remove photo")
+        click("Remove")
+        compose.waitUntil(10_000) {
+            snapshot().photos.none { it.exerciseId == id } &&
+                compose.onAllNodesWithText("Your photo of the machine").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    @Test fun routineMenuCanCancelRemovalAndDuplicateTheExerciseOrder() {
+        val id = DemoFixtures.routineId
+        launch("LibraryRoutineExpanded", "routine/$id")
+        val initial = snapshot()
+        val source = initial.routines.single { it.id == id }
+        val initialIds = initial.routines.map { it.id }.toSet()
+        fun menu() = compose.onNodeWithContentDescription("Routine options").performClick()
+        menu()
+        click("Remove")
+        click("Cancel")
+        assertEquals(source, snapshot().routines.single { it.id == id })
+
+        menu()
+        click("Duplicate")
+        compose.waitUntil(10_000) { snapshot().routines.any { it.id !in initialIds } }
+        val data = snapshot()
+        val copy = data.routines.single { it.id !in initialIds }
+        assertEquals("${source.title} copy", copy.title)
+        val originalItems = data.routineItems.filter { it.routineId == id }.sortedBy { it.position }
+        val copiedItems = data.routineItems.filter { it.routineId == copy.id }.sortedBy { it.position }
+        assertEquals(originalItems.map { it.exerciseId }, copiedItems.map { it.exerciseId })
+    }
+
+    @Test fun routineExerciseOrderCanBeChangedFromTheRowMenu() {
+        val id = DemoFixtures.routineId
+        launch("LibraryRoutineExpanded", "routine/$id")
+        val initial = snapshot()
+        val before = initial.routineItems.filter { it.routineId == id }.sortedBy { it.position }.map { it.exerciseId }
+        val first = initial.exercises.single { it.id == before.first() }.name
+        compose.onNodeWithContentDescription("Options for $first").performScrollTo().performClick()
+        compose.onNodeWithText("Move up").assertDoesNotExist()
+        click("Move down")
+        click("Save routine")
+        val expected = listOf(before[1], before[0]) + before.drop(2)
+        compose.waitUntil(10_000) {
+            val saved = journalViewModel.snapshot.value ?: return@waitUntil false
+            val order = saved.routineItems.filter { it.routineId == id }.sortedBy { it.position }.map { it.exerciseId }
+            order == expected && saved.drafts.none { it.id == "routine:$id" } && journalViewModel.saveState.value == SaveState.Saved
+        }
+    }
+
     @Test fun repeatedPastWorkoutConfirmationCreatesOneDraft() {
         launch("HistoryNovember", "History")
         val release = CompletableDeferred<Unit>()
         journalViewModel.write { release.await() }
         try {
             click("Past workout")
+            click("Add exercises")
+            compose.onNodeWithText("Enter a workout name").assertIsDisplayed()
             compose.onNodeWithText("Workout name").performTextReplacement("Evening session")
             val confirm = checkNotNull(
                 compose.onNodeWithText("Add exercises").fetchSemanticsNode().config[SemanticsActions.OnClick].action
@@ -361,15 +657,15 @@ class RedesignInteractionTest {
     @Test fun completedCheckInSaveDoesNotPopTheWorkoutWhenCheckInWasClosed() {
         launch("ActiveWorkoutPartiallyDone", "Today")
         click("Resume workout")
-        compose.onNodeWithContentDescription("Workout options").performScrollTo().performClick()
-        click("Before check-in")
+        compose.onNodeWithContentDescription("Workout options").performClick()
+        click("Check in before workout")
         val release = CompletableDeferred<Unit>()
         journalViewModel.write { release.await() }
         try {
-            compose.onNodeWithText("Note for this check-in").performScrollTo().performTextReplacement("Ready to lift")
+            compose.onNodeWithText("Note").performScrollTo().performTextReplacement("Ready to lift")
             click("Save")
             compose.onNodeWithText("Save").assertIsNotEnabled()
-            compose.onNodeWithContentDescription("Close check-in").performScrollTo().performClick()
+            compose.onNodeWithContentDescription("Back").performClick()
             compose.onNodeWithContentDescription("Workout options").assertIsDisplayed()
             releaseWrites(release)
 
@@ -400,5 +696,22 @@ class RedesignInteractionTest {
             hasText("Lat pulldown") and !hasSetTextAction()
         ).assertExists().performClick()
         compose.onNodeWithContentDescription("Favorite").assertExists()
+    }
+
+    @Test fun unavailableLocationNoLongerLooksSelected() {
+        launch("HistoryNovember", "Library")
+        click("Exercises")
+        click("All locations")
+        click("Home")
+        compose.onNodeWithText("Lat pulldown").assertDoesNotExist()
+        journalViewModel.write {
+            val exercise = snapshot().exercises.single { it.location == "Home" }
+            saveExercise(exercise.copy(location = "Gym"))
+        }
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithText("Lat pulldown").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("All locations").assertIsDisplayed()
+        compose.onNodeWithText("Home").assertDoesNotExist()
     }
 }

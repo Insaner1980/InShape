@@ -1,22 +1,22 @@
 package com.emmah.inshape.feature.workout
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.outlined.NoteAdd
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.ArrowDownward
-import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Info
@@ -27,21 +27,20 @@ import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.WbTwilight
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -50,6 +49,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import com.emmah.inshape.JournalViewModel
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.Workout
@@ -57,6 +59,7 @@ import com.emmah.inshape.data.WorkoutItem
 import com.emmah.inshape.feature.library.ExercisePicker
 import com.emmah.inshape.ui.components.ActionRow
 import com.emmah.inshape.ui.components.AppMenu
+import com.emmah.inshape.ui.components.ButtonSize
 import com.emmah.inshape.ui.components.ConfirmDialog
 import com.emmah.inshape.ui.components.EmptyState
 import com.emmah.inshape.ui.components.InShapeCard
@@ -70,12 +73,11 @@ import com.emmah.inshape.ui.components.Pill
 import com.emmah.inshape.ui.components.PrimaryButton
 import com.emmah.inshape.ui.components.ProgressSegments
 import com.emmah.inshape.ui.components.ProgressState
-import com.emmah.inshape.ui.components.ResponsiveRow
-import com.emmah.inshape.ui.components.SectionLabel
+import com.emmah.inshape.ui.components.PushedHeader
+import com.emmah.inshape.ui.components.SectionHeader
 import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.components.TextField
 import com.emmah.inshape.ui.theme.Dimens
-import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.InShapeType
 import com.emmah.inshape.ui.theme.formatElapsed
@@ -108,7 +110,7 @@ fun itemSummary(item: WorkoutItem): String = if (item.completedSets.isNotEmpty()
     "Not completed"
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun WorkoutScreen(
     id: String,
@@ -122,6 +124,7 @@ fun WorkoutScreen(
     modifier: Modifier = Modifier
 ) {
     val workout = data.workout(id) ?: return
+    val uses24Hours = DateFormat.is24HourFormat(LocalContext.current)
     val colors = InShapeTheme.colors
     var picker by remember { mutableStateOf(false) }
     var alternatives by remember { mutableStateOf(false) }
@@ -140,65 +143,82 @@ fun WorkoutScreen(
     var duration by rememberSaveable(current?.row?.id) {
         mutableStateOf(data.drafts.find { it.id == "duration:${current?.row?.id}" }?.payload ?: "")
     }
-    Page(modifier, bottomBar = {
-        PrimaryButton(
-            if (current == null) "Finish workout" else "Exercise done",
-            {
-                if (current == null) {
-                    onFinish()
-                } else {
-                    vm.write {
-                        val seconds = if (duration.isBlank()) {
-                            null
-                        } else {
-                            duration.toLongOrNull()?.takeIf {
-                                it >
-                                    0 &&
-                                    it <= Long.MAX_VALUE / 60
-                            }?.times(60)
-                                ?: throw IllegalArgumentException("Enter positive whole minutes")
+    val scrollState = rememberScrollState()
+    var clockHeight by remember { mutableIntStateOf(0) }
+    val screenTopPx = with(LocalDensity.current) { Dimens.screenTop.roundToPx() }
+    val showTopClock by remember(scrollState, screenTopPx) {
+        derivedStateOf { clockHeight > 0 && scrollState.value >= clockHeight + screenTopPx }
+    }
+    val bottomAction: (@Composable () -> Unit)? = if (WindowInsets.isImeVisible) {
+        null
+    } else {
+        {
+            PrimaryButton(
+                if (current == null) "Finish workout" else "Exercise done",
+                {
+                    if (current == null) {
+                        onFinish()
+                    } else {
+                        vm.write {
+                            val seconds = if (duration.isBlank()) {
+                                null
+                            } else {
+                                duration.toLongOrNull()?.takeIf {
+                                    it >
+                                        0 &&
+                                        it <= Long.MAX_VALUE / 60
+                                }?.times(60)
+                                    ?: throw IllegalArgumentException("Enter positive whole minutes")
+                            }
+                            markItemDone(current.row.id, seconds)
+                            deleteEditorDraft("duration:${current.row.id}")
                         }
-                        markItemDone(current.row.id, seconds)
-                        deleteEditorDraft("duration:${current.row.id}")
                     }
-                }
-            },
-            Modifier.fillMaxWidth().heightIn(
-                min = Dimens.button
+                },
+                Modifier.fillMaxWidth(),
+                size = ButtonSize.Large
             )
-        )
-    }) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") }
-            Box(Modifier.weight(1f))
-            OutlineButton("Finish", onFinish)
-            Box {
-                IconButton({ workoutMenu = true }) { Icon(Icons.Outlined.MoreVert, "Workout options") }
-                AppMenu(workoutMenu, { workoutMenu = false }) {
-                    MenuAction("Add exercise", Icons.Outlined.Add, {
-                        workoutMenu = false
-                        picker = true
-                    })
-                    MenuAction("Before check-in", Icons.Outlined.WbTwilight, {
-                        workoutMenu = false
-                        onCheckIn()
-                    })
-                    if (data.routines.any { it.id == workout.row.sourceRoutineId }) {
-                        MenuAction("Save changes to routine", Icons.Outlined.Save, {
+        }
+    }
+    Page(
+        modifier,
+        bottomBar = bottomAction,
+        topBar = {
+            PushedHeader(onBack) {
+                elapsed?.takeIf { showTopClock }?.let {
+                    Text(formatElapsed(it), style = InShapeType.numeric, modifier = Modifier.padding(end = Dimens.innerSmall))
+                }
+                OutlineButton("Finish", onFinish)
+                Box {
+                    IconButton({ workoutMenu = true }) { Icon(Icons.Outlined.MoreVert, "Workout options") }
+                    AppMenu(workoutMenu, { workoutMenu = false }) {
+                        MenuAction("Add exercise", Icons.Outlined.Add, {
                             workoutMenu = false
-                            routineSave = true
+                            picker = true
                         })
+                        MenuAction("Check in before workout", Icons.Outlined.WbTwilight, {
+                            workoutMenu = false
+                            onCheckIn()
+                        })
+                        if (data.routines.any { it.id == workout.row.sourceRoutineId }) {
+                            MenuAction("Save changes to routine", Icons.Outlined.Save, {
+                                workoutMenu = false
+                                routineSave = true
+                            })
+                        }
+                        HorizontalDivider(color = colors.divider)
+                        MenuAction("Discard workout", Icons.Outlined.Delete, {
+                            workoutMenu = false
+                            discard = true
+                        }, destructive = true)
                     }
-                    HorizontalDivider(color = colors.divider)
-                    MenuAction("Discard workout", Icons.Outlined.Delete, {
-                        workoutMenu = false
-                        discard = true
-                    }, destructive = true)
                 }
             }
-        }
+        },
+        scrollState = scrollState
+    ) {
         Column(
-            Modifier.fillMaxWidth().padding(bottom = Dimens.itemGap),
+            Modifier.fillMaxWidth().onSizeChanged { clockHeight = it.height }.padding(bottom = Dimens.itemGap),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Dimens.innerTiny)
         ) {
@@ -207,7 +227,7 @@ fun WorkoutScreen(
                 Text(formatElapsed(elapsed!!), style = MaterialTheme.typography.displayLarge)
                 workout.row.start?.let {
                     Text(
-                        "Started ${Instant.parse(it).workoutTime(ZoneId.of(workout.row.zoneId))}",
+                        "Started ${Instant.parse(it).workoutTime(ZoneId.of(workout.row.zoneId), uses24Hours)}",
                         style = MaterialTheme.typography.labelSmall,
                         color = colors.textSecondary
                     )
@@ -221,30 +241,34 @@ fun WorkoutScreen(
                 Text("Review the timing before saving.", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
             }
         }
-        ProgressSegments(
-            workout.items.map {
-                when {
-                    it.row.disposition == "DONE" -> ProgressState.Done
+        if (workout.items.isNotEmpty()) {
+            ProgressSegments(
+                workout.items.map {
+                    when {
+                        it.row.disposition == "DONE" -> ProgressState.Done
 
-                    it.row.id ==
-                        current?.row?.id -> ProgressState.Current
+                        it.row.id ==
+                            current?.row?.id -> ProgressState.Current
 
-                    else -> ProgressState.Pending
-                }
-            },
-            "${workout.doneCount} of ${workout.items.size} done"
-        )
-        Text(
-            if (current == null) "All exercises done" else "Exercise ${workout.items.indexOf(current) + 1} of ${workout.items.size}",
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.textSecondary
-        )
-        if (current ==
-            null
-        ) {
+                        else -> ProgressState.Pending
+                    }
+                },
+                "${workout.doneCount} of ${workout.items.size} done"
+            )
+            Text(
+                if (current == null) "All exercises done" else "Exercise ${workout.items.indexOf(current) + 1} of ${workout.items.size}",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textSecondary
+            )
+        }
+        if (current == null) {
+            val empty = workout.items.isEmpty()
             EmptyState(
-                "Your plan is complete",
-                "Add another exercise or finish with the work you recorded."
+                if (empty) "No exercises yet" else "Your plan is complete",
+                if (empty) "Add exercises as you go." else "Add another exercise or finish with the work you recorded.",
+                action = "Add exercise",
+                onAction = { picker = true },
+                icon = Icons.Outlined.Add
             )
         }
         current?.let { item ->
@@ -264,7 +288,7 @@ fun WorkoutScreen(
                 }
             }
             Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
-                ResponsiveRow {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         item.row.name,
                         Modifier.weight(1f),
@@ -297,26 +321,6 @@ fun WorkoutScreen(
                                 vm.write { skipItem(item.row.id) }
                             })
                             HorizontalDivider(color = colors.divider)
-                            MenuAction(
-                                "Move up",
-                                Icons.Outlined.ArrowUpward,
-                                {
-                                    menu = false
-                                    vm.write { moveItem(item.row.id, -1) }
-                                },
-                                enabled =
-                                    item.row.position > 0
-                            )
-                            MenuAction(
-                                "Move down",
-                                Icons.Outlined.ArrowDownward,
-                                {
-                                    menu = false
-                                    vm.write { moveItem(item.row.id, 1) }
-                                },
-                                enabled =
-                                    item.row.position < workout.items.lastIndex
-                            )
                             MenuAction("Remove exercise", Icons.Outlined.Delete, {
                                 menu = false
                                 if (item.hasPerformedWork) remove = item.row.id else vm.write { removeItem(item.row.id) }
@@ -324,15 +328,30 @@ fun WorkoutScreen(
                         }
                     }
                 }
-                if (item.row.setup.isNotBlank()) {
-                    Text(
-                        item.row.setup.split(',').joinToString(", ") {
-                            it.trim()
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.textSecondary
-                    )
+                val settings = item.row.setup.split(", ").mapNotNull { raw ->
+                    val entry = raw.trim()
+                    val label = entry.substringBefore(": ")
+                    val value = entry.substringAfter(": ")
+                    when {
+                        value.isBlank() || value.equals("None", ignoreCase = true) -> null
+
+                        label != value && label.equals("Handle", ignoreCase = true) -> value
+
+                        label != value && label.equals("Seat height", ignoreCase = true) -> "Seat $value"
+
+                        label != value -> "$label $value"
+
+                        // Older journal entries stored the label and value without a colon.
+                        entry.endsWith(" None", ignoreCase = true) -> null
+
+                        entry.startsWith("Handle ", ignoreCase = true) -> entry.drop("Handle ".length)
+
+                        entry.startsWith("Seat height ", ignoreCase = true) -> "Seat " + entry.drop("Seat height ".length)
+
+                        else -> entry
+                    }
                 }
+                if (settings.isNotEmpty()) ActionRow { settings.forEach { Pill(it, outlined = true) } }
                 val previous = data.history.filter {
                     it.row.id != id
                 }.sortedWith(
@@ -414,7 +433,7 @@ fun WorkoutScreen(
         }
         val next = pending.filter { it.row.id != current?.row?.id }
         if (next.isNotEmpty()) {
-            SectionLabel("Up next")
+            SectionHeader("Up next")
             ListCard {
                 next.forEach { nextItem ->
                     item {
@@ -438,7 +457,7 @@ fun WorkoutScreen(
         }
         val done = workout.items.filter { it.row.disposition == "DONE" }
         if (done.isNotEmpty()) {
-            SectionLabel("Done")
+            SectionHeader("Done")
             ListCard {
                 done.forEach { doneItem ->
                     item {
@@ -459,7 +478,7 @@ fun WorkoutScreen(
         }
         val skipped = workout.items.filter { it.row.disposition in listOf("SKIPPED", "INCOMPLETE") }
         if (skipped.isNotEmpty()) {
-            SectionLabel("Skipped")
+            SectionHeader("Skipped")
             ListCard {
                 skipped.forEach { skippedItem ->
                     item {
@@ -496,7 +515,7 @@ fun WorkoutScreen(
             val ids =
                 data.exercises.find { it.id == current.row.exerciseId }?.alternatives ?: emptyList()
             Page {
-                SectionLabel("Your alternatives")
+                SectionHeader("Your alternatives")
                 if (ids.isEmpty()) {
                     Text(
                         "Add your alternatives by editing this exercise in Library."
@@ -505,7 +524,7 @@ fun WorkoutScreen(
                 ListCard {
                     data.exercises.filter { it.id in ids && !it.archived }.forEach { exercise ->
                         item {
-                            ListRow(exercise.name, subtitle = exercise.equipmentName, onClick = {
+                            ListRow(exercise.name, subtitle = exercise.equipmentName, showChevron = false, onClick = {
                                 vm.write { useAlternative(current.row.id, exercise.id) }
                                 alternatives =
                                     false

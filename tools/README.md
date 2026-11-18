@@ -78,8 +78,14 @@ pwsh -NoProfile -File tools/sonar.ps1 -PlanOnly
 
 An actual upload uses `-AllowExternalUpload` and `SONAR_TOKEN` from the existing
 credential setup. The configured `sonar` PowerShell command loads the Sonar CLI's
-Windows credential automatically. Coverage is JVM-only; it does not include device
-coverage. A successful local build does not prove a GitHub workflow or cloud scan.
+Windows credential automatically. The default uses JVM coverage. To add coverage
+from a connected Android emulator or test device, run the following in PowerShell:
+
+```powershell
+.\tools\sonar.ps1 -IncludeDeviceCoverage -AllowExternalUpload
+```
+
+A successful local build does not prove a GitHub workflow or cloud scan.
 
 The actual SonarCloud analysis on 2026-11-14 passed the unchanged Sonar way gate
 with 89.4% new-code coverage, no open bugs or vulnerabilities, and 56 remaining

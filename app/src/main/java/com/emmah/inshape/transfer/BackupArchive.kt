@@ -14,13 +14,13 @@ import com.emmah.inshape.data.RoutineItem
 import com.emmah.inshape.data.SessionItem
 import com.emmah.inshape.data.SessionSet
 import com.emmah.inshape.data.WorkoutEntity
+import com.emmah.inshape.data.parseWorkoutInstant
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FilterOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.security.MessageDigest
-import java.time.Instant
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -74,7 +74,7 @@ object BackupArchive {
     )
     fun write(data: JournalSnapshot, photoFile: (PhotoAsset) -> File, output: OutputStream, createdAt: String, appVersion: String) {
         validateBackupData(data)
-        Instant.parse(createdAt)
+        parseWorkoutInstant(createdAt)
         val photos = data.photos.map {
             it.copy(path = "photos/${it.id}.${extensionFor(it.mediaType)}")
         }
@@ -215,7 +215,7 @@ object BackupArchive {
         require(manifest.formatVersion == 1) {
             "Unsupported backup version ${manifest.formatVersion}. Update InShape before restoring."
         }
-        Instant.parse(manifest.createdAt)
+        parseWorkoutInstant(manifest.createdAt)
         require(
             manifest.entries.size in 3..2003 && manifest.entries.keys.containsAll(metadataNames)
         ) {

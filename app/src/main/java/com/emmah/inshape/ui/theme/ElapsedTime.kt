@@ -6,6 +6,7 @@ import androidx.compose.runtime.produceState
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -27,7 +28,12 @@ fun formatDuration(seconds: Long): String {
     return if (minutes < 60) "$minutes min" else "${minutes / 60} h ${minutes % 60} min"
 }
 
-fun Instant.workoutTime(zone: ZoneId): String = atZone(zone).format(DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH))
+private val time24 = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
+private val time12 = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH)
+
+fun LocalTime.workoutTime(uses24Hours: Boolean): String = format(if (uses24Hours) time24 else time12)
+
+fun Instant.workoutTime(zone: ZoneId, uses24Hours: Boolean): String = atZone(zone).toLocalTime().workoutTime(uses24Hours)
 
 @Composable
 fun rememberElapsedSeconds(start: Instant?, clock: Clock): State<Long?> = produceState(

@@ -3,11 +3,11 @@
 
 package com.emmah.inshape.feature.workout
 
-import androidx.compose.foundation.layout.Row
+import android.text.format.DateFormat
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
-import androidx.compose.material3.Checkbox
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -15,8 +15,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.room.withTransaction
 import com.emmah.inshape.JournalViewModel
 import com.emmah.inshape.data.JournalSnapshot
@@ -24,20 +26,26 @@ import com.emmah.inshape.data.Workout
 import com.emmah.inshape.data.WorkoutTiming
 import com.emmah.inshape.data.resolveRecordedTime
 import com.emmah.inshape.ui.components.InShapeCard
-import com.emmah.inshape.ui.components.ListRow
+import com.emmah.inshape.ui.components.KeyValueRow
 import com.emmah.inshape.ui.components.NumberField
 import com.emmah.inshape.ui.components.OutlineButton
 import com.emmah.inshape.ui.components.Page
 import com.emmah.inshape.ui.components.PrimaryButton
 import com.emmah.inshape.ui.components.RecordedDatePicker
 import com.emmah.inshape.ui.components.RecordedTimePicker
-import com.emmah.inshape.ui.components.SectionLabel
+import com.emmah.inshape.ui.components.SectionHeader
 import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.components.TextField
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeTheme
+import com.emmah.inshape.ui.theme.formatDuration
+import com.emmah.inshape.ui.theme.instantLabel
+import com.emmah.inshape.ui.theme.journalDateLabel
+import com.emmah.inshape.ui.theme.workoutTime
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.OffsetTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -73,6 +81,7 @@ fun WorkoutTimingEditor(
 ) {
     val workout = data.workout(id) ?: return
     val zone = ZoneId.of(workout.row.zoneId)
+    val uses24Hours = DateFormat.is24HourFormat(LocalContext.current)
     val key = "timing:$id"
     var form by remember(id) {
         val start = workout.row.start?.let { Instant.parse(it).atZone(zone) }
@@ -109,7 +118,19 @@ fun WorkoutTimingEditor(
         form = value
         vm.saveDraft(key, "timing", Json.encodeToString(value))
     }
-    var picker by remember { mutableStateOf<String?>(null) }
+    var picker by rememberSaveable { mutableStateOf<String?>(null) }
+    var endpoint by rememberSaveable { mutableStateOf<String?>(null) }
+    fun dateLabel(date: String) = runCatching { date.journalDateLabel("EEE d MMM yyyy") }.getOrDefault("Invalid date")
+    fun timeLabel(time: String) = runCatching { LocalTime.parse(time.take(5)).workoutTime(uses24Hours) }.getOrDefault("Not recorded")
+    val computedDuration = if (form.unknownTimes) {
+        null
+    } else {
+        runCatching {
+            val start = resolveRecordedTime(form.startDate, form.startTime, zone, form.originalStart)
+            val end = resolveRecordedTime(form.endDate, form.endTime, zone, form.originalEnd)
+            Duration.between(start, end).seconds
+        }.getOrNull()
+    }
     val stale = form.revision != workout.row.revision
     Page(modifier, bottomBar = {
         PrimaryButton(if (correcting) "Save correction" else "Save workout", {
@@ -170,32 +191,18 @@ fun WorkoutTimingEditor(
     }) {
         if (stale) {
             InShapeCard(inset = true) {
-                SectionLabel("Saved values changed")
+                SectionHeader("Saved values changed")
                 Text("Review the saved values before keeping your draft.")
-                Text("${workout.row.title}, ${workout.row.journalDate}")
+                Text("${workout.row.title}, ${dateLabel(workout.row.journalDate)}")
                 Text("Note: ${workout.row.note.ifBlank { "None" }}")
-                Text("Start: ${workout.row.start ?: "Not recorded"}")
-                Text("End: ${workout.row.end ?: "Not recorded"}")
+                KeyValueRow("Started", workout.row.start?.instantLabel(zone, uses24Hours) ?: "Not recorded")
+                KeyValueRow("Finished", workout.row.end?.instantLabel(zone, uses24Hours) ?: "Not recorded")
                 Text("Duration: ${workout.row.durationSeconds?.let { "$it seconds" } ?: "Not recorded"}")
                 OutlineButton("Keep this draft", { edit(form.copy(revision = workout.row.revision)) })
             }
         }
-        androidx.compose.foundation.layout.Column(
-            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Dimens.itemGap)
-        ) {
-            SectionLabel(if (correcting) "Correct workout" else "Review your workout")
-            Text("${workout.performedCount} exercises with recorded work")
-            Text(
-                "${workout.items.count {
-                    it.row.disposition == "SKIPPED"
-                }} skipped, ${workout.items.count {
-                    it.row.disposition in listOf("PLANNED", "IN_PROGRESS", "INCOMPLETE")
-                }} incomplete"
-            )
-            Text("Only explicitly completed sets and activities count as performed work.")
-        }
         TextField(form.title, "Workout name", { edit(form.copy(title = it)) }, singleLine = true)
-        ListRow("Workout date", trailing = { Text(form.date) }, onClick = { picker = "Workout date" })
+        KeyValueRow("Workout date", dateLabel(form.date), onClick = { picker = "Workout date" })
         if (workout.row.timingNeedsReview) {
             Text(
                 "This session was resumed on another date. Review the interval or keep the times unknown."
@@ -204,31 +211,54 @@ fun WorkoutTimingEditor(
         androidx.compose.foundation.layout.Column(
             verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Dimens.itemGap)
         ) {
-            SectionLabel("Recorded timing")
+            SectionHeader("Recorded timing")
             if (zone != vm.container.clock.zone) Text("Recorded in ${zone.id}", color = InShapeTheme.colors.textSecondary)
             TextAction(if (form.unknownTimes) "Use recorded times" else "I don't know the times", {
                 edit(form.copy(unknownTimes = !form.unknownTimes))
             })
             if (!form.unknownTimes) {
-                listOf(
-                    "Start date" to form.startDate,
-                    "Started" to form.startTime,
-                    "End date" to form.endDate,
-                    "Finished" to form.endTime
-                ).forEach { (label, value) ->
-                    ListRow(label, trailing = { Text(value.ifBlank { "Not recorded" }) }, onClick = { picker = label })
+                KeyValueRow("Started", "${dateLabel(form.startDate)}, ${timeLabel(form.startTime)}", numeric = true) {
+                    endpoint = "Started"
                 }
+                KeyValueRow("Finished", "${dateLabel(form.endDate)}, ${timeLabel(form.endTime)}", numeric = true) {
+                    endpoint = "Finished"
+                }
+                val elapsed = when {
+                    computedDuration == null -> "Not recorded"
+                    computedDuration < 0 -> "Finish is before start"
+                    else -> formatDuration(computedDuration)
+                }
+                KeyValueRow("Elapsed time", elapsed, numeric = true)
             }
-            NumberField(form.duration, {
-                edit(form.copy(duration = it))
-            }, "Recorded duration in minutes (optional)")
-            Text(
-                "Leave duration blank when it is unknown. It can differ from the start-to-end interval."
+            NumberField(
+                form.duration,
+                { edit(form.copy(duration = it)) },
+                "Duration (min)",
+                Modifier.fillMaxWidth(),
+                supportingText = "Leave empty if you don't know."
             )
         }
         TextField(form.note, "Workout note", { edit(form.copy(note = it)) })
 
         if (!correcting) Text("Check-ins are optional. You can add one after saving.")
+    }
+    endpoint?.let { label ->
+        val isStart = label == "Started"
+        AlertDialog(
+            onDismissRequest = { endpoint = null },
+            title = { Text(label) },
+            text = {
+                androidx.compose.foundation.layout.Column {
+                    KeyValueRow("Date", dateLabel(if (isStart) form.startDate else form.endDate)) {
+                        picker = if (isStart) "Start date" else "End date"
+                    }
+                    KeyValueRow("Time", timeLabel(if (isStart) form.startTime else form.endTime), numeric = true) {
+                        picker = label
+                    }
+                }
+            },
+            confirmButton = { TextAction("Close", { endpoint = null }) }
+        )
     }
     picker?.let { field ->
         fun timeForDateChange(time: String, oldDate: String, newDate: String): String = if (oldDate == newDate) {
@@ -247,6 +277,7 @@ fun WorkoutTimingEditor(
                 }
             )
             picker = null
+            if (!field.endsWith("date")) endpoint = null
         }
         if (field.endsWith("date")) {
             RecordedDatePicker(

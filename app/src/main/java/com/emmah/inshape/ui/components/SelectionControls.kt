@@ -1,5 +1,6 @@
 package com.emmah.inshape.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.FlowRow
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -35,28 +37,25 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.InShapeType
-import com.emmah.inshape.ui.theme.isDark
 
 enum class PillTone { Neutral, Accent }
 
 @Composable
-fun Pill(text: String, modifier: Modifier = Modifier, tone: PillTone = PillTone.Neutral) {
+fun Pill(text: String, modifier: Modifier = Modifier, tone: PillTone = PillTone.Neutral, outlined: Boolean = false) {
     val colors = InShapeTheme.colors
     Surface(
-        modifier.heightIn(min = Dimens.weekCircle),
+        modifier.heightIn(min = if (outlined) Dimens.setNumber else Dimens.weekCircle),
         shape = InShapeShapes.chip,
-        color = if (tone ==
-            PillTone.Accent
-        ) {
-            colors.ink
-        } else {
-            colors.surface
-        }
+        color = when {
+            outlined -> colors.background
+            tone == PillTone.Accent -> colors.ink
+            else -> colors.surface
+        },
+        border = if (outlined) BorderStroke(Dimens.line, colors.textSecondary) else null
     ) {
         Text(
             text,
@@ -74,7 +73,7 @@ fun Pill(text: String, modifier: Modifier = Modifier, tone: PillTone = PillTone.
 }
 
 @Composable
-fun FilterPill(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun FilterPill(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, showDropdown: Boolean = false) {
     val colors = InShapeTheme.colors
     Surface(
         onClick,
@@ -86,9 +85,10 @@ fun FilterPill(text: String, selected: Boolean, onClick: () -> Unit, modifier: M
         shape = InShapeShapes.chip,
         color = if (selected) colors.text else colors.surface
     ) {
-        Box(
+        Row(
             Modifier.padding(horizontal = Dimens.inner, vertical = Dimens.innerSmall),
-            contentAlignment = Alignment.Center
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Dimens.innerTiny)
         ) {
             Text(
                 text,
@@ -97,6 +97,9 @@ fun FilterPill(text: String, selected: Boolean, onClick: () -> Unit, modifier: M
                 ),
                 color = if (selected) colors.background else colors.text
             )
+            if (showDropdown) {
+                Icon(Icons.Outlined.KeyboardArrowDown, null, Modifier.size(Dimens.iconSmall))
+            }
         }
     }
 }
@@ -184,10 +187,15 @@ fun InShapeSwitch(
         colors = SwitchDefaults.colors(
             checkedTrackColor = colors.ink,
             checkedThumbColor = colors.onInk,
-            uncheckedTrackColor = colors.surfaceStrong,
-            uncheckedThumbColor = colors.background,
+            uncheckedTrackColor = colors.background,
+            uncheckedThumbColor = colors.textSecondary,
             checkedBorderColor = Color.Transparent,
-            uncheckedBorderColor = colors.divider
+            uncheckedBorderColor = colors.textSecondary,
+            disabledCheckedTrackColor = colors.ink.copy(alpha = .38f),
+            disabledCheckedThumbColor = colors.onInk.copy(alpha = .38f),
+            disabledUncheckedTrackColor = colors.background,
+            disabledUncheckedThumbColor = colors.textSecondary.copy(alpha = .38f),
+            disabledUncheckedBorderColor = colors.textSecondary.copy(alpha = .38f)
         )
     )
 }

@@ -1,5 +1,6 @@
 package com.emmah.inshape.feature.workout
 
+import android.text.format.DateFormat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,12 +14,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -32,18 +31,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.room.withTransaction
 import com.emmah.inshape.JournalViewModel
+import com.emmah.inshape.data.EditorDraft
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.Workout
 import com.emmah.inshape.data.WorkoutTiming
 import com.emmah.inshape.data.resolveRecordedTime
+import com.emmah.inshape.ui.components.ButtonSize
 import com.emmah.inshape.ui.components.ConfirmDialog
 import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListRow
 import com.emmah.inshape.ui.components.NumberField
 import com.emmah.inshape.ui.components.Page
 import com.emmah.inshape.ui.components.PrimaryButton
+import com.emmah.inshape.ui.components.PushedHeader
 import com.emmah.inshape.ui.components.RecordedTimePicker
 import com.emmah.inshape.ui.components.ResponsiveRow
 import com.emmah.inshape.ui.components.TextAction
@@ -51,15 +54,15 @@ import com.emmah.inshape.ui.components.TextField
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
+import com.emmah.inshape.ui.theme.displayDate
 import com.emmah.inshape.ui.theme.formatDuration
 import com.emmah.inshape.ui.theme.journalDateLabel
+import com.emmah.inshape.ui.theme.workoutTime
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlinx.serialization.json.Json
 
 @Composable
@@ -111,24 +114,35 @@ fun FinishScreen(
 ) {
     val workout = data.workout(id) ?: return
     val key = "finish:$id"
-    var form by remember(id) {
+    var savedForm by remember(id) {
         val payload = data.drafts.find { it.id == key && it.kind == "finish" }?.payload
         mutableStateOf(finishDraft(payload, vm.container.clock.instant(), workout.row.note))
     }
+    val currentNote = workout.row.note
+    val form = savedForm.withCurrentWorkoutNote(currentNote)
+    val noteConflict = form.note != form.originalNote && currentNote != form.originalNote && currentNote != form.note
     var fixTime by remember { mutableStateOf(false) }
     var showNote by remember { mutableStateOf(form.note.isNotBlank()) }
     var discard by remember { mutableStateOf(false) }
     val colors = InShapeTheme.colors
     val zone = ZoneId.of(workout.row.zoneId)
+    val uses24Hours = DateFormat.is24HourFormat(LocalContext.current)
     val empty = nothingRecorded(workout, form.note)
     LaunchedEffect(id) { vm.saveDraft(key, "finish", Json.encodeToString(form)) }
     fun edit(value: FinishDraft) {
-        form = value
+        savedForm = value
         vm.saveDraft(key, "finish", Json.encodeToString(value))
     }
     fun back() {
+        val draft = form.afterReturningToWorkout()
         vm.write {
-            deleteEditorDraft(key)
+            if (draft == null) {
+                deleteEditorDraft(key)
+            } else {
+                saveEditorDraft(
+                    EditorDraft(key, "finish", Json.encodeToString(draft), vm.container.clock.instant().toString())
+                )
+            }
             onBack()
         }
     }
@@ -144,7 +158,6 @@ fun FinishScreen(
                         val duration = finishDuration(value, workout.row.start)
                         require(!value.unknownTimes || value.minutes.isBlank() || duration != null) { "Enter positive whole minutes" }
                         db.withTransaction {
-                            if (value.note != workout.row.note) saveWorkoutNote(id, value.note)
                             finishWorkout(
                                 id,
                                 WorkoutTiming(
@@ -154,29 +167,31 @@ fun FinishScreen(
                                     clearTimes = value.unknownTimes,
                                     durationSeconds = if (value.unknownTimes) duration else null,
                                     inferDuration = !value.unknownTimes
-                                )
+                                ),
+                                note = value.note.takeIf { it != value.originalNote },
+                                expectedNote = value.originalNote
                             )
                             deleteEditorDraft(key)
                         }
                         onSaveComplete()
                     }
                 }
-            }, Modifier.fillMaxWidth())
+            }, Modifier.fillMaxWidth(), enabled = empty || !noteConflict, size = ButtonSize.Large)
             if (empty) TextAction("Discard workout", { discard = true }, color = colors.error)
         }
-    }) {
-        IconButton({ back() }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") }
-        Surface(Modifier.size(Dimens.touch), shape = InShapeShapes.pill, color = colors.ink) {
-            Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Check, null, tint = colors.onInk) }
+    }, topBar = { PushedHeader(onBack = ::back) }) {
+        if (!empty) {
+            Surface(Modifier.size(Dimens.touch), shape = InShapeShapes.pill, color = colors.ink) {
+                Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Check, null, tint = colors.onInk) }
+            }
         }
-        Text("Workout done", style = MaterialTheme.typography.headlineMedium)
+        Text(if (empty) "Nothing recorded yet" else "Workout done", style = MaterialTheme.typography.headlineMedium)
         Text(
             "${workout.row.title}, ${workout.row.journalDate.journalDateLabel("EEEE d MMMM")}",
             style = MaterialTheme.typography.bodyMedium,
             color = colors.textSecondary
         )
         if (empty) {
-            Text("Nothing recorded yet", style = MaterialTheme.typography.titleMedium)
             Text(
                 "Complete at least one set, mark an exercise done or add a note.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -188,7 +203,7 @@ fun FinishScreen(
                 if (!form.unknownTimes) {
                     (form.fixedStart ?: workout.row.start)?.let {
                         Text(
-                            workoutTimeRange(Instant.parse(it), Instant.parse(form.end), zone),
+                            workoutTimeRange(Instant.parse(it), Instant.parse(form.end), zone, uses24Hours),
                             style = MaterialTheme.typography.bodyMedium,
                             color = colors.textSecondary
                         )
@@ -201,24 +216,21 @@ fun FinishScreen(
             item { ListRow("Fix time", onClick = { fixTime = true }) }
             item { ListRow(if (form.note.isBlank()) "Add note" else "Note", onClick = { showNote = !showNote }) }
             item {
-                ListRow("Share to Health Connect", trailing = {
-                    Text(
-                        if (data.preferences.shareWorkouts &&
-                            form.unknownTimes
-                        ) {
-                            "Off for this workout"
-                        } else if (data.preferences.shareWorkouts) {
-                            "On"
-                        } else {
-                            "Off"
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.textSecondary
-                    )
-                }, onClick = onSettings)
+                val status = when {
+                    !data.preferences.shareWorkouts -> "Off"
+                    form.unknownTimes -> "Times needed"
+                    else -> "On"
+                }
+                ListRow("Share to Health Connect", subtitle = status, onClick = onSettings)
             }
         }
-        if (showNote) TextField(form.note, "Workout note", { edit(form.copy(note = it)) })
+        if (noteConflict) {
+            Text("The workout note changed elsewhere. Choose which note to save.", color = colors.error)
+            Text("Current note: ${currentNote.ifBlank { "No note" }}")
+            TextAction("Keep current note", { edit(form.copy(note = currentNote, originalNote = currentNote)) })
+            TextAction("Use draft note", { edit(form.copy(originalNote = currentNote)) })
+        }
+        if (showNote || noteConflict) TextField(form.note, "Workout note", { edit(form.copy(note = it)) })
     }
     if (fixTime) {
         FixTimeSheet(form, workout.row.start, zone, {
@@ -230,7 +242,6 @@ fun FinishScreen(
         ConfirmDialog("Discard this workout?", "The session and all work recorded in it will be deleted.", "Discard", {
             vm.write {
                 deleteWorkout(id)
-                deleteEditorDraft(key)
                 onDelete()
             }
         }, { discard = false })
@@ -246,8 +257,12 @@ private fun FixTimeSheet(initial: FinishDraft, recordedStart: String?, zone: Zon
     val start = draft.fixedStart ?: recordedStart
     val crossesMidnight =
         start != null && Instant.parse(start).atZone(zone).toLocalDate() != Instant.parse(draft.end).atZone(zone).toLocalDate()
-    fun timeLabel(value: String) =
-        Instant.parse(value).atZone(zone).format(DateTimeFormatter.ofPattern(if (crossesMidnight) "EEE HH:mm" else "HH:mm", Locale.ENGLISH))
+    val uses24Hours = DateFormat.is24HourFormat(LocalContext.current)
+    fun timeLabel(value: String): String {
+        val dateTime = Instant.parse(value).atZone(zone)
+        val day = if (crossesMidnight) dateTime.toLocalDate().displayDate("EEE") + " " else ""
+        return day + dateTime.toLocalTime().workoutTime(uses24Hours)
+    }
     val colors = InShapeTheme.colors
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -363,7 +378,11 @@ private fun FixTimeSheet(initial: FinishDraft, recordedStart: String?, zone: Zon
                     draft = if (editingStart) {
                         draft.copy(fixedStart = resolved)
                     } else {
-                        draft.copy(fixedStart = zonedStart.toInstant().toString(), end = resolved)
+                        draft.copy(
+                            fixedStart = zonedStart.toInstant().toString(),
+                            end = resolved,
+                            endMode = FinishDraft.EndMode.Manual
+                        )
                     }
                     error = null
                 } catch (failure: IllegalArgumentException) {

@@ -1,5 +1,6 @@
 package com.emmah.inshape.transfer
 
+import android.text.format.DateFormat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.ColumnScope
@@ -7,22 +8,28 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.emmah.inshape.JournalViewModel
 import com.emmah.inshape.ui.components.ConfirmDialog
 import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListCardScope
 import com.emmah.inshape.ui.components.ListRow
+import com.emmah.inshape.ui.components.LocalPageSnackbar
 import com.emmah.inshape.ui.theme.InShapeTheme
-import com.emmah.inshape.ui.theme.InShapeType
 import com.emmah.inshape.ui.theme.instantLabel
+import java.time.ZoneId
 
 // Slot content: siblings use the caller's layout and spacing, so there is no single modifier root.
 @Suppress("ModifierMissing", "ktlint:compose:modifier-missing-check")
 @Composable
 fun ColumnScope.BackupControls(vm: JournalViewModel, lastBackupAt: String?, additionalRows: ListCardScope.() -> Unit) {
+    val uses24Hours = DateFormat.is24HourFormat(LocalContext.current)
+    val zone = ZoneId.systemDefault()
+    val snackbar = LocalPageSnackbar.current
     val transfer = vm.transfers
     val state by transfer.state.collectAsStateWithLifecycle()
     val save =
@@ -47,6 +54,14 @@ fun ColumnScope.BackupControls(vm: JournalViewModel, lastBackupAt: String?, addi
                 transfer.pickerCancelled()
             }
         }
+    LaunchedEffect(transfer, snackbar) {
+        if (snackbar == null) return@LaunchedEffect
+        transfer.state.collect { result ->
+            if (result.message == "Backup saved successfully." && transfer.consumeMessage(result)) {
+                snackbar.showSnackbar(result.message)
+            }
+        }
+    }
     ListCard {
         item {
             ListRow(
@@ -54,7 +69,7 @@ fun ColumnScope.BackupControls(vm: JournalViewModel, lastBackupAt: String?, addi
                 titleStyle = MaterialTheme.typography.bodyLarge,
                 subtitle =
                     lastBackupAt?.let {
-                        "Last backup ${it.instantLabel()}"
+                        "Last backup ${it.instantLabel(zone, uses24Hours)}"
                     } ?: "No backup yet",
                 onClick = {
                     save.launch("InShape.inshape-backup")
@@ -70,7 +85,7 @@ fun ColumnScope.BackupControls(vm: JournalViewModel, lastBackupAt: String?, addi
         additionalRows()
     }
     if (state.busy) LinearProgressIndicator()
-    if (state.message.isNotBlank()) {
+    if (state.message.isNotBlank() && state.message != "Backup saved successfully." && state.message != "Export cancelled.") {
         Text(
             state.message,
             style = MaterialTheme.typography.bodySmall,
@@ -87,7 +102,7 @@ fun ColumnScope.BackupControls(vm: JournalViewModel, lastBackupAt: String?, addi
         }
         ConfirmDialog(
             "Replace the current journal?",
-            "Backup created ${backup.staged.manifest.createdAt.instantLabel()}. " +
+            "Backup created ${backup.staged.manifest.createdAt.instantLabel(zone, uses24Hours)}. " +
                 "It contains ${data.workouts.size} workout records, ${data.exercises.size} exercises, " +
                 "${data.routines.size} routines and ${data.photos.size} photos.\n\n" +
                 "All current journal records and drafts will be replaced. $activeMessage\n\n" +

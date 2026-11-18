@@ -14,7 +14,6 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import com.emmah.inshape.data.Exercise
-import com.emmah.inshape.data.Setting
 import com.emmah.inshape.data.newId
 import com.emmah.inshape.navigation.AppNavigation
 import com.emmah.inshape.ui.theme.InShapeTheme
@@ -103,8 +102,8 @@ class EndToEndJournalTest {
         click("More details")
         input("Recognizable machine name", "Machine A")
         click("Add setting")
-        input("Setting label", "Seat")
-        input("Setting value", "4")
+        input("Label", "Seat")
+        input("Value", "4")
         click("Save exercise")
         compose.waitUntil(10_000) {
             runBlocking {
@@ -115,11 +114,11 @@ class EndToEndJournalTest {
         }
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onAllNodesWithText("Today").onLast().performClick()
-        click("Start workout")
+        click("Start")
         compose.waitUntil(30_000) {
             compose.onAllNodesWithContentDescription("Workout options").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithContentDescription("Workout options").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Workout options").performClick()
         click("Add exercise")
         click("Lat pulldown")
         compose.onNodeWithText("00:00").assertExists()
@@ -151,6 +150,18 @@ class EndToEndJournalTest {
         click("Finish workout")
         compose.onNodeWithText("Workout done").assertExists()
         compose.onNodeWithText("Under 1 min").assertExists()
+        click("Add note")
+        input("Workout note", "Keep this note after returning")
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Finish workout").fetchSemanticsNodes().isNotEmpty() }
+        compose.runOnIdle { testClock.time = testClock.time.plusSeconds(5) }
+        click("Finish workout")
+        compose.onNodeWithText("Keep this note after returning").assertExists()
+        runBlocking {
+            val active = requireNotNull(container.repository.snapshot().active)
+            container.repository.saveWorkoutNote(active.row.id, "Note from another screen")
+        }
+        click("Use draft note")
         click("Save workout")
         compose.waitUntil(10_000) {
             runBlocking {
@@ -174,7 +185,8 @@ class EndToEndJournalTest {
                 .single()
                 .load
         )
-        assertEquals(Instant.parse("2026-11-13T10:00:25Z"), Instant.parse(completed.row.end))
+        assertEquals("Keep this note after returning", completed.row.note)
+        assertEquals(Instant.parse("2026-11-13T10:00:30Z"), Instant.parse(completed.row.end))
         assertTrue(completed.row.timingConfirmed)
         compose.waitUntil(10_000) { compose.onAllNodesWithText("How did it feel?").fetchSemanticsNodes().isNotEmpty() }
         click("Skip")
@@ -202,7 +214,7 @@ class EndToEndJournalTest {
     }
 
     @Test fun emptyFinishAcceptsANoteAndManualDurationWithoutSharingUnknownTimes() {
-        click("Start workout")
+        click("Start")
         click("Finish workout")
         compose.onNodeWithText("Nothing recorded yet").assertExists()
         compose.onNodeWithText("Save workout").assertDoesNotExist()
@@ -221,5 +233,25 @@ class EndToEndJournalTest {
         assertEquals(null, saved.end)
         assertFalse(saved.timingConfirmed)
         compose.waitUntil(10_000) { compose.onAllNodesWithText("How did it feel?").fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    @Test fun cancellingDiscardKeepsTheWorkoutAndConfirmingItRemovesTheDraft() {
+        click("Start")
+        click("Finish workout")
+        val id = runBlocking { requireNotNull(container.repository.snapshot().active).row.id }
+        compose.waitUntil(10_000) {
+            runBlocking { container.repository.snapshot().drafts.any { it.id == "finish:$id" } }
+        }
+        click("Discard workout")
+        compose.onNodeWithText("Discard this workout?").assertExists()
+        click("Cancel")
+        assertEquals(id, runBlocking { container.repository.snapshot().active?.row?.id })
+
+        click("Discard workout")
+        click("Discard")
+        compose.waitUntil(10_000) { runBlocking { container.repository.snapshot().active == null } }
+        val data = runBlocking { container.repository.snapshot() }
+        assertTrue(data.drafts.none { it.id == "finish:$id" })
+        assertTrue(data.history.isEmpty())
     }
 }

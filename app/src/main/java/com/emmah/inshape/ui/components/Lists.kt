@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -26,11 +25,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.dp
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
-import com.emmah.inshape.ui.theme.InShapeType
 
 class ListCardScope {
     internal val items = mutableListOf<@Composable () -> Unit>()
@@ -59,7 +56,8 @@ fun ListRow(
     trailing: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
     enabled: Boolean = true,
-    titleStyle: TextStyle = MaterialTheme.typography.bodyLarge
+    titleStyle: TextStyle = MaterialTheme.typography.bodyLarge,
+    showChevron: Boolean = trailing == null && onClick != null
 ) {
     val large = LocalDensity.current.fontScale >= 1.3f
     val rowModifier = modifier.fillMaxWidth().heightIn(
@@ -100,9 +98,7 @@ fun ListRow(
             if (large) trailing?.invoke()
         }
         if (!large) trailing?.invoke()
-        if (trailing == null &&
-            onClick != null
-        ) {
+        if (showChevron) {
             Icon(
                 Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                 null,

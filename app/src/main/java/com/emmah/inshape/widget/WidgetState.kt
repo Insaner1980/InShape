@@ -3,6 +3,7 @@ package com.emmah.inshape.widget
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.ui.theme.journalDateLabel
 import java.time.LocalDate
+import java.time.ZoneId
 
 data class WidgetState(
     val week: LocalDate,
@@ -12,10 +13,14 @@ data class WidgetState(
     val latest: String?,
     val activeTitle: String? = null,
     val activeStart: String? = null,
-    val timingNeedsReview: Boolean = false
+    val timingNeedsReview: Boolean = false,
+    val activeZone: ZoneId? = null,
+    val doneExercises: Int = 0,
+    val totalExercises: Int = 0
 )
 fun widgetState(data: JournalSnapshot, today: LocalDate): WidgetState {
     val week = today.minusDays((today.dayOfWeek.value - 1).toLong())
+    val active = data.active
     val completed = data.history.filter { it.qualifiesForAttendance }
     return WidgetState(
         week,
@@ -25,8 +30,11 @@ fun widgetState(data: JournalSnapshot, today: LocalDate): WidgetState {
         completed.maxByOrNull {
             it.row.journalDate
         }?.row?.let { "${it.title}\n${it.journalDate.journalDateLabel()}" },
-        data.active?.row?.title,
-        data.active?.row?.start,
-        data.active?.row?.timingNeedsReview ?: false
+        active?.row?.title,
+        active?.row?.start,
+        active?.row?.timingNeedsReview ?: false,
+        active?.row?.zoneId?.let(ZoneId::of),
+        active?.doneCount ?: 0,
+        active?.items?.size ?: 0
     )
 }

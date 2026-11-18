@@ -420,10 +420,11 @@ class JournalRepository(val db: JournalDatabase, val clock: Clock) {
         dao.put(row.copy(note = note, discomfort = discomfort))
         changed(row.workoutId)
     }
-    suspend fun finishWorkout(workoutId: String, timing: WorkoutTiming) = db.withTransaction {
-        val workout = snapshot().workout(workoutId) ?: error("Workout not found")
+    suspend fun finishWorkout(id: String, timing: WorkoutTiming, note: String? = null, expectedNote: String? = null) = db.withTransaction {
+        val workout = snapshot().workout(id) ?: error("Workout not found")
         if (workout.row.state == "COMPLETED") return@withTransaction
-        require(workout.hasPerformedWork || workout.row.note.isNotBlank()) {
+        val savedNote = resolveFinishNote(workout.row.note, note, expectedNote)
+        require(workout.hasPerformedWork || savedNote.isNotBlank()) {
             "Nothing recorded yet. Add work or a note, or discard this workout."
         }
         require(!workout.row.timingNeedsReview || timing.acknowledged) {
@@ -443,6 +444,7 @@ class JournalRepository(val db: JournalDatabase, val clock: Clock) {
         dao.put(
             workout.row.copy(
                 state = "COMPLETED", activeKey = null, start = start, end = end, journalDate = date,
+                note = savedNote,
                 startOffset = start?.let {
                     Instant.parse(it).atZone(ZoneId.of(workout.row.zoneId)).offset.id
                 },
@@ -457,7 +459,15 @@ class JournalRepository(val db: JournalDatabase, val clock: Clock) {
         workout.items.filter {
             it.row.disposition in listOf("PLANNED", "IN_PROGRESS")
         }.forEach { dao.put(it.row.copy(disposition = "INCOMPLETE")) }
-        changed(workoutId)
+        changed(id)
+    }
+
+    private fun resolveFinishNote(current: String, note: String?, expectedNote: String?): String {
+        if (note == null) return current
+        require(note == current || expectedNote == current) {
+            "Workout note changed elsewhere. Review the current note before saving."
+        }
+        return note
     }
 
     private fun completedDurationSource(manual: Long?, interval: Long?): String = when {
@@ -549,6 +559,7 @@ class JournalRepository(val db: JournalDatabase, val clock: Clock) {
         } else {
             dao.deleteOutbox(id)
         }
+        dao.deleteDraft("finish:$id")
         dao.deleteWorkout(id)
     }
     suspend fun createPastWorkout(date: String, title: String): String = db.withTransaction {

@@ -7,15 +7,14 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -25,6 +24,7 @@ import com.emmah.inshape.data.BodyObservation
 import com.emmah.inshape.ui.components.SelectField
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeTheme
+import kotlin.math.hypot
 
 data class BodyRegion(val id: String, val label: String)
 val bodyRegions: List<BodyRegion> =
@@ -35,7 +35,14 @@ val bodyRegions: List<BodyRegion> =
             listOf("left", "right").map { side ->
                 BodyRegion(
                     "${side}_$part",
-                    "$side ${part.replace('_', ' ')}".replaceFirstChar(Char::titlecase)
+                    "$side ${if (part == "forearm_wrist") {
+                        "wrist and forearm"
+                    } else {
+                        part.replace(
+                            '_',
+                            ' '
+                        )
+                    }}".replaceFirstChar(Char::titlecase)
                 )
             }
         }
@@ -85,19 +92,34 @@ fun BodyMap(
     controls: @Composable () -> Unit = {}
 ) {
     val colors = InShapeTheme.colors
-    Row(
-        modifier.fillMaxWidth().padding(vertical = Dimens.inner),
-        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+    val select by rememberUpdatedState(onSelect)
+    Column(
+        modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)
     ) {
+        controls()
         Canvas(
-            Modifier.width(Dimens.bodyWidth).height(Dimens.bodyHeight).pointerInput(back) {
+            Modifier.fillMaxWidth().height(Dimens.bodyHeight).pointerInput(back) {
                 detectTapGestures { point ->
                     val scale = minOf(size.width / 100f, size.height / 240f)
-                    bodyRegionAt(
-                        (point.x - (size.width - 100f * scale) / 2f) / scale,
-                        point.y / scale,
-                        back
-                    )?.let(onSelect)
+                    val x = (point.x - (size.width - 100f * scale) / 2f) / scale
+                    val y = point.y / scale
+                    val region = bodyRegionAt(x, y, back) ?: bodyShapes(back).mapNotNull { shape ->
+                        val bounds = RectF()
+                        shape.path.computeBounds(bounds, true)
+                        val target = Dimens.touch.toPx() / scale
+                        val dx = x - bounds.centerX()
+                        val dy = y - bounds.centerY()
+                        if (kotlin.math.abs(dx) > maxOf(target, bounds.width()) / 2f ||
+                            kotlin.math.abs(dy) > maxOf(target, bounds.height()) / 2f
+                        ) {
+                            null
+                        } else {
+                            shape.id to hypot(dx, dy)
+                        }
+                    }.minByOrNull { it.second }?.first
+                    region?.let(select)
                 }
             }
         ) {
@@ -106,7 +128,10 @@ fun BodyMap(
                 translate((size.width - 100f * scale) / 2f, 0f)
                 scale(scale, scale, pivot = androidx.compose.ui.geometry.Offset.Zero)
             }) {
-                drawCircle(colors.surfaceStrong, 10f, androidx.compose.ui.geometry.Offset(50f, 20f))
+                val head = androidx.compose.ui.geometry.Offset(50f, 20f)
+                val outline = Stroke(Dimens.chartOutline.toPx() / scale)
+                drawCircle(colors.surfaceStrong, 10f, head)
+                drawCircle(colors.textSecondary, 10f, head, style = outline)
                 val silhouette = Path().apply {
                     addRoundRect(RectF(45f, 29f, 55f, 47f), 2f, 2f, Path.Direction.CW)
                     addRoundRect(RectF(36f, 43f, 64f, 124f), 10f, 10f, Path.Direction.CW)
@@ -116,7 +141,7 @@ fun BodyMap(
                     addRoundRect(RectF(51f, 121f, 64f, 224f), 6f, 6f, Path.Direction.CW)
                 }
                 drawPath(silhouette.asComposePath(), colors.surfaceStrong)
-                drawPath(silhouette.asComposePath(), colors.surfaceStrong, style = Stroke(.7f))
+                drawPath(silhouette.asComposePath(), colors.textSecondary, style = outline)
                 bodyShapes(back).forEach { region ->
                     val observation = observations.find { it.region == region.id }
                     when {
@@ -131,17 +156,11 @@ fun BodyMap(
                 }
             }
         }
-        Column(
-            Modifier.weight(1f).padding(start = Dimens.innerSmall),
-            verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)
-        ) {
-            controls()
-            Text(
-                "Tap the body to add an area. A filled dot means pain, a ring means stiffness only.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.textSecondary
-            )
-        }
+        Text(
+            "Tap the body to add an area. A filled area means pain. An outline means stiffness only.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.textSecondary
+        )
     }
     SelectField("Add body area", "Choose area", bodyRegions.map { it.label }, { label ->
         onSelect(

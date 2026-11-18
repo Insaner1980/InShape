@@ -24,8 +24,8 @@ class ActiveWorkoutNotifierTest {
 
     @Test fun contentUsesSystemChronometerAndExplicitActions() {
         val notification = activeWorkoutNotification(context, notice)!!
-        assertEquals("Workout in progress", notification.extras.getString(Notification.EXTRA_TITLE))
-        assertTrue(notification.extras.getString(Notification.EXTRA_TEXT)!!.startsWith("Full body A, started "))
+        assertEquals("Full body A", notification.extras.getString(Notification.EXTRA_TITLE))
+        assertTrue(notification.extras.getString(Notification.EXTRA_TEXT)!!.startsWith("Started "))
         assertEquals(Instant.parse(notice.start).toEpochMilli(), notification.`when`)
         assertTrue(notification.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER))
         assertTrue(notification.flags and Notification.FLAG_ONGOING_EVENT != 0)

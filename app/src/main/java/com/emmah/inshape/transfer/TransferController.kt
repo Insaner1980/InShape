@@ -21,6 +21,9 @@ class TransferController(private val container: AppContainer, private val scope:
     private val mutableState = MutableStateFlow(TransferState())
     val state = mutableState.asStateFlow()
 
+    fun consumeMessage(expected: TransferState): Boolean =
+        !expected.busy && !expected.isError && mutableState.compareAndSet(expected, expected.copy(message = ""))
+
     // UI boundary: display provider/storage errors while preserving cancellation and the draft.
     @Suppress("TooGenericExceptionCaught")
     fun run(label: String, action: suspend () -> String) {
@@ -87,12 +90,24 @@ class TransferController(private val container: AppContainer, private val scope:
         mutableState.value = mutableState.value.copy(prepared = null)
         val prepared = container.exports.prepare(format, selection)
         mutableState.value = mutableState.value.copy(prepared = prepared)
-        "$format is ready. Save it or choose where to share it."
+        ""
     }
+    fun exportCancelled() {
+        if (mutableState.value.busy) return
+        container.exports.release(mutableState.value.prepared)
+        mutableState.value = mutableState.value.copy(prepared = null, message = "Export cancelled.", isError = false)
+    }
+
+    fun shareFailed() {
+        mutableState.value = mutableState.value.copy(message = "Could not open a share app. Save the file instead.", isError = true)
+    }
+
     fun saveExport(uri: Uri) {
         val prepared = mutableState.value.prepared ?: return
         run("Saving export…") {
             container.exports.save(prepared, uri)
+            container.exports.release(prepared)
+            mutableState.value = mutableState.value.copy(prepared = null)
             "${prepared.format} export saved successfully."
         }
     }

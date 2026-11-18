@@ -4,4 +4,20 @@
     <string name="history">History</string>
     <string name="library">Library</string>
     <string name="back">Back</string>
+    <plurals name="workout_count">
+        <item quantity="one">%d workout</item>
+        <item quantity="other">%d workouts</item>
+    </plurals>
+    <plurals name="workout_count_label">
+        <item quantity="one">workout</item>
+        <item quantity="other">workouts</item>
+    </plurals>
+    <plurals name="exercise_count">
+        <item quantity="one">%d exercise</item>
+        <item quantity="other">%d exercises</item>
+    </plurals>
+    <plurals name="link_count">
+        <item quantity="one">%d link</item>
+        <item quantity="other">%d links</item>
+    </plurals>
 </resources>

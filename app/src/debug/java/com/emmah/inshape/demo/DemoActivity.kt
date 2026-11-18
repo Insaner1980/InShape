@@ -7,16 +7,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -72,36 +69,19 @@ class DemoActivity : ComponentActivity() {
             ActivityTheme(host.container.themeSettings) {
                 LaunchedEffect(requested) { host.load(requested) }
                 if (host.loaded == requested) {
-                    Box(Modifier.fillMaxSize()) {
-                        AppNavigation(
-                            host.container,
-                            initialRoute = DemoFixtures.route(requested),
-                            initialExpandedRoutineId = if (requested ==
-                                "LibraryRoutineExpanded"
-                            ) {
-                                DemoFixtures.routineId
-                            } else {
-                                null
-                            }
-                        )
-                        if (requested ==
-                            "FailedSave"
-                        ) {
-                            Surface(
-                                Modifier.align(
-                                    androidx.compose.ui.Alignment.BottomCenter
-                                ).padding(com.emmah.inshape.ui.theme.Dimens.inner)
-                            ) {
-                                com.emmah.inshape.ui.components.SaveStatus(
-                                    com.emmah.inshape.SaveState.Failed(
-                                        "Demo: storage is full. Pending changes are retained."
-                                    ),
-                                    {
-                                    }
-                                )
-                            }
+                    val vm: com.emmah.inshape.JournalViewModel = viewModel {
+                        com.emmah.inshape.JournalViewModel(host.container)
+                    }
+                    LaunchedEffect(requested) {
+                        if (requested == "FailedSave") {
+                            vm.write { throw java.io.IOException("Demo: storage is full. Pending changes are retained.") }
                         }
                     }
+                    AppNavigation(
+                        host.container,
+                        initialRoute = DemoFixtures.route(requested),
+                        vm = vm
+                    )
                 } else {
                     Box(
                         Modifier.fillMaxSize(),

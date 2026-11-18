@@ -1,6 +1,11 @@
 package com.emmah.inshape.feature.checkin
 
-import com.emmah.inshape.data.BodyObservation
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import com.emmah.inshape.ui.components.ActionRow
+import com.emmah.inshape.ui.components.Pill
 
 enum class EffortLevel(val label: String, val stored: Int) { Easy("Easy", 3), JustRight("Just right", 6), Hard("Hard", 8) }
 fun effortLevelOf(value: Int?): EffortLevel? = when (value) {
@@ -19,7 +24,11 @@ fun bodyLevelOf(value: Int?): BodyLevel? = when (value) {
     else -> BodyLevel.Strong
 }
 
-fun bodyLevelSummary(observation: BodyObservation): String = listOfNotNull(
-    observation.pain?.let { "Pain, ${bodyLevelOf(it)!!.label.lowercase()}" },
-    observation.stiffness?.let { "Stiffness, ${bodyLevelOf(it)!!.label.lowercase()}" }
-).joinToString(", ").ifBlank { "Not recorded" }
+@Composable
+fun BodyLevelPills(pain: Int?, stiffness: Int?, modifier: Modifier = Modifier) {
+    ActionRow(modifier) {
+        bodyLevelOf(pain)?.let { Pill("Pain ${it.label.lowercase()}", outlined = true) }
+        bodyLevelOf(stiffness)?.let { Pill("Stiffness ${it.label.lowercase()}", outlined = true) }
+        if (pain == null && stiffness == null) Text("Not recorded", style = MaterialTheme.typography.bodyMedium)
+    }
+}

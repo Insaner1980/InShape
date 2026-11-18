@@ -21,14 +21,13 @@ private fun style(size: Int, height: Int, weight: FontWeight = FontWeight.Normal
     fontSize = size.sp,
     lineHeight = height.sp,
     fontWeight = weight,
-    letterSpacing = spacing.em,
-    fontFeatureSettings = "tnum"
+    letterSpacing = spacing.em
 )
 
 val AppTypography = Typography(
-    displayLarge = style(56, 60, FontWeight.Medium, -.03f),
+    displayLarge = style(56, 60, FontWeight.Medium, -.03f).copy(fontFeatureSettings = "tnum"),
     displayMedium = style(40, 44, FontWeight.Medium, -.03f),
-    displaySmall = style(40, 44, FontWeight.Medium, -.03f),
+    displaySmall = style(40, 44, FontWeight.Medium, -.03f).copy(fontFeatureSettings = "tnum"),
     headlineLarge = style(28, 34, FontWeight.SemiBold, -.02f),
     headlineMedium = style(28, 34, FontWeight.SemiBold, -.02f),
     headlineSmall = style(20, 26, FontWeight.SemiBold, -.01f),
@@ -42,7 +41,8 @@ val AppTypography = Typography(
 )
 
 object InShapeType {
-    val setValue = style(18, 24, FontWeight.SemiBold)
+    val setValue = style(18, 24, FontWeight.SemiBold).copy(fontFeatureSettings = "tnum")
+    val numeric = AppTypography.bodyLarge.copy(fontFeatureSettings = "tnum")
     val nav = style(12, 16)
     val navSelected = style(12, 16, FontWeight.SemiBold)
 }

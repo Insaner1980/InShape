@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -19,6 +20,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -33,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import com.emmah.inshape.JournalViewModel
 import com.emmah.inshape.data.SessionSet
 import com.emmah.inshape.ui.components.AppMenu
@@ -67,19 +70,22 @@ fun SetTableHeader(basis: String, modifier: Modifier = Modifier) {
                     loadLabel(basis),
                     Modifier.weight(1f),
                     style = MaterialTheme.typography.labelSmall,
-                    color = InShapeTheme.colors.textSecondary
+                    color = InShapeTheme.colors.textSecondary,
+                    textAlign = TextAlign.Center
                 )
                 Text(
                     "Reps",
                     Modifier.weight(1f),
                     style = MaterialTheme.typography.labelSmall,
-                    color = InShapeTheme.colors.textSecondary
+                    color = InShapeTheme.colors.textSecondary,
+                    textAlign = TextAlign.Center
                 )
                 Text(
                     "Done",
                     Modifier.width(Dimens.setField),
                     style = MaterialTheme.typography.labelSmall,
-                    color = InShapeTheme.colors.textSecondary
+                    color = InShapeTheme.colors.textSecondary,
+                    textAlign = TextAlign.Center
                 )
             }
         }
@@ -113,13 +119,6 @@ fun SetRow(set: SessionSet, number: Int, basis: String, vm: JournalViewModel, mo
                 )
             }
             AppMenu(menu, { menu = false }) {
-                if (complete) {
-                    DropdownMenuItem({ Text("Edit set $number") }, {
-                        menu = false
-                        editing =
-                            true
-                    })
-                }
                 DropdownMenuItem({ Text("Remove set $number") }, {
                     menu = false
                     vm.write { removeSet(set.id) }
@@ -128,42 +127,46 @@ fun SetRow(set: SessionSet, number: Int, basis: String, vm: JournalViewModel, mo
         }
     }
 
-    @Composable fun Load(modifier: Modifier = Modifier, compact: Boolean = false) = NumberField(
+    @Composable fun SetValue(
+        label: String,
+        completedValue: String,
+        draftValue: String,
+        onChange: (String) -> Unit,
+        modifier: Modifier = Modifier,
+        decimal: Boolean = false,
+        compact: Boolean = false
+    ) {
         if (complete) {
-            set.load
-                ?: ""
+            Surface(
+                onClick = { editing = true },
+                modifier = modifier.heightIn(min = Dimens.setField).semantics {
+                    contentDescription = "Correct $label for set $number"
+                },
+                color = colors.surface,
+                shape = InShapeShapes.field
+            ) {
+                Column(
+                    Modifier.padding(Dimens.innerSmall),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if (!compact) Text(label, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                    Text(completedValue, style = InShapeType.setValue)
+                }
+            }
         } else {
-            load
-        },
-        {
-            load = it
-            vm.write { saveSetDraft(set.id, it, reps) }
-        },
-        unit,
-        modifier,
-        decimal = true,
-        readOnly = complete,
-        compact = compact,
-        highlighted = highlighted
-    )
+            NumberField(draftValue, onChange, label, modifier, decimal = decimal, compact = compact, highlighted = highlighted)
+        }
+    }
 
-    @Composable fun Reps(modifier: Modifier = Modifier, compact: Boolean = false) = NumberField(
-        if (complete) {
-            set.reps?.toString()
-                ?: ""
-        } else {
-            reps
-        },
-        {
-            reps = it
-            vm.write { saveSetDraft(set.id, load, it) }
-        },
-        "Reps",
-        modifier,
-        readOnly = complete,
-        compact = compact,
-        highlighted = highlighted
-    )
+    val changeLoad: (String) -> Unit = {
+        load = it
+        vm.write { saveSetDraft(set.id, it, reps) }
+    }
+    val changeReps: (String) -> Unit = {
+        reps = it
+        vm.write { saveSetDraft(set.id, load, it) }
+    }
 
     @Composable fun Done() {
         Box(Modifier.size(Dimens.setField), contentAlignment = Alignment.Center) {
@@ -181,7 +184,7 @@ fun SetRow(set: SessionSet, number: Int, basis: String, vm: JournalViewModel, mo
                         } else {
                             Modifier.border(
                                 Dimens.chartOutline,
-                                colors.divider,
+                                colors.textSecondary,
                                 InShapeShapes.pill
                             )
                         }
@@ -190,7 +193,7 @@ fun SetRow(set: SessionSet, number: Int, basis: String, vm: JournalViewModel, mo
                 Icon(
                     Icons.Outlined.Check,
                     if (complete) "Undo set $number" else "Complete set $number",
-                    tint = if (complete) colors.onInk else colors.textTertiary
+                    tint = if (complete) colors.onInk else colors.textSecondary
                 )
             }
         }
@@ -209,8 +212,8 @@ fun SetRow(set: SessionSet, number: Int, basis: String, vm: JournalViewModel, mo
                     )
                     Done()
                 }
-                Load(Modifier.fillMaxWidth())
-                Reps(Modifier.fillMaxWidth())
+                SetValue(unit, set.load.orEmpty(), load, changeLoad, Modifier.fillMaxWidth(), decimal = true)
+                SetValue("Reps", set.reps?.toString().orEmpty(), reps, changeReps, Modifier.fillMaxWidth())
             }
         } else {
             Row(
@@ -218,8 +221,8 @@ fun SetRow(set: SessionSet, number: Int, basis: String, vm: JournalViewModel, mo
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Options()
-                Load(Modifier.weight(1f), true)
-                Reps(Modifier.weight(1f), true)
+                SetValue(unit, set.load.orEmpty(), load, changeLoad, Modifier.weight(1f), decimal = true, compact = true)
+                SetValue("Reps", set.reps?.toString().orEmpty(), reps, changeReps, Modifier.weight(1f), compact = true)
                 Done()
             }
         }

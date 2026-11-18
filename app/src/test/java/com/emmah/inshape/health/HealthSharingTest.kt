@@ -8,16 +8,20 @@ import com.emmah.inshape.data.StartSource
 import com.emmah.inshape.data.WorkoutEntity
 import com.emmah.inshape.data.WorkoutTiming
 import com.emmah.inshape.data.createTestDatabase
+import java.io.IOException
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -44,8 +48,8 @@ class HealthSharingTest {
     }
 
     @After fun close() = db.close()
-    private suspend fun completed(): String {
-        repo.updatePreferences(Preferences(shareWorkouts = true))
+    private suspend fun completed(shareWorkouts: Boolean = true): String {
+        repo.updatePreferences(Preferences(shareWorkouts = shareWorkouts))
         val exercise = Exercise(name = "Mobility", category = "Mobility")
         repo.saveExercise(exercise)
         val id = repo.startWorkout(StartSource.Empty)
@@ -112,11 +116,141 @@ class HealthSharingTest {
         assertTrue(repo.snapshot().outbox.isEmpty())
         assertEquals(1, gateway.rows.size)
     }
+
+    @Test fun aFailedOlderWriteDoesNotAttachItsErrorToTheNewerQueuedRevision() = runBlocking {
+        val id = completed()
+        val original = repo.snapshot().outbox.single()
+        gateway.afterWrite = { repo.saveWorkoutNote(id, "Corrected during upload") }
+        gateway.failAfterWrite = true
+
+        assertFalse(service.sync())
+
+        val snapshot = repo.snapshot()
+        val queued = snapshot.outbox.single()
+        assertTrue(queued.revision > original.revision)
+        assertEquals(0, queued.attempts)
+        assertNull(queued.error)
+        assertEquals("PENDING", snapshot.healthStates.single().status)
+        assertNull(snapshot.healthStates.single().error)
+        assertTrue(service.sync())
+        assertEquals(queued.revision, gateway.rows.getValue(queued.clientRecordId).version)
+    }
+
+    @Test fun cancellingAWriteLeavesItsQueuedOperationAndShareStateUntouched() = runBlocking {
+        completed()
+        val original = repo.snapshot()
+        val entered = CompletableDeferred<Unit>()
+        gateway.beforeCanWrite = {
+            entered.complete(Unit)
+            awaitCancellation()
+        }
+        val sync = launch { service.sync() }
+        entered.await()
+        sync.cancelAndJoin()
+
+        val snapshot = repo.snapshot()
+        assertEquals(original.outbox, snapshot.outbox)
+        assertEquals(original.healthStates, snapshot.healthStates)
+        assertTrue(gateway.rows.isEmpty())
+    }
+
+    @Test fun providerFailureWithoutAMessageLeavesAUsefulErrorAndOtherWorkoutsSync() = runBlocking {
+        val first = completed()
+        val second = completed()
+        gateway.beforeCanWrite = {
+            gateway.beforeCanWrite = null
+            throw IOException()
+        }
+
+        assertFalse(service.sync())
+
+        val snapshot = repo.snapshot()
+        val failed = snapshot.outbox.single()
+        val failureMessage = "Health Connect could not finish this operation. Retry when access is available."
+        val successfulId = (setOf(first, second) - failed.workoutId).single()
+        val failedState = snapshot.healthStates.single { it.workoutId == failed.workoutId }
+        assertEquals(1, failed.attempts)
+        assertEquals(failureMessage, failed.error)
+        assertEquals("PENDING", failedState.status)
+        assertEquals(failureMessage, failedState.error)
+        assertEquals("SHARED", snapshot.healthStates.single { it.workoutId == successfulId }.status)
+        assertEquals(setOf("inshape:workout:$successfulId"), gateway.rows.keys)
+    }
+
+    @Test fun explicitRemovalKeepsTheLocalWorkoutAndHoldsFutureEdits() = runBlocking {
+        val id = completed()
+        assertTrue(service.sync())
+        val shared = repo.snapshot().healthStates.single()
+        gateway.allowed = false
+
+        service.removeShared(id)
+        val pending = repo.snapshot()
+        val removal = pending.outbox.single()
+        assertEquals("DELETE", removal.operation)
+        assertEquals(shared.clientRecordId, removal.clientRecordId)
+        assertEquals(shared.clientVersion + 1, removal.revision)
+        assertTrue(pending.healthStates.single().restoredHold)
+        assertFalse(service.sync())
+        assertEquals(setOf(shared.clientRecordId), gateway.rows.keys)
+
+        gateway.allowed = true
+        assertTrue(service.sync())
+        val removed = repo.snapshot().healthStates.single()
+        assertEquals("REMOVED", removed.status)
+        assertEquals(0L, removed.acknowledgedRevision)
+        assertNull(removed.platformId)
+        assertNull(removed.error)
+        assertTrue(gateway.rows.isEmpty())
+        repo.saveWorkoutNote(id, "Kept in the local journal")
+        val edited = repo.snapshot()
+        assertEquals("Kept in the local journal", edited.workout(id)?.row?.note)
+        assertTrue(edited.outbox.isEmpty())
+    }
+
+    @Test fun reconciliationRequiresOptInAndQueuesASelectedLocalWorkout() = runBlocking {
+        val id = completed(shareWorkouts = false)
+        val original = repo.snapshot()
+        val disabled = runCatching { service.reconcile(id) }.exceptionOrNull()
+        assertTrue(disabled is IllegalArgumentException)
+        assertEquals("Enable workout sharing first.", disabled?.message)
+        assertTrue(repo.snapshot().outbox.isEmpty())
+
+        repo.updatePreferences(Preferences(shareWorkouts = true))
+        service.reconcile(id)
+
+        val queued = repo.snapshot()
+        val state = queued.healthStates.single()
+        assertEquals("PENDING", state.status)
+        assertFalse(state.restoredHold)
+        assertEquals("inshape:workout:$id", state.clientRecordId)
+        assertEquals(original.workout(id)!!.row.revision + 1, state.clientVersion)
+        assertEquals(state.clientVersion, queued.outbox.single().revision)
+    }
+
+    @Test fun reconciliationRejectsAWorkoutEditedWhileReadingItsExternalVersion() = runBlocking {
+        val id = completed()
+        assertTrue(service.sync())
+        val shared = repo.snapshot().healthStates.single()
+        val restored = shared.copy(restoredHold = true, platformId = null)
+        db.journal().put(restored)
+        gateway.beforeReadVersion = { repo.saveWorkoutNote(id, "Changed during reconciliation") }
+
+        val failure = runCatching { service.reconcile(id) }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+        assertEquals("This workout changed. Review it and try again.", failure?.message)
+        val snapshot = repo.snapshot()
+        assertEquals(restored, snapshot.healthStates.single())
+        assertTrue(snapshot.outbox.isEmpty())
+        assertEquals("Changed during reconciliation", snapshot.workout(id)?.row?.note)
+    }
+
     private class FakeGateway : HealthGateway {
         var allowed = true
         var failAfterWrite = false
         var afterWrite: (suspend () -> Unit)? = null
         var beforeCanWrite: (suspend () -> Unit)? = null
+        var beforeReadVersion: (suspend () -> Unit)? = null
         val rows = mutableMapOf<String, SharedWorkout>()
         override suspend fun canWrite(): Boolean {
             beforeCanWrite?.invoke()
@@ -133,14 +267,17 @@ class HealthSharingTest {
             callback?.invoke()
             if (failAfterWrite) {
                 failAfterWrite = false
-                throw java.io.IOException("Interrupted after external write")
+                throw IOException("Interrupted after external write")
             }
             return record.clientId
         }
         override suspend fun delete(clientId: String) {
             rows.remove(clientId)
         }
-        override suspend fun existingVersion(workout: WorkoutEntity, clientId: String) = rows[clientId]?.version ?: 0
+        override suspend fun existingVersion(workout: WorkoutEntity, clientId: String): Long {
+            beforeReadVersion?.invoke()
+            return rows[clientId]?.version ?: 0
+        }
     }
 
     @Test fun disablingSharingWaitsForInFlightWriteAndPreventsLaterWrites() = runBlocking {

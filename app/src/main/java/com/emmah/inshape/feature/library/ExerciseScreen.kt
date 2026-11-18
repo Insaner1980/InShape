@@ -5,23 +5,27 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AddAPhoto
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.HorizontalDivider
@@ -38,13 +42,14 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
 import com.emmah.inshape.JournalViewModel
 import com.emmah.inshape.data.DateRange
@@ -57,21 +62,24 @@ import com.emmah.inshape.feature.progress.calculatePersonalBest
 import com.emmah.inshape.feature.workout.itemSummary
 import com.emmah.inshape.media.PhotoStore
 import com.emmah.inshape.ui.components.ActionRow
+import com.emmah.inshape.ui.components.AppMenu
 import com.emmah.inshape.ui.components.ConfirmDialog
 import com.emmah.inshape.ui.components.EmptyState
 import com.emmah.inshape.ui.components.InShapeCard
+import com.emmah.inshape.ui.components.KeyValueRow
 import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListRow
+import com.emmah.inshape.ui.components.MenuAction
 import com.emmah.inshape.ui.components.OutlineButton
 import com.emmah.inshape.ui.components.Page
 import com.emmah.inshape.ui.components.Pill
-import com.emmah.inshape.ui.components.PrimaryButton
-import com.emmah.inshape.ui.components.ResponsiveRow
-import com.emmah.inshape.ui.components.SectionLabel
+import com.emmah.inshape.ui.components.PushedHeader
+import com.emmah.inshape.ui.components.SectionHeader
 import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
+import com.emmah.inshape.ui.theme.LightColors
 import com.emmah.inshape.ui.theme.displayDate
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -97,7 +105,7 @@ fun ExerciseScreen(
     if (exercise == null &&
         historical == null
     ) {
-        Page(modifier) { EmptyState("Exercise not found", "It may have been removed by a restore.") }
+        Page(modifier, topBar = { PushedHeader(onBack) }) { EmptyState("Exercise not found", "It may have been removed by a restore.") }
         return
     }
     val photos = data.photos.filter { it.exerciseId == id }
@@ -124,13 +132,10 @@ fun ExerciseScreen(
             replacement = null
         }
     val context = LocalContext.current
-    Page(modifier) {
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-        ) {
-            IconButton(onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") }
-            Spacer(Modifier.weight(1f))
+    var photoMenu by remember { mutableStateOf(false) }
+    val pickPhoto = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+    Page(modifier, topBar = {
+        PushedHeader(onBack) {
             if (exercise !=
                 null
             ) {
@@ -145,24 +150,43 @@ fun ExerciseScreen(
             }
             OutlineButton("Edit", onEdit, enabled = exercise != null)
         }
-        Text(historical?.name ?: exercise!!.name, style = MaterialTheme.typography.headlineLarge)
+    }) {
+        Text(historical?.name ?: exercise!!.name, style = MaterialTheme.typography.headlineMedium)
         ActionRow {
             listOfNotNull(
                 exercise?.muscles?.takeIf { it.isNotBlank() },
                 historical?.category ?: exercise?.category
-            ).forEach { Pill(it) }
+            ).forEach { Pill(it, outlined = true) }
         }
         if (selected !=
             null
         ) {
-            PhotoImage(
-                selected,
-                vm.container.photos,
-                Modifier.fillMaxWidth().aspectRatio(1.79f).clip(InShapeShapes.card).clickable {
-                    fullPhoto =
-                        selected
+            Box(Modifier.fillMaxWidth()) {
+                PhotoImage(
+                    selected,
+                    vm.container.photos,
+                    Modifier.fillMaxWidth().aspectRatio(Dimens.PHOTO_ASPECT).clip(InShapeShapes.card)
+                        .clickable(onClickLabel = "View full photo") { fullPhoto = selected }
+                )
+                Box(Modifier.align(Alignment.TopEnd).padding(Dimens.innerSmall)) {
+                    Surface(shape = InShapeShapes.pill, color = InShapeTheme.colors.background) {
+                        IconButton({ photoMenu = true }, Modifier.size(Dimens.touch)) {
+                            Icon(Icons.Outlined.MoreVert, "Photo options")
+                        }
+                    }
+                    AppMenu(photoMenu, { photoMenu = false }) {
+                        MenuAction("Replace photo", Icons.Outlined.PhotoCamera, {
+                            photoMenu = false
+                            replacement = selected.id
+                            replace.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        })
+                        MenuAction("Remove photo", Icons.Outlined.Delete, {
+                            photoMenu = false
+                            removal = selected
+                        }, destructive = true)
+                    }
                 }
-            )
+            }
         } else {
             Surface(
                 Modifier.fillMaxWidth().heightIn(min = Dimens.photoPlaceholder),
@@ -172,19 +196,13 @@ fun ExerciseScreen(
                 Column(
                     Modifier.padding(Dimens.inner),
                     horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                    verticalArrangement = Arrangement.spacedBy(Dimens.itemGap, Alignment.CenterVertically)
                 ) {
                     Icon(Icons.Outlined.AddAPhoto, null, Modifier.size(Dimens.iconLarge))
                     Text("Your photo of the machine", color = InShapeTheme.colors.text)
                     OutlineButton(
                         "Add photo",
-                        {
-                            picker.launch(
-                                PickVisualMediaRequest(
-                                    ActivityResultContracts.PickVisualMedia.ImageOnly
-                                )
-                            )
-                        },
+                        pickPhoto,
                         enabled =
                             exercise != null
                     )
@@ -203,34 +221,21 @@ fun ExerciseScreen(
                         }
                     )
                 }
-                OutlineButton(
-                    "Add photo",
-                    {
-                        picker.launch(
-                            PickVisualMediaRequest(
-                                ActivityResultContracts.PickVisualMedia.ImageOnly
-                            )
-                        )
-                    },
-                    enabled =
-                        exercise != null,
-                    icon = Icons.Outlined.Add
-                )
+                if (exercise != null) {
+                    Surface(
+                        pickPhoto,
+                        Modifier.size(Dimens.photoThumbnail),
+                        shape = InShapeShapes.field,
+                        border = BorderStroke(Dimens.line, InShapeTheme.colors.outline)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Outlined.Add, "Add photo")
+                        }
+                    }
+                }
             }
         }
-        selected?.let { photo ->
-            ActionRow {
-                TextAction("View full photo", { fullPhoto = photo })
-                TextAction("Replace photo", {
-                    replacement = photo.id
-                    replace.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    )
-                })
-                TextAction("Remove photo", { removal = photo }, color = InShapeTheme.colors.error)
-            }
-        }
-        SectionLabel("Machine settings")
+        SectionHeader("Machine settings")
         Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
             if (historical !=
                 null
@@ -243,15 +248,13 @@ fun ExerciseScreen(
                 ListCard {
                     exercise.settings.forEach { setting ->
                         item {
-                            ListRow(setting.label, titleStyle = MaterialTheme.typography.bodyMedium, trailing = {
-                                Text(setting.value, style = MaterialTheme.typography.bodyLarge)
-                            })
+                            KeyValueRow(setting.label, setting.value)
                         }
                     }
                 }
             }
         }
-        SectionLabel("My instructions")
+        SectionHeader("My instructions")
         Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
             Text(
                 exercise?.instructions?.ifBlank { "No instructions recorded" }
@@ -277,20 +280,21 @@ fun ExerciseScreen(
             if (exercise?.notes?.isNotBlank() == true) Text(exercise.notes)
             linkError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
-        SectionLabel("Alternatives")
+        SectionHeader("Alternatives")
         Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
             val alternatives = data.exercises.filter {
                 it.id in
                     (exercise?.alternatives ?: emptyList())
             }
             if (alternatives.isEmpty()) Text("Choose your own alternatives using Edit.")
-            alternatives.forEach { OutlineButton(it.name, { onExercise(it.id) }) }
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
-            ResponsiveRow {
-                Text("History", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-                TextAction("See chart", onChart)
+            ListCard {
+                alternatives.forEach { alternative ->
+                    item { ListRow(alternative.name, onClick = { onExercise(alternative.id) }) }
+                }
             }
+        }
+        SectionHeader("History", action = "See chart", onAction = onChart)
+        Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
             val history = data.history.mapNotNull { workout ->
                 workout.items.find {
                     it.row.exerciseId ==
@@ -340,19 +344,15 @@ fun ExerciseScreen(
         }
     }
     fullPhoto?.let { photo ->
-        Dialog(onDismissRequest = { fullPhoto = null }) {
-            Surface(shape = InShapeShapes.card) {
-                Column(Modifier.padding(Dimens.itemGap)) {
-                    PhotoImage(
-                        photo,
-                        vm.container.photos,
-                        Modifier.fillMaxWidth().weight(1f, false)
-                    )
-                    PrimaryButton("Close photo", {
-                        fullPhoto =
-                            null
-                    })
+        Dialog(
+            onDismissRequest = { fullPhoto = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+        ) {
+            Column(Modifier.fillMaxSize().background(LightColors.ink).safeDrawingPadding()) {
+                IconButton({ fullPhoto = null }, Modifier.size(Dimens.touch)) {
+                    Icon(Icons.Outlined.Close, "Close photo", tint = LightColors.onInk)
                 }
+                PhotoImage(photo, vm.container.photos, Modifier.fillMaxWidth().weight(1f), fullSize = true)
             }
         }
     }
@@ -378,11 +378,11 @@ internal fun JournalViewModel.importExercisePhotos(exerciseId: String, uris: Lis
 }
 
 @Composable
-fun PhotoImage(asset: PhotoAsset, store: PhotoStore, modifier: Modifier = Modifier) {
+fun PhotoImage(asset: PhotoAsset, store: PhotoStore, modifier: Modifier = Modifier, fullSize: Boolean = false) {
     var failed by remember(asset.path) { mutableStateOf(false) }
-    val bitmap by produceState<android.graphics.Bitmap?>(null, asset.path) {
+    val bitmap by produceState<android.graphics.Bitmap?>(null, asset.path, fullSize) {
         try {
-            value = store.thumbnail(asset)
+            value = if (fullSize) store.thumbnail(asset, maxSize = 2048) else store.thumbnail(asset)
             failed = value == null
         } catch (
             cancelled: kotlinx.coroutines.CancellationException

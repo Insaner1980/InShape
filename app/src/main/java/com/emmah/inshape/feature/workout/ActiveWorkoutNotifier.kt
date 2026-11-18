@@ -16,12 +16,21 @@ import androidx.core.content.edit
 import com.emmah.inshape.MainActivity
 import com.emmah.inshape.R
 import com.emmah.inshape.data.JournalSnapshot
+import com.emmah.inshape.ui.theme.workoutTime
 import java.time.Instant
-import java.util.Date
+import java.time.ZoneId
 
-data class ActiveNotice(val id: String, val title: String, val start: String?, val timingNeedsReview: Boolean)
+data class ActiveNotice(
+    val id: String,
+    val title: String,
+    val start: String?,
+    val timingNeedsReview: Boolean,
+    val zone: ZoneId = ZoneId.systemDefault()
+)
 
-fun JournalSnapshot.activeNotice(): ActiveNotice? = active?.row?.let { ActiveNotice(it.id, it.title, it.start, it.timingNeedsReview) }
+fun JournalSnapshot.activeNotice(): ActiveNotice? = active?.row?.let {
+    ActiveNotice(it.id, it.title, it.start, it.timingNeedsReview, ZoneId.of(it.zoneId))
+}
 
 fun activeWorkoutNotification(context: Context, notice: ActiveNotice?): Notification? {
     if (notice == null || notice.timingNeedsReview || notice.start == null) return null
@@ -42,8 +51,8 @@ fun activeWorkoutNotification(context: Context, notice: ActiveNotice?): Notifica
     )
     val builder = Notification.Builder(context, ActiveWorkoutNotifier.CHANNEL)
         .setSmallIcon(R.drawable.ic_stat_workout)
-        .setContentTitle("Workout in progress")
-        .setContentText("${notice.title}, started ${DateFormat.getTimeFormat(context).format(Date(whenMillis))}")
+        .setContentTitle(notice.title.ifBlank { "Workout" })
+        .setContentText("Started ${Instant.ofEpochMilli(whenMillis).workoutTime(notice.zone, DateFormat.is24HourFormat(context))}")
         .setWhen(whenMillis).setShowWhen(true).setUsesChronometer(true)
         .setOngoing(true).setOnlyAlertOnce(true)
         .setCategory(if (Build.VERSION.SDK_INT >= 31) Notification.CATEGORY_WORKOUT else Notification.CATEGORY_PROGRESS)

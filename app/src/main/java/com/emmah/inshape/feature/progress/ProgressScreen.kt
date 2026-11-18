@@ -2,7 +2,6 @@ package com.emmah.inshape.feature.progress
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -12,6 +11,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.emmah.inshape.data.DateRange
 import com.emmah.inshape.data.Exercise
@@ -19,11 +19,11 @@ import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.NumericInputResult
 import com.emmah.inshape.data.parseDecimalInput
 import com.emmah.inshape.data.weekStart
+import com.emmah.inshape.feature.checkin.BodyLevelPills
 import com.emmah.inshape.feature.checkin.bodyRegions
 import com.emmah.inshape.ui.components.ActionRow
 import com.emmah.inshape.ui.components.EmptyState
 import com.emmah.inshape.ui.components.FilterPill
-import com.emmah.inshape.ui.components.InShapeCard
 import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListRow
 import com.emmah.inshape.ui.components.NumberField
@@ -31,8 +31,7 @@ import com.emmah.inshape.ui.components.Page
 import com.emmah.inshape.ui.components.Pill
 import com.emmah.inshape.ui.components.PillTone
 import com.emmah.inshape.ui.components.ResponsiveRow
-import com.emmah.inshape.ui.components.ScreenHeader
-import com.emmah.inshape.ui.components.SectionLabel
+import com.emmah.inshape.ui.components.SectionHeader
 import com.emmah.inshape.ui.components.SegmentedControl
 import com.emmah.inshape.ui.components.SelectField
 import com.emmah.inshape.ui.components.TextAction
@@ -112,36 +111,7 @@ fun ProgressScreen(
         }
         Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
             val weeks = weeklyAttendance(history, range)
-            ResponsiveRow {
-                Column(
-                    Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)
-                ) {
-                    Text(
-                        "Workouts per week",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = colors.textSecondary
-                    )
-                    ResponsiveRow {
-                        Text(
-                            String.format(
-                                Locale.ENGLISH,
-                                "%.1f",
-                                averageWeeklyAttendance(history, range, today)
-                            ),
-                            style = MaterialTheme.typography.displaySmall
-                        )
-                        Text(
-                            "on average",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.textSecondary
-                        )
-                    }
-                }
-                data.preferences.weeklyGoal?.let {
-                    Text("Goal $it", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
-                }
-            }
+            SectionHeader("Workouts per week")
             if (history.none { it.qualifiesForAttendance && it.row.journalDate in range }) {
                 Text(
                     "No workouts recorded in this period.",
@@ -149,6 +119,13 @@ fun ProgressScreen(
                     color = colors.textSecondary
                 )
             } else {
+                Column {
+                    Text(
+                        String.format(Locale.ENGLISH, "%.1f", averageWeeklyAttendance(history, range, today)),
+                        style = MaterialTheme.typography.displaySmall
+                    )
+                    Text("on average", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+                }
                 if (weeks.first().week > range.start) {
                     Text(
                         "Chart shows the latest ${weeks.size} weeks.",
@@ -160,7 +137,7 @@ fun ProgressScreen(
             }
         }
         if (!showExercise) {
-            SectionLabel("Exercises", quiet = true)
+            SectionHeader("Exercises", quiet = true)
             ListCard {
                 available.distinctBy { it.row.exerciseId }.forEach { exercise ->
                     val series =
@@ -204,7 +181,7 @@ fun ProgressScreen(
                 }
             }
         } else {
-            TextAction("All exercises", { showExercise = false })
+            ListRow("All exercises", onClick = { showExercise = false })
         }
         if (showExercise) {
             if (item ==
@@ -266,13 +243,14 @@ fun ProgressScreen(
                             ) {
                                 Pill(
                                     "${if (change.signum() > 0) "+" else ""}${change.stripTrailingZeros().toPlainString()} $unit",
+                                    modifier = Modifier.align(Alignment.CenterVertically),
                                     tone = PillTone.Accent
                                 )
                             }
                         }
                     }
                     recorded.lastOrNull()?.let { latest ->
-                        ResponsiveRow {
+                        Column {
                             Text(
                                 "${latest.value!!.stripTrailingZeros().toPlainString()} $unit",
                                 style = MaterialTheme.typography.displaySmall
@@ -282,7 +260,7 @@ fun ProgressScreen(
                             ) {
                                 Text(
                                     "was ${recorded.first().value!!.stripTrailingZeros().toPlainString()}" +
-                                        " on ${recorded.first().date.displayDate()}",
+                                        " $unit on ${recorded.first().date.displayDate()}",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = colors.textSecondary
                                 )
@@ -369,23 +347,13 @@ fun ProgressScreen(
                 }
                 calculatePersonalBest(history, query)?.let { best ->
                     Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
-                        ResponsiveRow {
-                            Text(
-                                if (best.previous ==
-                                    null
-                                ) {
-                                    "First recorded result"
-                                } else if (best.isNewRecord) {
-                                    "New record in this period"
-                                } else {
-                                    "Best in this period"
-                                },
-                                Modifier.weight(1f),
-                                style = MaterialTheme.typography.titleSmall,
-                                color = colors.textSecondary
-                            )
-                            if (best.isNewRecord) Pill("New record", tone = PillTone.Accent)
-                        }
+                        SectionHeader(
+                            when {
+                                best.previous == null -> "First recorded result"
+                                best.isNewRecord -> "New record in this period"
+                                else -> "Best in this period"
+                            }
+                        )
                         Text(
                             "${best.point.value!!.stripTrailingZeros().toPlainString()} $unit",
                             style = MaterialTheme.typography.headlineSmall
@@ -469,16 +437,8 @@ fun ProgressScreen(
                     })
                     if (showValues) {
                         points.forEach {
-                            Text(
-                                "${it.date.displayDate()}: pain ${it.pain?.let { score ->
-                                    com.emmah.inshape.feature.checkin.bodyLevelOf(score)!!.label.lowercase()
-                                } ?: "not recorded"}, stiffness " +
-                                    "${it.stiffness?.let { score ->
-                                        com.emmah.inshape.feature.checkin.bodyLevelOf(score)!!.label.lowercase()
-                                    } ?: "not recorded"}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = colors.textSecondary
-                            )
+                            Text(it.date.displayDate(), style = MaterialTheme.typography.bodyLarge)
+                            BodyLevelPills(it.pain, it.stiffness)
                         }
                     }
                 }

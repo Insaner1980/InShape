@@ -26,10 +26,9 @@ import com.emmah.inshape.ui.components.PillTone
 import com.emmah.inshape.ui.components.PrimaryButton
 import com.emmah.inshape.ui.components.ProgressSegments
 import com.emmah.inshape.ui.components.ProgressState
-import com.emmah.inshape.ui.components.SaveStatus
 import com.emmah.inshape.ui.components.ScreenHeader
 import com.emmah.inshape.ui.components.SearchField
-import com.emmah.inshape.ui.components.SectionLabel
+import com.emmah.inshape.ui.components.SectionHeader
 import com.emmah.inshape.ui.components.SegmentedControl
 import com.emmah.inshape.ui.components.SelectField
 import com.emmah.inshape.ui.components.Stepper
@@ -60,7 +59,7 @@ fun ComponentPreview(mode: ThemeMode, modifier: Modifier = Modifier) {
                 ScreenHeader("Components", trailing = {
                     IconCircleButton(Icons.Outlined.Add, "Add", {})
                 })
-                SectionLabel("Section", action = "See all", onAction = {})
+                SectionHeader("Section", action = "See all", onAction = {})
                 GroupLabel("Group")
                 InShapeCard(color = InShapeTheme.colors.ink) {
                     PrimaryButton("Start workout", {}, icon = Icons.Outlined.Add, inverted = true)
@@ -97,7 +96,6 @@ fun ComponentPreview(mode: ThemeMode, modifier: Modifier = Modifier) {
                 Stepper("3", {}, {}, true, "Decrease", "Increase")
                 ProgressSegments(ProgressState.entries, "1 of 3 done")
                 EmptyState("No workouts", "Start when you are ready", action = "Create routine", onAction = {})
-                SaveStatus(com.emmah.inshape.SaveState.Saved, {})
             }
         }
     }

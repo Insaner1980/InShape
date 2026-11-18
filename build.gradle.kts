@@ -38,17 +38,22 @@ sonar {
     }
 }
 
+val sonarDeviceCoverage = providers.gradleProperty("sonarDeviceCoverage").orNull == "true"
+
 project(":app") {
+    val coverageReports = mutableListOf("reports/coverage/test/debug/report.xml")
+    if (sonarDeviceCoverage) coverageReports += "reports/coverage/androidTest/debug/connected/report.xml"
     sonar {
         properties {
             property(
                 "sonar.coverage.jacoco.xmlReportPaths",
-                layout.buildDirectory.file("reports/coverage/test/debug/report.xml").get().asFile.absolutePath
+                coverageReports.joinToString(",") { layout.buildDirectory.file(it).get().asFile.absolutePath }
             )
         }
     }
 }
 
 tasks.named("sonar") {
-    dependsOn(":app:assembleDebug", ":app:createDebugUnitTestCoverageReport")
+    dependsOn(":app:assembleDebug", ":app:createDebugUnitTestCoverageReport", ":app:lintDebug")
+    if (sonarDeviceCoverage) dependsOn(":app:createDebugAndroidTestCoverageReport")
 }

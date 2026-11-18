@@ -40,7 +40,7 @@ class LauncherWidgetTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val repository = (context.applicationContext as InShapeApplication).container.repository
         val before = repository.snapshot().workouts
-        val expectedAction = if (repository.snapshot().active == null) "Start workout" else "Resume workout"
+        val expectedAction = if (repository.snapshot().active == null) "Start" else "Resume workout"
         val intent = Intent(context, MainActivity::class.java)
             .setAction(MainActivity.START_OR_RESUME)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -71,22 +71,11 @@ class LauncherWidgetTest {
         }
     }
 
-    private fun waitFor(timeout: Long = 15_000, condition: () -> Boolean) {
-        val deadline = SystemClock.uptimeMillis() + timeout
-        var ready = condition()
-        while (!ready && SystemClock.uptimeMillis() < deadline) {
-            SystemClock.sleep(100)
-            ready = condition()
-        }
-        assertTrue("Platform state did not become ready", ready)
-    }
+    private fun waitFor(timeout: Long = 15_000, condition: () -> Boolean) = compose.waitUntil(timeout, condition)
 
     private fun clickPlatformText(vararg texts: String): Boolean {
-        val root = automation.rootInActiveWindow ?: return false
-        if (root.packageName?.toString() == "com.emmah.inshape") return false
-
         fun find(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
-            if (texts.any {
+            if (node.isVisibleToUser && texts.any {
                     it.equals(node.text?.toString(), true) ||
                         it.equals(node.contentDescription?.toString(), true)
                 }
@@ -95,8 +84,9 @@ class LauncherWidgetTest {
             }
             return (0 until node.childCount).firstNotNullOfOrNull { node.getChild(it)?.let(::find) }
         }
-        val node = find(root) ?: return false
-        var action: AccessibilityNodeInfo? = node
+        val roots = sequenceOf(automation.rootInActiveWindow) + automation.windows.asSequence().map { it.root }
+        var action = roots.filterNotNull().filter { it.packageName?.toString() != "com.emmah.inshape" }
+            .firstNotNullOfOrNull(::find)
         while (action != null && !action.isClickable) action = action.parent
         return action?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
     }
@@ -162,7 +152,7 @@ class LauncherWidgetTest {
         if (manager.getAppWidgetIds(component).isEmpty()) {
             compose.onNodeWithContentDescription("Settings").performClick()
             compose.onNodeWithText("Home screen widget").performScrollTo().performClick()
-            waitFor {
+            waitFor(30_000) {
                 clickPlatformText(
                     "Add automatically",
                     "Add to home screen",

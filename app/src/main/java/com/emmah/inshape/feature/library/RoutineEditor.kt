@@ -4,20 +4,21 @@ import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DragIndicator
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,14 +31,19 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import com.emmah.inshape.JournalViewModel
+import com.emmah.inshape.R
 import com.emmah.inshape.data.Exercise
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.Routine
@@ -45,17 +51,17 @@ import com.emmah.inshape.data.RoutineItem
 import com.emmah.inshape.data.SetTarget
 import com.emmah.inshape.data.newId
 import com.emmah.inshape.data.validatedSetValues
-import com.emmah.inshape.ui.components.ActionRow
 import com.emmah.inshape.ui.components.AppMenu
+import com.emmah.inshape.ui.components.ButtonSize
 import com.emmah.inshape.ui.components.ConfirmDialog
-import com.emmah.inshape.ui.components.InShapeCard
 import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListRow
+import com.emmah.inshape.ui.components.MenuAction
 import com.emmah.inshape.ui.components.NumberField
 import com.emmah.inshape.ui.components.OutlineButton
 import com.emmah.inshape.ui.components.Page
 import com.emmah.inshape.ui.components.PrimaryButton
-import com.emmah.inshape.ui.components.SectionLabel
+import com.emmah.inshape.ui.components.PushedHeader
 import com.emmah.inshape.ui.components.SelectField
 import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.components.TextField
@@ -118,8 +124,7 @@ fun RoutineEditor(
     onSave: () -> Unit,
     onStart: (String) -> Unit,
     onCreateExercise: () -> Unit,
-    modifier: Modifier = Modifier,
-    embedded: Boolean = false
+    modifier: Modifier = Modifier
 ) {
     var draft by remember(id) {
         mutableStateOf(
@@ -192,7 +197,14 @@ fun RoutineEditor(
                 it.id == item.exerciseId
             }?.name ?: "Exercise"} moved to position ${target + 1}"
     }
+    var showNameError by rememberSaveable { mutableStateOf(false) }
+    var routineMenu by remember { mutableStateOf(false) }
     fun save(start: Boolean) {
+        if (draft.title.isBlank()) {
+            showNameError = true
+            details = true
+            return
+        }
         val toSave = draft
         vm.write {
             fun minutes(value: String): Int? = if (value.isBlank()) {
@@ -233,19 +245,45 @@ fun RoutineEditor(
         }
     }
     val dragStep = with(LocalDensity.current) { Dimens.rowMinTwoLine.toPx() }
-    val content: @Composable ColumnScope.() -> Unit = {
-        Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
-            Row(Modifier.fillMaxWidth()) {
-                Column(Modifier.weight(1f)) {
-                    SectionLabel(draft.title.ifBlank { "New routine" })
-                    Text(
-                        "${draft.items.size} exercises" +
-                            draft.duration.takeIf {
-                                it.isNotBlank()
-                            }?.let { ", about $it min" }.orEmpty()
-                    )
+    Page(
+        modifier,
+        topBar = {
+            PushedHeader(onBack = onSave, title = draft.title.ifBlank { "New routine" }) {
+                Box {
+                    IconButton({ routineMenu = true }) { Icon(Icons.Outlined.MoreVert, "Routine options") }
+                    AppMenu(routineMenu, { routineMenu = false }) {
+                        MenuAction("Edit details", Icons.Outlined.Edit, {
+                            routineMenu = false
+                            details = true
+                        })
+                        if (id != "new") {
+                            MenuAction("Duplicate", Icons.Outlined.ContentCopy, {
+                                routineMenu = false
+                                vm.write {
+                                    duplicateRoutine(id)
+                                    onSave()
+                                }
+                            })
+                            MenuAction("Remove", Icons.Outlined.Delete, {
+                                routineMenu = false
+                                removing = true
+                            }, destructive = true)
+                        }
+                    }
                 }
             }
+        },
+        bottomBar = {
+            PrimaryButton("Start routine", {
+                save(true)
+            }, Modifier.fillMaxWidth(), size = ButtonSize.Large, enabled = draft.items.isNotEmpty())
+        }
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
+            Text(
+                pluralStringResource(R.plurals.exercise_count, draft.items.size, draft.items.size) +
+                    draft.duration.takeIf(String::isNotBlank)?.let { ", about $it min" }.orEmpty()
+            )
             if (draft.description.isNotBlank()) Text(draft.description)
             if (movement.isNotEmpty()) {
                 Text(
@@ -268,6 +306,26 @@ fun RoutineEditor(
                             val exercise = data.exercises.find { it.id == entry.exerciseId }
                             ListRow(
                                 exercise?.name ?: "Archived exercise",
+                                modifier = Modifier.semantics {
+                                    customActions = buildList {
+                                        if (index > 0) {
+                                            add(
+                                                CustomAccessibilityAction("Move up") {
+                                                    move(entry.id, -1)
+                                                    true
+                                                }
+                                            )
+                                        }
+                                        if (index < draft.items.lastIndex) {
+                                            add(
+                                                CustomAccessibilityAction("Move down") {
+                                                    move(entry.id, 1)
+                                                    true
+                                                }
+                                            )
+                                        }
+                                    }
+                                },
                                 subtitle = if (entry.mode ==
                                     "DURATION"
                                 ) {
@@ -322,24 +380,6 @@ fun RoutineEditor(
                                                     null
                                                 editingItem = entry.id
                                             })
-                                            DropdownMenuItem(
-                                                { Text("Move up") },
-                                                {
-                                                    menu = null
-                                                    move(entry.id, -1)
-                                                },
-                                                enabled =
-                                                    index > 0
-                                            )
-                                            DropdownMenuItem(
-                                                { Text("Move down") },
-                                                {
-                                                    menu = null
-                                                    move(entry.id, 1)
-                                                },
-                                                enabled =
-                                                    index < draft.items.lastIndex
-                                            )
                                             DropdownMenuItem({ Text("Remove exercise") }, {
                                                 menu = null
                                                 edit(
@@ -359,23 +399,10 @@ fun RoutineEditor(
                     }
                 }
             }
-            HorizontalDivider()
-            ActionRow {
-                OutlineButton("Add exercise", { picker = true })
-                OutlineButton("Start routine", { save(true) })
-            }
-            TextAction("Edit routine details", { details = true })
-            if (embedded) PrimaryButton("Save routine", { save(false) }, Modifier.fillMaxWidth())
+            TextAction("Add exercise", { picker = true }, icon = Icons.Outlined.Add)
+            // The editor keeps a draft until Save routine or Start routine is pressed.
+            OutlineButton("Save routine", { save(false) }, Modifier.fillMaxWidth())
         }
-    }
-    if (embedded) {
-        Column(
-            modifier = modifier,
-            verticalArrangement = Arrangement.spacedBy(Dimens.inner),
-            content = content
-        )
-    } else {
-        Page(modifier, bottomBar = { PrimaryButton("Save routine", { save(false) }, Modifier.fillMaxWidth()) }, content = content)
     }
     if (details) {
         AlertDialog(onDismissRequest = {
@@ -385,28 +412,25 @@ fun RoutineEditor(
                 Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)
             ) {
-                TextField(draft.title, "Routine name", { edit(draft.copy(title = it)) }, singleLine = true)
+                TextField(
+                    draft.title,
+                    "Routine name",
+                    { edit(draft.copy(title = it)) },
+                    singleLine = true,
+                    error = "Enter a routine name".takeIf { showNameError && draft.title.isBlank() }
+                )
                 TextField(draft.description, "Description (optional)", {
                     edit(draft.copy(description = it))
                 })
                 NumberField(draft.duration, {
                     edit(draft.copy(duration = it))
                 }, "Estimated minutes (optional)")
-                if (id != "new") {
-                    TextAction("Duplicate routine", {
-                        vm.write {
-                            duplicateRoutine(id)
-                            details = false
-                            onSave()
-                        }
-                    })
-                    TextAction("Remove routine", {
-                        details = false
-                        removing = true
-                    }, color = InShapeTheme.colors.error)
-                }
             }
-        }, confirmButton = { TextAction("Done", { details = false }) })
+        }, confirmButton = {
+            TextAction("Done", {
+                if (draft.title.isBlank()) showNameError = true else details = false
+            })
+        })
     }
     editingItem?.let { editing ->
         val index = draft.items.indexOfFirst { it.id == editing }

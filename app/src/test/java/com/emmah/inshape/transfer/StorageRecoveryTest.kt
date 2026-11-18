@@ -11,6 +11,8 @@ import com.emmah.inshape.AppContainer
 import com.emmah.inshape.data.Exercise
 import com.emmah.inshape.data.PhotoAsset
 import com.emmah.inshape.data.newId
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.RandomAccessFile
 import kotlinx.coroutines.runBlocking
@@ -130,6 +132,51 @@ class StorageRecoveryTest {
         assertEquals(listOf(replacement.path), container.photos.root.list()!!.toList())
         container.photos.removePhoto(replacement.id)
         assertFalse(container.photos.file(replacement).exists())
+    }
+
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    @Test
+    fun verifiedBackupRestoresPhotosAndRejectsAStaleConfirmation() = runBlocking {
+        val image = ByteArrayOutputStream()
+        val bitmap = Bitmap.createBitmap(640, 24, Bitmap.Config.ARGB_8888)
+        try {
+            assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, image))
+        } finally {
+            bitmap.recycle()
+        }
+        val resolver = shadowOf(context.contentResolver)
+        val source = Uri.parse("content://storage/backup-photo")
+        resolver.registerInputStream(source, ByteArrayInputStream(image.toByteArray()))
+        val original = container.photos.importPhoto(exercise.id, source)
+        val originalFile = container.photos.file(original)
+        val expectedBytes = originalFile.readBytes()
+
+        val archive = ByteArrayOutputStream()
+        val destination = Uri.parse("content://storage/journal-backup")
+        resolver.registerOutputStream(destination, archive)
+        container.backups.createBackup(destination)
+        val lastBackupAt = requireNotNull(container.repository.snapshot().preferences.lastBackupAt)
+        container.repository.saveExercise(exercise.copy(name = "Locally edited"))
+
+        val stagingRoot = File(container.storageRoot, "transfer-staging")
+        resolver.registerInputStream(destination, ByteArrayInputStream(archive.toByteArray()))
+        container.backups.validateBackup(destination).use { backup ->
+            assertThrows(IllegalArgumentException::class.java) {
+                runBlocking { container.backups.replaceJournal(backup, "expired confirmation") }
+            }
+            assertEquals("Locally edited", container.repository.snapshot().exercises.single().name)
+            assertTrue(originalFile.isFile)
+            container.backups.replaceJournal(backup, backup.identity)
+        }
+
+        val restored = container.repository.snapshot()
+        val restoredPhoto = restored.photos.single()
+        assertEquals(exercise, restored.exercises.single())
+        assertEquals(original.id, restoredPhoto.id)
+        assertTrue(expectedBytes.contentEquals(container.photos.file(restoredPhoto).readBytes()))
+        assertEquals(lastBackupAt, restored.preferences.lastBackupAt)
+        assertFalse(originalFile.exists())
+        assertTrue(stagingRoot.list().orEmpty().isEmpty())
     }
 
     @Test fun failedPhotoDeletionIsReportedAndStartupRecoveryRetriesIt() = runBlocking {

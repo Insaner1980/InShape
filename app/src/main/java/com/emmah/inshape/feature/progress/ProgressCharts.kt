@@ -31,10 +31,14 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import com.emmah.inshape.R
 import com.emmah.inshape.data.weekStart
+import com.emmah.inshape.ui.components.KeyValueRow
 import com.emmah.inshape.ui.components.ResponsiveRow
 import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.theme.Dimens
@@ -162,23 +166,25 @@ fun ColumnScope.ExerciseChart(points: List<MetricPoint>, unit: String) {
     TextAction(if (showData) "Hide data values" else "View data values", { showData = !showData })
     if (showData) {
         points.forEachIndexed { index, point ->
-            TextAction(
-                "${point.date.displayDate()}: ${point.value?.stripTrailingZeros()?.toPlainString()?.let {
-                    "$it $unit"
-                } ?: "Not recorded"}",
-                {
-                    selected =
-                        index
-                }
-            )
+            val value = point.value?.stripTrailingZeros()?.toPlainString()?.let { "$it $unit" } ?: "Not recorded"
+            KeyValueRow(point.date.displayDate(), value, numeric = true, onClick = { selected = index })
         }
     }
 }
 
 @Composable
-fun AttendanceChart(weeks: List<WeekCount>, goal: Int?, today: LocalDate, modifier: Modifier = Modifier) {
+fun ColumnScope.AttendanceChart(weeks: List<WeekCount>, goal: Int?, today: LocalDate, modifier: Modifier = Modifier) {
     val colors = InShapeTheme.colors
     val maximum = maxOf(1, weeks.maxOfOrNull { it.count } ?: 0, goal ?: 0)
+    if (goal != null) {
+        Text(
+            "Goal $goal",
+            Modifier.fillMaxWidth(),
+            style = InShapeType.nav,
+            color = colors.textSecondary,
+            textAlign = TextAlign.End
+        )
+    }
     Canvas(
         modifier.fillMaxWidth().height(
             Dimens.chartAttendance
@@ -205,9 +211,15 @@ fun AttendanceChart(weeks: List<WeekCount>, goal: Int?, today: LocalDate, modifi
             val height = max(Dimens.innerTiny.toPx(), size.height * week.count / maximum)
             val offset = Offset(slot * index + gap / 2, size.height - height)
             val dimensions = Size((slot - gap).coerceAtLeast(1f), height)
-            if (week.week ==
-                weekStart(today)
-            ) {
+            if (week.week == weekStart(today) && week.count == 0) {
+                drawLine(
+                    colors.textSecondary,
+                    Offset(offset.x, offset.y + height / 2),
+                    Offset(offset.x + dimensions.width, offset.y + height / 2),
+                    strokeWidth = height,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(Dimens.innerTiny.toPx(), Dimens.chartLine.toPx()))
+                )
+            } else if (week.week == weekStart(today)) {
                 drawRoundRect(
                     colors.textSecondary,
                     offset,
@@ -252,7 +264,7 @@ fun AttendanceChart(weeks: List<WeekCount>, goal: Int?, today: LocalDate, modifi
     if (details) {
         weeks.forEach {
             Text(
-                "Week of ${it.week.displayDate()}: ${it.count} workouts",
+                "Week of ${it.week.displayDate()}: ${pluralStringResource(R.plurals.workout_count, it.count, it.count)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.textSecondary
             )
@@ -371,12 +383,12 @@ private fun DrawScope.drawChartGrid(color: Color) {
 
 @Composable
 fun ExerciseSparkline(points: List<MetricPoint>, modifier: Modifier = Modifier) {
+    val values = points.mapNotNull { it.value?.toFloat() }
+    val low = values.minOrNull() ?: return
+    val span = values.max() - low
+    if (span == 0f) return
     val colors = InShapeTheme.colors
     Canvas(modifier.size(Dimens.sparklineWidth, Dimens.sparklineHeight)) {
-        val values = points.mapNotNull { it.value?.toFloat() }
-        if (values.isEmpty()) return@Canvas
-        val low = values.min()
-        val span = (values.max() - low).coerceAtLeast(1f)
         fun point(index: Int, value: Float) = Offset(
             if (points.size == 1) size.width / 2 else index * size.width / points.lastIndex,
             size.height - Dimens.ring.toPx() - (value - low) / span * (size.height - 2 * Dimens.ring.toPx())

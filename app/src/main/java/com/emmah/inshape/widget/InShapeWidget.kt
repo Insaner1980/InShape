@@ -1,8 +1,10 @@
 package com.emmah.inshape.widget
 
+import android.appwidget.AppWidgetProviderInfo
 import android.content.Context
 import android.content.Intent
 import android.os.SystemClock
+import android.text.format.DateFormat
 import android.widget.RemoteViews
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -13,6 +15,7 @@ import androidx.glance.ButtonDefaults
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.LocalSize
+import androidx.glance.action.Action
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.AndroidRemoteViews
 import androidx.glance.appwidget.GlanceAppWidget
@@ -22,6 +25,7 @@ import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
+import androidx.glance.color.ColorProvider
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
@@ -30,6 +34,7 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
+import androidx.glance.layout.wrapContentHeight
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
@@ -45,16 +50,18 @@ import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 
-class InShapeWidget : GlanceAppWidget() {
+class InShapeWidget(private val previewOnly: Boolean = false) : GlanceAppWidget() {
     override val sizeMode = SizeMode.Responsive(
         setOf(DpSize(Dimens.widgetNarrow, Dimens.widgetHeight), DpSize(Dimens.widgetWide, Dimens.widgetHeight))
     )
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        if (previewOnly) {
+            providePreview(context, AppWidgetProviderInfo.WIDGET_CATEGORY_HOME_SCREEN)
+            return
+        }
         val container = (context.applicationContext as InShapeApplication).container
         val initial = container.repository.snapshot()
-        val text = androidx.glance.color.ColorProvider(LightColors.text, DarkColors.text)
-        val secondary = androidx.glance.color.ColorProvider(LightColors.textSecondary, DarkColors.textSecondary)
         provideContent {
             val data by container.repository.changes.collectAsState(initial)
             val state = widgetState(data, LocalDate.now(container.clock))
@@ -67,45 +74,72 @@ class InShapeWidget : GlanceAppWidget() {
             val timer = start?.takeUnless { state.timingNeedsReview }?.let {
                 workoutTimer(context, Duration.between(it, container.clock.instant()))
             }
-            val narrow = LocalSize.current.width < Dimens.widgetWide
-            val titleStyle = TextStyle(color = text, fontSize = AppTypography.titleMedium.fontSize, fontWeight = FontWeight.Medium)
-            val labelStyle = TextStyle(color = secondary, fontSize = AppTypography.labelSmall.fontSize)
-            Column(
-                GlanceModifier.fillMaxSize()
-                    .background(androidx.glance.color.ColorProvider(LightColors.background, DarkColors.surface))
-                    .cornerRadius(Dimens.cardPadding).clickable(open).padding(Dimens.inner),
-                verticalAlignment = Alignment.Vertical.CenterVertically
-            ) {
-                val subtitle = when {
-                    !state.resume -> state.goal?.let { "${state.count} of $it" } ?: "${state.count} workouts"
-                    narrow -> null
-                    else -> start?.let { "Started ${it.workoutTime(container.clock.zone)}" } ?: "Time not recorded"
-                }
-                WidgetHeader(state.resume, subtitle, labelStyle)
-                Spacer(GlanceModifier.height(Dimens.innerSmall))
-                if (state.resume) {
-                    val title = state.activeTitle ?: "Workout"
-                    if (narrow) {
-                        Text(title, style = titleStyle, maxLines = 2)
-                        if (timer != null) AndroidRemoteViews(timer) else Text("Review workout timing", style = labelStyle)
-                    } else {
-                        Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Vertical.CenterVertically) {
-                            Text(title, GlanceModifier.defaultWeight(), style = titleStyle, maxLines = 2)
-                            if (timer != null) AndroidRemoteViews(timer) else Text("Review timing", style = labelStyle)
-                        }
-                    }
-                } else {
-                    Text("No workout running", style = titleStyle)
-                    Button(
-                        "Start",
-                        open,
-                        colors = ButtonDefaults.buttonColors(
-                            backgroundColor = androidx.glance.color.ColorProvider(LightColors.ink, DarkColors.ink),
-                            contentColor = androidx.glance.color.ColorProvider(LightColors.onInk, DarkColors.onInk)
-                        )
-                    )
-                }
+            val time = start?.takeUnless { state.timingNeedsReview }?.let {
+                "Started ${it.workoutTime(state.activeZone ?: container.clock.zone, DateFormat.is24HourFormat(context))}"
             }
+            WidgetContent(
+                state,
+                open,
+                timer,
+                time,
+                context.resources.getQuantityString(R.plurals.workout_count, state.count, state.count)
+            )
+        }
+    }
+
+    override suspend fun providePreview(context: Context, widgetCategory: Int) {
+        val state = WidgetState(LocalDate.now(), 2, 3, false, null)
+        provideContent {
+            WidgetContent(
+                state,
+                actionStartActivity(Intent(context, WidgetActivity::class.java)),
+                timer = null,
+                time = null,
+                workoutCount = context.resources.getQuantityString(R.plurals.workout_count, state.count, state.count)
+            )
+        }
+    }
+}
+
+@Composable
+private fun WidgetContent(state: WidgetState, open: Action, timer: RemoteViews?, time: String?, workoutCount: String) {
+    val titleStyle = TextStyle(
+        color = ColorProvider(LightColors.text, DarkColors.text),
+        fontSize = AppTypography.titleMedium.fontSize,
+        fontWeight = FontWeight.Medium
+    )
+    val labelStyle = TextStyle(
+        color = ColorProvider(LightColors.textSecondary, DarkColors.textSecondary),
+        fontSize = AppTypography.labelSmall.fontSize
+    )
+    Column(
+        GlanceModifier.fillMaxSize()
+            .background(ColorProvider(LightColors.background, DarkColors.surface))
+            .cornerRadius(Dimens.cardPadding).clickable(open).padding(Dimens.inner),
+        verticalAlignment = Alignment.Vertical.CenterVertically
+    ) {
+        if (state.resume) {
+            WidgetHeader(true, time.takeIf { LocalSize.current.width >= Dimens.widgetWide }, labelStyle)
+            Text(state.activeTitle?.ifBlank { "Workout" } ?: "Workout", style = titleStyle, maxLines = 1)
+            Text("${state.doneExercises} of ${state.totalExercises}", style = labelStyle)
+            if (timer != null) {
+                AndroidRemoteViews(timer, modifier = GlanceModifier.wrapContentHeight())
+            } else {
+                Text("Review workout timing", style = labelStyle)
+            }
+        } else {
+            WidgetHeader(false, state.goal?.let { "${state.count} of $it" } ?: workoutCount, labelStyle)
+            Spacer(GlanceModifier.height(Dimens.innerSmall))
+            Text("No workout running", style = titleStyle)
+            Button(
+                "Start",
+                open,
+                modifier = GlanceModifier.height(Dimens.touch),
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = ColorProvider(LightColors.ink, DarkColors.ink),
+                    contentColor = ColorProvider(LightColors.onInk, DarkColors.onInk)
+                )
+            )
         }
     }
 }

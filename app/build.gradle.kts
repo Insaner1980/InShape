@@ -28,7 +28,10 @@ android {
         buildConfig = true
     }
     buildTypes {
-        debug { enableUnitTestCoverage = true }
+        debug {
+            enableUnitTestCoverage = true
+            enableAndroidTestCoverage = providers.gradleProperty("sonarDeviceCoverage").orNull == "true"
+        }
     }
     testCoverage { jacocoVersion = "0.8.16" }
     compileOptions {

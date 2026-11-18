@@ -23,6 +23,7 @@ object Dimens {
     val ring = 2.dp
     val line = 1.dp
     val weekDay = 36.dp
+    val reminderDay = 40.dp
     val calendarDay = 48.dp
     val setField = 52.dp
     val setNumber = 28.dp
@@ -31,14 +32,15 @@ object Dimens {
     val chartExercise = 140.dp
     val chartObservation = 100.dp
     val inlineField = 144.dp
+    val pickerWidth = 360.dp
     val topBarLarge = 112.dp
     val navBar = 72.dp
     val navBarLarge = 120.dp
+    const val PHOTO_ASPECT = 1.79f
     val photoPlaceholder = 200.dp
     val photoThumbnail = 72.dp
     val iconLarge = 32.dp
-    val bodyWidth = 72.dp
-    val bodyHeight = 156.dp
+    val bodyHeight = 300.dp
     val chartLine = 3.dp
     val chartDot = 5.dp
     val chartDash = 7.dp

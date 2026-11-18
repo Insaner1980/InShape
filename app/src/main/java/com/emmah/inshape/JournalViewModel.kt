@@ -21,7 +21,7 @@ sealed interface SaveState {
     data object Idle : SaveState
     data object Saving : SaveState
     data object Saved : SaveState
-    data class Failed(val message: String, val retryable: Boolean = true) : SaveState
+    data class Failed(val message: String, val retryable: Boolean = true, val occurrence: Long = 0) : SaveState
 }
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -41,6 +41,7 @@ class JournalViewModel(val container: AppContainer) : ViewModel() {
     private val status = MutableStateFlow<SaveState>(SaveState.Idle)
     val saveState = status.asStateFlow()
     private val writes = Channel<PendingWrite>(Channel.UNLIMITED)
+    private var failureOccurrence = 0L
     private val retries = Channel<Unit>(Channel.CONFLATED)
     init {
         viewModelScope.launch {
@@ -79,7 +80,8 @@ class JournalViewModel(val container: AppContainer) : ViewModel() {
 
     private fun saveFailure(error: Exception, retryable: Boolean) = SaveState.Failed(
         error.message ?: "Could not save. Your changes are still on this screen.",
-        retryable
+        retryable,
+        ++failureOccurrence
     )
     fun write(action: suspend JournalRepository.() -> Unit) = write(null, action)
 

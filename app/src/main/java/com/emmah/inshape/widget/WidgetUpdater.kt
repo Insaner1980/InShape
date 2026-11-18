@@ -3,6 +3,7 @@ package com.emmah.inshape.widget
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.updateAll
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -63,15 +64,10 @@ object WidgetUpdater {
             "widget-fallback"
         ).forEach(work::cancelUniqueWork)
     }
-    fun requestPin(context: Context): Boolean {
-        val manager = AppWidgetManager.getInstance(context)
-        return manager.isRequestPinAppWidgetSupported &&
-            manager.requestPinAppWidget(
-                ComponentName(context, InShapeWidgetReceiver::class.java),
-                null,
-                null
-            )
-    }
+    suspend fun requestPin(context: Context): Boolean = GlanceAppWidgetManager(context).requestPinGlanceAppWidget(
+        InShapeWidgetReceiver::class.java,
+        preview = InShapeWidget(previewOnly = true)
+    )
 }
 class WidgetRefreshWorker(context: Context, parameters: WorkerParameters) : CoroutineWorker(context, parameters) {
     override suspend fun doWork(): Result = try {

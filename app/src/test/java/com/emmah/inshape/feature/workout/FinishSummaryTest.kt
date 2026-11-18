@@ -31,8 +31,31 @@ class FinishSummaryTest {
             FinishDraft(end.toString(), "Edited note", fixedStart = Instant.MAX.toString())
         ).forEach { draft ->
             val restored = finishDraft(Json.encodeToString(draft), end, "Old note")
-            assertEquals(FinishDraft(end.toString(), "Edited note", unknownTimes = true), restored)
+            assertEquals(finishDraft(null, end, "Old note").copy(note = "Edited note", unknownTimes = true), restored)
         }
+    }
+
+    @Test fun reopeningAfterReturningOnlyRefreshesAnAutomaticEnd() {
+        val later = end.plusSeconds(60)
+        val fresh = finishDraft(null, end, "Original")
+        assertNull(fresh.afterReturningToWorkout())
+
+        val edited = fresh.copy(note = "Edited", fixedStart = end.minusSeconds(600).toString())
+        val saved = requireNotNull(edited.afterReturningToWorkout())
+        assertEquals(edited.copy(end = later.toString()), finishDraft(Json.encodeToString(saved), later, "Original"))
+
+        val manual = edited.copy(endMode = FinishDraft.EndMode.Manual)
+        val savedManual = requireNotNull(manual.afterReturningToWorkout())
+        assertEquals(manual, finishDraft(Json.encodeToString(savedManual), later, "Original"))
+    }
+
+    @Test fun onlyUntouchedNotesFollowAConcurrentUpdate() {
+        val original = finishDraft(null, end, "Original")
+        val current = original.withCurrentWorkoutNote("Newer note")
+        assertEquals("Newer note", current.note)
+        assertEquals("Newer note", current.originalNote)
+        val edited = original.copy(note = "Draft note")
+        assertEquals(edited, edited.withCurrentWorkoutNote("Newer note"))
     }
 
     @Test fun rangeIncludesWeekdaysOnlyWhenCrossingMidnight() {

@@ -23,12 +23,12 @@ data class InShapeColors(
 val LightColors = InShapeColors(
     false, Color(0xFFFFFFFF), Color(0xFFF4F4F4), Color(0xFFEBEBEB),
     Color(0xFFE3E3E3), Color(0xFF0B0B0B), Color(0xFF0B0B0B),
-    Color(0xFF5E5E5E), Color(0xFF8E8E8E), Color(0xFF0B0B0B),
+    Color(0xFF5E5E5E), Color(0xFF707070), Color(0xFF0B0B0B),
     Color(0xFFFFFFFF), Color(0xFFB3261E), Color(0x520B0B0B)
 )
 val DarkColors = InShapeColors(
     true, Color(0xFF0B0B0B), Color(0xFF1A1A1A), Color(0xFF242424),
     Color(0xFF2A2A2A), Color(0xFFF5F5F5), Color(0xFFF5F5F5),
-    Color(0xFFA3A3A3), Color(0xFF6F6F6F), Color(0xFFF5F5F5),
+    Color(0xFFA3A3A3), Color(0xFF858585), Color(0xFFF5F5F5),
     Color(0xFF0B0B0B), Color(0xFFF2B8B5), Color(0x99000000)
 )

@@ -1,11 +1,15 @@
 package com.emmah.inshape.feature.library
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -14,8 +18,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import com.emmah.inshape.JournalViewModel
+import com.emmah.inshape.R
 import com.emmah.inshape.data.Exercise
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.SavedLink
@@ -23,7 +30,6 @@ import com.emmah.inshape.data.Setting
 import com.emmah.inshape.data.newId
 import com.emmah.inshape.ui.components.ConfirmDialog
 import com.emmah.inshape.ui.components.GroupLabel
-import com.emmah.inshape.ui.components.InShapeCard
 import com.emmah.inshape.ui.components.Page
 import com.emmah.inshape.ui.components.PrimaryButton
 import com.emmah.inshape.ui.components.SelectField
@@ -50,51 +56,46 @@ fun ExerciseEditor(id: String, data: JournalSnapshot, vm: JournalViewModel, onSa
     }
     var more by remember(id) { mutableStateOf(false) }
     var archive by remember { mutableStateOf(false) }
+    var showNameError by remember(id) { mutableStateOf(false) }
     Page(modifier, bottomBar = {
         PrimaryButton("Save exercise", {
-            vm.write {
-                saveExercise(exercise)
-                deleteEditorDraft("exercise:$id")
-                onSave(exercise.id)
+            if (exercise.name.isBlank()) {
+                showNameError = true
+            } else {
+                vm.write {
+                    saveExercise(exercise)
+                    deleteEditorDraft("exercise:$id")
+                    onSave(exercise.id)
+                }
             }
         }, Modifier.fillMaxWidth().heightIn(min = Dimens.button))
     }) {
-        TextField(exercise.name, "Exercise name", { edit(exercise.copy(name = it)) }, singleLine = true)
+        TextField(
+            exercise.name,
+            "Exercise name",
+            { edit(exercise.copy(name = it)) },
+            singleLine = true,
+            error = "Enter an exercise name".takeIf { showNameError && exercise.name.isBlank() }
+        )
         GroupLabel("Machine settings")
         androidx.compose.foundation.layout.Column(
             verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Dimens.itemGap)
         ) {
             exercise.settings.forEachIndexed { index, setting ->
-                TextField(setting.label, "Setting label", { text ->
-                    edit(
-                        exercise.copy(
-                            settings = exercise.settings.toMutableList().also {
-                                it[index] =
-                                    setting.copy(label = text)
-                            }
-                        )
-                    )
-                }, singleLine = true)
-                TextField(setting.value, "Setting value", { text ->
-                    edit(
-                        exercise.copy(
-                            settings = exercise.settings.toMutableList().also {
-                                it[index] =
-                                    setting.copy(value = text)
-                            }
-                        )
-                    )
-                }, singleLine = true)
-                TextAction("Remove setting", {
-                    edit(
-                        exercise.copy(
-                            settings = exercise.settings.filterIndexed { i, _ ->
-                                i !=
-                                    index
-                            }
-                        )
-                    )
-                })
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Dimens.innerSmall)
+                ) {
+                    TextField(setting.label, "Label", { text ->
+                        edit(exercise.copy(settings = exercise.settings.toMutableList().also { it[index] = setting.copy(label = text) }))
+                    }, Modifier.weight(1f), singleLine = true)
+                    TextField(setting.value, "Value", { text ->
+                        edit(exercise.copy(settings = exercise.settings.toMutableList().also { it[index] = setting.copy(value = text) }))
+                    }, Modifier.weight(1f), singleLine = true)
+                    IconButton({
+                        edit(exercise.copy(settings = exercise.settings.filterIndexed { i, _ -> i != index }))
+                    }) { Icon(Icons.Outlined.Close, "Remove setting ${index + 1}") }
+                }
             }
             TextAction("Add setting", {
                 edit(
@@ -116,7 +117,7 @@ fun ExerciseEditor(id: String, data: JournalSnapshot, vm: JournalViewModel, onSa
             subtitle = listOfNotNull(
                 exercise.category.takeIf { it.isNotBlank() },
                 exercise.location.takeIf { it.isNotBlank() },
-                exercise.links.size.takeIf { it > 0 }?.let { "$it links" }
+                exercise.links.size.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.link_count, it, it) }
             ).joinToString(", "),
             onClick = { more = !more }
         )
@@ -150,7 +151,7 @@ fun ExerciseEditor(id: String, data: JournalSnapshot, vm: JournalViewModel, onSa
                             )
                         )
                     })
-                    TextField(link.url, "HTTP or HTTPS address", { text ->
+                    TextField(link.url, "Web address", { text ->
                         edit(
                             exercise.copy(
                                 links = exercise.links.toMutableList().also {
@@ -180,7 +181,7 @@ fun ExerciseEditor(id: String, data: JournalSnapshot, vm: JournalViewModel, onSa
                 verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Dimens.itemGap)
             ) {
                 data.exercises.filter { it.id != exercise.id && !it.archived }.forEach { option ->
-                    Row {
+                    Row(Modifier.heightIn(min = Dimens.rowMin), verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(option.id in exercise.alternatives, { checked ->
                             edit(
                                 exercise.copy(

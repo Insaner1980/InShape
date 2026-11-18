@@ -52,7 +52,7 @@ object DemoFixtures {
         "ProgressWithHistory" -> "History?view=progress&exercise=$pulldownId"
         "SparseHistory" -> "History?view=progress"
         "HistoryNovember" -> "History"
-        "LibraryRoutineExpanded" -> "Library"
+        "LibraryRoutineExpanded" -> "routine/$routineId"
         "SettingsConfigured" -> "Settings"
         else -> "Today"
     }

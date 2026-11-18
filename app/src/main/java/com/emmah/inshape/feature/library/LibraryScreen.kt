@@ -2,6 +2,7 @@ package com.emmah.inshape.feature.library
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconToggleButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
@@ -18,7 +20,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,15 +27,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.onClick
 import com.emmah.inshape.JournalViewModel
+import com.emmah.inshape.R
 import com.emmah.inshape.data.JournalSnapshot
-import com.emmah.inshape.data.Routine
 import com.emmah.inshape.data.Workout
+import com.emmah.inshape.ui.components.AppMenu
 import com.emmah.inshape.ui.components.EmptyState
 import com.emmah.inshape.ui.components.FilterPill
-import com.emmah.inshape.ui.components.IconCircleButton
-import com.emmah.inshape.ui.components.InitialsTile
 import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListRow
 import com.emmah.inshape.ui.components.OutlineButton
@@ -42,7 +44,6 @@ import com.emmah.inshape.ui.components.Page
 import com.emmah.inshape.ui.components.ScreenHeader
 import com.emmah.inshape.ui.components.SearchField
 import com.emmah.inshape.ui.components.SegmentedControl
-import com.emmah.inshape.ui.components.SelectField
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
@@ -94,17 +95,16 @@ fun lastRecordedValues(history: List<Workout>): Map<String, LastRecordedValue> =
 fun LibraryScreen(
     data: JournalSnapshot,
     onExercise: (String) -> Unit,
-    onStart: (String) -> Unit,
+    onRoutine: (String) -> Unit,
     vm: JournalViewModel,
-    modifier: Modifier = Modifier,
-    initialExpandedId: String? = null
+    modifier: Modifier = Modifier
 ) {
     var segment by rememberSaveable { mutableIntStateOf(0) }
     var search by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf("All") }
     var location by rememberSaveable { mutableStateOf("All locations") }
     var favorites by rememberSaveable { mutableStateOf(false) }
-    var expanded by rememberSaveable { mutableStateOf(initialExpandedId) }
+    var locationsMenu by rememberSaveable { mutableStateOf(false) }
     val history = data.history
     val recorded = remember(history) { lastRecordedValues(history) }
     val today = LocalDate.now(vm.container.clock)
@@ -112,77 +112,33 @@ fun LibraryScreen(
     Page(modifier) {
         ScreenHeader("Library", trailing = {
             OutlineButton(if (segment == 0) "New routine" else "New exercise", {
-                if (segment == 0) expanded = "new" else onExercise("new")
+                if (segment == 0) onRoutine("new") else onExercise("new")
             }, icon = Icons.Outlined.Add)
         })
         SegmentedControl(listOf("Routines", "Exercises"), segment, { segment = it })
         if (segment == 0) {
-            if (data.routines.isEmpty() &&
-                expanded != "new"
-            ) {
+            if (data.routines.isEmpty()) {
                 EmptyState(
                     "Make it your routine",
                     "Add the exercises you want to remember. Planned values stay separate from your recorded work."
                 )
-            }
-            if (expanded ==
-                "new"
-            ) {
-                RoutineEditor("new", data, vm, {
-                    expanded = null
-                }, onStart, { onExercise("new") }, embedded = true)
-            }
-            val before = data.routines.takeWhile { it.id != expanded }
-            val after = if (expanded == null ||
-                data.routines.none { it.id == expanded }
-            ) {
-                emptyList()
             } else {
-                data.routines.dropWhile {
-                    it.id !=
-                        expanded
-                }.drop(1)
-            }
-
-            @Composable fun Routines(rows: List<Routine>) {
-                if (rows.isNotEmpty()) {
-                    ListCard {
-                        rows.forEach { routine ->
-                            item {
-                                ListRow(
-                                    routine.title,
-                                    subtitle =
-                                        "${data.routineItems.count {
-                                            it.routineId == routine.id
-                                        }} exercises" +
-                                            (
-                                                routine.description.takeIf {
-                                                    it.isNotBlank()
-                                                }?.let { ", $it" }
-                                                    ?: routine.durationMinutes?.let {
-                                                        ", about $it min"
-                                                    }.orEmpty()
-                                                ),
-                                    onClick = {
-                                        expanded =
-                                            routine.id
-                                    }
-                                )
-                            }
+                ListCard {
+                    data.routines.forEach { routine ->
+                        item {
+                            val count = data.routineItems.count { it.routineId == routine.id }
+                            val detail = routine.description.takeIf(String::isNotBlank)
+                                ?: routine.durationMinutes?.let { "about $it min" }
+                            val exercises = pluralStringResource(R.plurals.exercise_count, count, count)
+                            ListRow(
+                                routine.title,
+                                subtitle = listOfNotNull(exercises, detail).joinToString(", "),
+                                onClick = { onRoutine(routine.id) }
+                            )
                         }
                     }
                 }
             }
-            Routines(before)
-            data.routines.find { it.id == expanded }?.let { routine ->
-                key(routine.id) {
-                    RoutineEditor(routine.id, data, vm, {
-                        expanded =
-                            null
-                    }, onStart, { onExercise("new") }, embedded = true)
-                }
-            }
-            Routines(after)
         } else {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(Dimens.innerSmall),
@@ -211,10 +167,24 @@ fun LibraryScreen(
                     )
                 }
             }
+            val locations = data.exercises.filter { !it.archived && it.location.isNotBlank() }.map { it.location }.distinct()
             Row(
                 Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(Dimens.innerSmall)
             ) {
+                if (locations.isNotEmpty()) {
+                    Box {
+                        FilterPill(location, location != "All locations", { locationsMenu = true }, showDropdown = true)
+                        AppMenu(locationsMenu, { locationsMenu = false }) {
+                            (listOf("All locations") + locations).forEach { label ->
+                                DropdownMenuItem({ Text(label) }, {
+                                    location = label
+                                    locationsMenu = false
+                                })
+                            }
+                        }
+                    }
+                }
                 (
                     listOf("All") +
                         exerciseCategories
@@ -225,19 +195,10 @@ fun LibraryScreen(
                     })
                 }
             }
-            val locations = data.exercises.filter { !it.archived }.map { it.location }.distinct()
-            if (locations.size >
-                1
-            ) {
-                SelectField("Location", location, listOf("All locations") + locations, {
-                    location =
-                        it
-                })
-            }
             val matching = data.exercises.filter {
                 !it.archived && (!favorites || it.favorite) &&
                     (category == "All" || it.category == category) &&
-                    (locations.size <= 1 || location == "All locations" || it.location == location) &&
+                    (location !in locations || it.location == location) &&
                     listOf(it.name, it.nickname, it.equipmentName).any { value ->
                         value.contains(search, true)
                     }
@@ -257,7 +218,9 @@ fun LibraryScreen(
                                         exercise.equipmentName
                                     ).filter(String::isNotBlank).joinToString(", ")
                                 },
-                                leading = { InitialsTile(exercise.name) },
+                                leading = data.photos.firstOrNull { it.exerciseId == exercise.id }?.let { photo ->
+                                    { PhotoImage(photo, vm.container.photos, Modifier.size(Dimens.touch).clip(InShapeShapes.field)) }
+                                },
                                 trailing = last?.let {
                                     {
                                         Column(horizontalAlignment = Alignment.End) {
@@ -278,7 +241,8 @@ fun LibraryScreen(
                                         }
                                     }
                                 },
-                                onClick = { onExercise(exercise.id) }
+                                onClick = { onExercise(exercise.id) },
+                                showChevron = false
                             )
                         }
                     }
@@ -304,7 +268,7 @@ fun ExercisePicker(data: JournalSnapshot, onChoose: (String) -> Unit, onCreate: 
                     item {
                         ListRow(exercise.name, subtitle = exercise.equipmentName, onClick = {
                             onChoose(exercise.id)
-                        })
+                        }, showChevron = false)
                     }
                 }
             }

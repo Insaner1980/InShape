@@ -1,6 +1,7 @@
 package com.emmah.inshape
 
 import android.content.Context
+import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -9,7 +10,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithText
@@ -35,7 +36,7 @@ import org.junit.Rule
 import org.junit.Test
 
 class WorkoutTimingEditorTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val id = DemoFixtures.activeId
     private val databaseName = "timing-${newId()}.db"
@@ -43,6 +44,7 @@ class WorkoutTimingEditorTest {
 
     @After fun cleanup() {
         if (::container.isInitialized) {
+            compose.activityRule.scenario.close()
             container.close()
             context.deleteDatabase(databaseName)
             container.storageRoot.deleteRecursively()
@@ -56,7 +58,7 @@ class WorkoutTimingEditorTest {
 
         compose.clickText("Workout date")
         compose.clickText("Cancel")
-        compose.onNodeWithText(invalidDate).assertExists()
+        compose.onNodeWithText("Invalid date").assertExists()
         compose.clickText("Workout date")
         compose.clickText("Done")
         compose.clickText("Save correction")
@@ -78,10 +80,12 @@ class WorkoutTimingEditorTest {
         }
 
         compose.clickText("Started")
+        compose.clickText("Time")
         compose.onNodeWithText("Done").assertIsNotEnabled()
         compose.clickText("UTC+03:00")
         compose.clickText("Done")
         compose.clickText("Finished")
+        compose.clickText("Time")
         compose.clickText("UTC+02:00")
         compose.clickText("Done")
         compose.clickText("Save correction")

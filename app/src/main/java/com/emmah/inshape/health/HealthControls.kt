@@ -40,12 +40,11 @@ import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListRow
 import com.emmah.inshape.ui.components.OutlineButton
 import com.emmah.inshape.ui.components.ResponsiveRow
-import com.emmah.inshape.ui.components.SectionLabel
+import com.emmah.inshape.ui.components.SectionHeader
 import com.emmah.inshape.ui.components.SelectField
 import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeTheme
-import com.emmah.inshape.ui.theme.InShapeType
 import java.time.ZonedDateTime
 import kotlinx.coroutines.launch
 
@@ -93,6 +92,19 @@ fun ColumnScope.HealthSettings(data: JournalSnapshot, vm: JournalViewModel) {
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { refresh() }
     LaunchedEffect(data.preferences.readHeartRate) { refresh() }
     GroupLabel("Health Connect")
+    if (!available) {
+        Text(
+            if (gateway.availability() ==
+                HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED
+            ) {
+                "Install or update Health Connect to connect on this device."
+            } else {
+                "Health Connect is unavailable on this device."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = InShapeTheme.colors.textSecondary
+        )
+    }
     ListCard {
         HealthCapability.entries.forEach { capability ->
             item {
@@ -106,13 +118,7 @@ fun ColumnScope.HealthSettings(data: JournalSnapshot, vm: JournalViewModel) {
                         capability.label
                     },
                     titleStyle = MaterialTheme.typography.bodyLarge,
-                    subtitle = if (enabled &&
-                        !available
-                    ) {
-                        "Unavailable"
-                    } else if (enabled &&
-                        capability.permission !in grants
-                    ) {
+                    subtitle = if (available && enabled && capability.permission !in grants) {
                         "Permission needed"
                     } else {
                         null
@@ -129,22 +135,17 @@ fun ColumnScope.HealthSettings(data: JournalSnapshot, vm: JournalViewModel) {
                             ) {
                                 request.launch(setOf(capability.permission))
                             }
-                        }, capability.label, enabled = available || enabled)
+                        }, capability.label, enabled = available)
                     }
                 )
                 if (enabled && available &&
                     capability.permission !in grants
                 ) {
-                    TextAction("Allow ${capability.label.lowercase()}", {
+                    TextAction("Allow access", {
                         request.launch(setOf(capability.permission))
                     })
                 }
             }
-        }
-        item {
-            ListRow("Privacy and permissions", titleStyle = MaterialTheme.typography.bodyLarge, onClick = {
-                context.startActivity(Intent(context, HealthPrivacyActivity::class.java))
-            })
         }
         if (available) {
             item {
@@ -162,24 +163,6 @@ fun ColumnScope.HealthSettings(data: JournalSnapshot, vm: JournalViewModel) {
                 })
             }
         }
-    }
-    Text(
-        "Workout summaries can be shared; steps, sleep and heart rate are optional context.",
-        style = MaterialTheme.typography.bodySmall,
-        color = InShapeTheme.colors.textSecondary
-    )
-    if (!available) {
-        Text(
-            if (gateway.availability() ==
-                HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED
-            ) {
-                "Install or update Health Connect to connect on this device."
-            } else {
-                "Health Connect is unavailable on this device."
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = InShapeTheme.colors.textSecondary
-        )
     }
     if (data.preferences.readHeartRate &&
         sources.isNotEmpty()
@@ -297,7 +280,7 @@ fun HealthToday(preferences: Preferences, container: AppContainer) {
             error = true
         }
     }
-    SectionLabel("Health context")
+    SectionHeader("Health context")
     if (error) {
         Text(
             "Health Connect is unavailable. Your journal is ready to use.",
@@ -362,7 +345,7 @@ fun WorkoutHealthControls(workout: Workout, data: JournalSnapshot, vm: JournalVi
             if (readPermission in result) vm.write { vm.container.healthSharing.reconcile(id) }
         }
     InShapeCard(modifier) {
-        SectionLabel("Health Connect")
+        SectionHeader("Health Connect")
         Text(
             state?.error
                 ?: if (state?.restoredHold ==

@@ -30,8 +30,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
-import com.emmah.inshape.SaveState
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
@@ -105,30 +103,6 @@ fun ActionRow(modifier: Modifier = Modifier, content: @Composable FlowRowScope.(
         verticalArrangement = Arrangement.spacedBy(Dimens.innerTiny),
         content = content
     )
-}
-
-@Composable
-fun SaveStatus(state: SaveState, retry: () -> Unit, modifier: Modifier = Modifier) {
-    when (state) {
-        SaveState.Idle -> Unit
-
-        SaveState.Saving -> Text("Saving...", modifier, style = MaterialTheme.typography.bodyMedium)
-
-        SaveState.Saved -> Text("Saved automatically", modifier, style = MaterialTheme.typography.bodyMedium)
-
-        is SaveState.Failed -> InShapeCard(modifier, inset = true) {
-            Text("Could not save", color = InShapeTheme.colors.error)
-            Text(state.message)
-            if (state.retryable) {
-                OutlineButton(
-                    "Retry",
-                    retry
-                )
-            } else {
-                Text("Review your values and save again.")
-            }
-        }
-    }
 }
 
 @Composable

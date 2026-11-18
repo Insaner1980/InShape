@@ -14,11 +14,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Home
@@ -26,16 +23,16 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,10 +60,8 @@ import com.emmah.inshape.JournalViewModel
 import com.emmah.inshape.MainActivity
 import com.emmah.inshape.R
 import com.emmah.inshape.SaveState
-import com.emmah.inshape.data.Exercise
 import com.emmah.inshape.data.Routine
 import com.emmah.inshape.data.StartSource
-import com.emmah.inshape.data.Workout
 import com.emmah.inshape.feature.checkin.CheckInScreen
 import com.emmah.inshape.feature.history.HistoryScreen
 import com.emmah.inshape.feature.history.WorkoutDetailScreen
@@ -74,21 +69,18 @@ import com.emmah.inshape.feature.library.ExerciseEditor
 import com.emmah.inshape.feature.library.ExerciseScreen
 import com.emmah.inshape.feature.library.LibraryScreen
 import com.emmah.inshape.feature.library.RoutineEditor
-import com.emmah.inshape.feature.progress.ProgressScreen
 import com.emmah.inshape.feature.settings.SettingsScreen
 import com.emmah.inshape.feature.today.TodayScreen
 import com.emmah.inshape.feature.workout.FinishScreen
 import com.emmah.inshape.feature.workout.WorkoutScreen
 import com.emmah.inshape.feature.workout.WorkoutTimingEditor
-import com.emmah.inshape.ui.components.OutlineButton
-import com.emmah.inshape.ui.components.SaveStatus
+import com.emmah.inshape.ui.components.LocalPageSnackbar
+import com.emmah.inshape.ui.components.PushedHeader
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.InShapeType
 import java.time.Duration
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 import kotlinx.coroutines.delay
 
 enum class Destination { Today, History, Library, Settings }
@@ -101,7 +93,6 @@ fun AppNavigation(
     entryAction: Pair<String, Long>? = null,
     consumeEntry: () -> Unit = {},
     initialRoute: String = "Today",
-    initialExpandedRoutineId: String? = null,
     vm: JournalViewModel = viewModel(
         factory = remember(container) { viewModelFactory { initializer { JournalViewModel(container) } } }
     )
@@ -109,6 +100,16 @@ fun AppNavigation(
     val currentConsumeEntry by rememberUpdatedState(consumeEntry)
     val data by vm.snapshot.collectAsStateWithLifecycle()
     val saving by vm.saveState.collectAsStateWithLifecycle()
+    val snackbar = remember { SnackbarHostState() }
+    LaunchedEffect(saving) {
+        val failure = saving as? SaveState.Failed ?: return@LaunchedEffect
+        val result = snackbar.showSnackbar(
+            message = "Could not save. ${failure.message}",
+            actionLabel = if (failure.retryable) "Retry" else null,
+            duration = if (failure.retryable) SnackbarDuration.Indefinite else SnackbarDuration.Long
+        )
+        if (result == SnackbarResult.ActionPerformed) vm.retry()
+    }
     val largeText = LocalDensity.current.fontScale > 1.3f
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
@@ -203,78 +204,22 @@ fun AppNavigation(
         modifier = modifier,
         topBar = {
             val hasScreenHeader = when (route.substringBefore('/')) {
-                "checkin", "exercise", "workout", "finish" -> true
+                "checkin", "exercise", "workout", "finish", "detail", "routine" -> true
                 else -> false
             }
             if (!isMain && !hasScreenHeader) {
-                TopAppBar(
-                    title = {
-                        Column {
-                            Text(
-                                when {
-                                    route.startsWith(
-                                        "workout/"
-                                    ) -> data?.workout(workoutId ?: "")?.row?.title
-                                        ?: "Workout"
-
-                                    route.startsWith("exercise-edit") -> "Edit exercise"
-
-                                    route.startsWith("exercise/") -> "Exercise"
-
-                                    route.startsWith("routine/") -> "Routine"
-
-                                    route.startsWith("checkin/") -> "Check-in"
-
-                                    route.startsWith("timing/") -> "Review workout"
-
-                                    route.startsWith("detail/") -> "Workout details"
-
-                                    route == "Export" -> "Export your journal"
-
-                                    else -> ""
-                                },
-                                style = MaterialTheme.typography.titleLarge
-                            )
-                        }
-                    },
-                    navigationIcon = {
-                        IconButton({
-                            nav.popBackStack()
-                        }) {
-                            Icon(
-                                Icons.AutoMirrored.Outlined.ArrowBack,
-                                stringResource(R.string.back)
-                            )
-                        }
-                    },
-                    expandedHeight = if (largeText) Dimens.topBarLarge else Dimens.rowMinTwoLine,
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = InShapeTheme.colors.background,
-                        scrolledContainerColor = InShapeTheme.colors.background,
-                        navigationIconContentColor = InShapeTheme.colors.text
-                    )
-                )
+                val title = when {
+                    route.startsWith("exercise-edit") -> if (workoutId == "new") "New exercise" else "Edit exercise"
+                    route.startsWith("timing/") -> "Review workout"
+                    route == "Settings" -> "Settings"
+                    route == "Export" -> "Export your journal"
+                    else -> ""
+                }
+                PushedHeader(onBack = { nav.popBackStack() }, title = title)
             }
         },
         bottomBar = {
-            Column(
-                modifier = if (!isMain &&
-                    saving != SaveState.Idle
-                ) {
-                    Modifier.navigationBarsPadding()
-                } else {
-                    Modifier
-                }
-            ) {
-                if (saving !=
-                    SaveState.Idle
-                ) {
-                    Box(
-                        Modifier.padding(horizontal = Dimens.inner, vertical = Dimens.innerTiny)
-                    ) {
-                        SaveStatus(saving, vm::retry)
-                    }
-                }
+            Column {
                 if (isMain) HorizontalDivider(color = InShapeTheme.colors.divider)
                 if (isMain) {
                     NavigationBar(
@@ -340,120 +285,132 @@ fun AppNavigation(
                 CircularProgressIndicator()
             }
         } else {
-            NavHost(nav, initialRoute, Modifier.padding(padding).consumeWindowInsets(padding)) {
-                composable("Today") {
-                    TodayScreen(state, today, {
-                        nav.navigate("Settings")
-                    }, ::start, {
-                        nav.navigate("Library")
-                    }, {
-                        val screen = if (it == state.active?.row?.id) "workout" else "detail"
-                        nav.navigate("$screen/$it")
-                    }, clock = container.clock) { com.emmah.inshape.health.HealthToday(state.preferences, container) }
-                }
-                composable(
-                    "History?view={view}&exercise={exercise}",
-                    arguments = listOf(
-                        androidx.navigation.navArgument("view") { defaultValue = "calendar" },
-                        androidx.navigation.navArgument("exercise") {
-                            nullable = true
-                            defaultValue = null
+            CompositionLocalProvider(LocalPageSnackbar provides snackbar) {
+                NavHost(nav, initialRoute, Modifier.padding(padding).consumeWindowInsets(padding)) {
+                    composable("Today") {
+                        TodayScreen(
+                            state,
+                            today,
+                            onSettings = { nav.navigate("Settings") },
+                            onStart = ::start,
+                            onWorkout = {
+                                val screen = if (it == state.active?.row?.id) "workout" else "detail"
+                                nav.navigate("$screen/$it")
+                            },
+                            clock = container.clock,
+                            onOpenRoutine = { nav.navigate(if (it == null) "Library" else "routine/$it") }
+                        ) {
+                            com.emmah.inshape.health.HealthToday(state.preferences, container)
                         }
-                    )
-                ) { backStack ->
-                    HistoryScreen(
-                        state,
-                        today,
-                        vm,
-                        { nav.navigate("detail/$it") },
-                        {
-                            if (nav.currentBackStackEntry === backStack && backStack.lifecycle.currentState != Lifecycle.State.DESTROYED) {
-                                nav.navigate("workout/$it")
+                    }
+                    composable(
+                        "History?view={view}&exercise={exercise}",
+                        arguments = listOf(
+                            androidx.navigation.navArgument("view") { defaultValue = "calendar" },
+                            androidx.navigation.navArgument("exercise") {
+                                nullable = true
+                                defaultValue = null
                             }
-                        },
-                        initialView = backStack.arguments?.getString("view") ?: "calendar",
-                        initialExerciseId = backStack.arguments?.getString("exercise")
-                    )
-                }
-                composable("Library") {
-                    LibraryScreen(state, {
-                        exercise(it)
-                    }, { start(StartSource.Routine(it)) }, vm, initialExpandedId = initialExpandedRoutineId)
-                }
-                composable("Settings") { SettingsScreen(state, vm) { nav.navigate("Export") } }
-                composable("Export") { com.emmah.inshape.transfer.ExportScreen(state, vm) }
-                composable("exercise/{id}?item={item}") { backStack ->
-                    val id = backStack.arguments!!.getString("id")!!
-                    ExerciseScreen(id, backStack.arguments?.getString("item"), state, vm, {
-                        nav.navigate("exercise-edit/$id")
-                    }, {
-                        exercise(it)
-                    }, {
-                        nav.navigate("detail/$it")
-                    }, { nav.navigate("History?view=progress&exercise=$id") }, { nav.popBackStack() })
-                }
-                composable("exercise-edit/{id}") { backStack ->
-                    ExerciseEditor(backStack.arguments!!.getString("id")!!, state, vm, onSave = { id ->
-                        nav.popBackStack()
-                        exercise(id)
-                    })
-                }
-                composable("routine/{id}") { backStack ->
-                    RoutineEditor(backStack.arguments!!.getString("id")!!, state, vm, {
-                        nav.popBackStack()
-                    }, { start(StartSource.Routine(it)) }, { exercise("new") })
-                }
-                composable("workout/{id}") { backStack ->
-                    val id = backStack.arguments!!.getString("id")!!
-                    WorkoutScreen(id, state, vm, { exerciseId, item ->
-                        exercise(exerciseId, item)
-                    }, {
-                        nav.navigate("checkin/$id/BEFORE")
-                    }, { nav.navigate(finishRoute(id)) }, { nav.popBackStack("Today", false) }, { nav.popBackStack() })
-                }
-                composable("finish/{id}") { backStack ->
-                    val id = backStack.arguments!!.getString("id")!!
-                    FinishScreen(id, state, vm, { nav.popBackStack() }, {
-                        nav.navigate("detail/$id") { popUpTo("workout/$id") { inclusive = true } }
-                        nav.navigate("checkin/$id/AFTER")
-                    }, { nav.navigate("Settings") }, { nav.popBackStack("Today", false) })
-                }
-                composable("timing/{id}/{mode}") { backStack ->
-                    val id = backStack.arguments!!.getString("id")!!
-                    val correcting =
-                        backStack.arguments?.getString("mode") == "correct"
-                    WorkoutTimingEditor(id, state, vm, correcting, onSave = {
-                        if (correcting) {
-                            nav.popBackStack()
-                        } else {
-                            nav.navigate("detail/$id") {
-                                popUpTo("workout/$id") {
-                                    inclusive =
-                                        true
+                        )
+                    ) { backStack ->
+                        HistoryScreen(
+                            state,
+                            today,
+                            vm,
+                            { nav.navigate("detail/$it") },
+                            {
+                                if (nav.currentBackStackEntry === backStack &&
+                                    backStack.lifecycle.currentState != Lifecycle.State.DESTROYED
+                                ) {
+                                    nav.navigate("workout/$it")
                                 }
-                            }
-                            nav.navigate("checkin/$id/AFTER")
-                        }
-                    })
-                }
-                composable("detail/{id}") { backStack ->
-                    val id = backStack.arguments!!.getString("id")!!
-                    WorkoutDetailScreen(id, state, vm, {
-                        start(StartSource.Repeat(id))
-                    }, {
-                        nav.navigate("checkin/$id/$it")
-                    }, {
-                        nav.navigate("timing/$id/correct")
-                    }, { nav.popBackStack() }, { exerciseId, item -> exercise(exerciseId, item) })
-                }
-                composable("checkin/{id}/{phase}") { backStack ->
-                    val id = backStack.arguments!!.getString("id")!!
-                    val phase = backStack.arguments!!.getString("phase")!!
-                    CheckInScreen(id, phase, state, vm, {
-                        if (nav.currentBackStackEntry === backStack && backStack.lifecycle.currentState != Lifecycle.State.DESTROYED) {
+                            },
+                            initialView = backStack.arguments?.getString("view") ?: "calendar",
+                            initialExerciseId = backStack.arguments?.getString("exercise")
+                        )
+                    }
+                    composable("Library") {
+                        LibraryScreen(state, {
+                            exercise(it)
+                        }, { nav.navigate("routine/$it") }, vm)
+                    }
+                    composable("Settings") { SettingsScreen(state, vm) { nav.navigate("Export") } }
+                    composable("Export") { com.emmah.inshape.transfer.ExportScreen(state, vm) }
+                    composable("exercise/{id}?item={item}") { backStack ->
+                        val id = backStack.arguments!!.getString("id")!!
+                        ExerciseScreen(id, backStack.arguments?.getString("item"), state, vm, {
+                            nav.navigate("exercise-edit/$id")
+                        }, {
+                            exercise(it)
+                        }, {
+                            nav.navigate("detail/$it")
+                        }, { nav.navigate("History?view=progress&exercise=$id") }, { nav.popBackStack() })
+                    }
+                    composable("exercise-edit/{id}") { backStack ->
+                        ExerciseEditor(backStack.arguments!!.getString("id")!!, state, vm, onSave = { id ->
                             nav.popBackStack()
-                        }
-                    })
+                            exercise(id)
+                        })
+                    }
+                    composable("routine/{id}") { backStack ->
+                        RoutineEditor(backStack.arguments!!.getString("id")!!, state, vm, {
+                            if (nav.currentBackStackEntry === backStack) nav.popBackStack()
+                        }, { id ->
+                            if (nav.currentBackStackEntry === backStack) start(StartSource.Routine(id))
+                        }, { exercise("new") })
+                    }
+                    composable("workout/{id}") { backStack ->
+                        val id = backStack.arguments!!.getString("id")!!
+                        WorkoutScreen(id, state, vm, { exerciseId, item ->
+                            exercise(exerciseId, item)
+                        }, {
+                            nav.navigate("checkin/$id/BEFORE")
+                        }, { nav.navigate(finishRoute(id)) }, { nav.popBackStack("Today", false) }, { nav.popBackStack() })
+                    }
+                    composable("finish/{id}") { backStack ->
+                        val id = backStack.arguments!!.getString("id")!!
+                        FinishScreen(id, state, vm, { nav.popBackStack() }, {
+                            nav.navigate("detail/$id") { popUpTo("workout/$id") { inclusive = true } }
+                            nav.navigate("checkin/$id/AFTER")
+                        }, { nav.navigate("Settings") }, { nav.popBackStack("Today", false) })
+                    }
+                    composable("timing/{id}/{mode}") { backStack ->
+                        val id = backStack.arguments!!.getString("id")!!
+                        val correcting =
+                            backStack.arguments?.getString("mode") == "correct"
+                        WorkoutTimingEditor(id, state, vm, correcting, onSave = {
+                            if (correcting) {
+                                nav.popBackStack()
+                            } else {
+                                nav.navigate("detail/$id") {
+                                    popUpTo("workout/$id") {
+                                        inclusive =
+                                            true
+                                    }
+                                }
+                                nav.navigate("checkin/$id/AFTER")
+                            }
+                        })
+                    }
+                    composable("detail/{id}") { backStack ->
+                        val id = backStack.arguments!!.getString("id")!!
+                        WorkoutDetailScreen(id, state, vm, {
+                            start(StartSource.Repeat(id))
+                        }, {
+                            nav.navigate("checkin/$id/$it")
+                        }, {
+                            nav.navigate("timing/$id/correct")
+                        }, { nav.popBackStack() }, { exerciseId, item -> exercise(exerciseId, item) })
+                    }
+                    composable("checkin/{id}/{phase}") { backStack ->
+                        val id = backStack.arguments!!.getString("id")!!
+                        val phase = backStack.arguments!!.getString("phase")!!
+                        CheckInScreen(id, phase, state, vm, {
+                            if (nav.currentBackStackEntry === backStack && backStack.lifecycle.currentState != Lifecycle.State.DESTROYED) {
+                                nav.popBackStack()
+                            }
+                        })
+                    }
                 }
             }
         }

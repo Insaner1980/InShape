@@ -3,6 +3,7 @@
 param(
     [switch]$PlanOnly,
     [switch]$AllowExternalUpload,
+    [switch]$IncludeDeviceCoverage,
     [ValidateRange(1, 86400)][int]$GradleTimeoutSeconds = 3600
 )
 
@@ -12,15 +13,19 @@ $gradleArguments = @(
     '--no-daemon', '--no-configuration-cache', '--console=plain',
     'sonar', '-Dsonar.qualitygate.wait=true'
 )
+if ($IncludeDeviceCoverage) {
+    $gradleArguments += '-PsonarDeviceCoverage=true'
+}
 if ($PlanOnly) {
+    $coverage = if ($IncludeDeviceCoverage) { 'JVM and connected Android tests' } else { 'JVM tests (including Robolectric)' }
     Write-Output @(
         'sonar',
         "  - root: $projectRoot",
         '  - project: Insaner1980_InShape (organization: insaner1980)',
         '  - server: https://sonarcloud.io',
         '  - local working tree -> SonarCloud project main branch',
-        '  - debug build, JVM tests and coverage report',
-        '  - JVM tests only (including Robolectric); no emulator, device tests or saved device coverage',
+        '  - debug build and Android Lint report',
+        "  - coverage from $coverage",
         "  - Gradle: $($gradleArguments -join ' ')",
         '  - uploads source and analysis metadata; waits for the quality gate',
         '  - report: reports/sonar.txt',

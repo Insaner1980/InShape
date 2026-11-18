@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -22,6 +24,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldColors
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -33,7 +36,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
@@ -48,7 +50,14 @@ private fun fieldColors(): TextFieldColors = TextFieldDefaults.colors(
 )
 
 @Composable
-fun TextField(value: String, label: String, onChange: (String) -> Unit, modifier: Modifier = Modifier, singleLine: Boolean = false) {
+fun TextField(
+    value: String,
+    label: String,
+    onChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    singleLine: Boolean = false,
+    error: String? = null
+) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     androidx.compose.material3.TextField(
@@ -70,6 +79,8 @@ fun TextField(value: String, label: String, onChange: (String) -> Unit, modifier
         },
         shape = InShapeShapes.field,
         singleLine = singleLine,
+        isError = error != null,
+        supportingText = error?.let { { Text(it, color = InShapeTheme.colors.error) } },
         colors = fieldColors(),
         interactionSource = interaction
     )
@@ -82,13 +93,18 @@ fun NumberField(
     label: String,
     modifier: Modifier = Modifier,
     decimal: Boolean = false,
-    enabled: Boolean = true,
     readOnly: Boolean = false,
     compact: Boolean = false,
-    highlighted: Boolean = false
+    highlighted: Boolean = false,
+    supportingText: String? = null
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
+    val bringIntoView = remember { BringIntoViewRequester() }
+    LaunchedEffect(focused) {
+        if (focused && !readOnly) bringIntoView.bringIntoView()
+    }
+    val fieldModifier = modifier.bringIntoViewRequester(bringIntoView)
     val border = if (focused ||
         highlighted
     ) {
@@ -100,7 +116,7 @@ fun NumberField(
         KeyboardOptions(keyboardType = if (decimal) KeyboardType.Decimal else KeyboardType.Number)
     if (compact) {
         Surface(
-            modifier.heightIn(min = Dimens.setField).then(border),
+            fieldModifier.heightIn(min = Dimens.setField).then(border),
             color = if (highlighted) InShapeTheme.colors.background else InShapeTheme.colors.surface,
             shape = InShapeShapes.field
         ) {
@@ -111,7 +127,7 @@ fun NumberField(
                         contentDescription =
                             label
                     },
-                    enabled = enabled, readOnly = readOnly, singleLine = true,
+                    readOnly = readOnly, singleLine = true,
                     textStyle = com.emmah.inshape.ui.theme.InShapeType.setValue.copy(
                         color = InShapeTheme.colors.text,
                         textAlign = TextAlign.Center
@@ -125,10 +141,11 @@ fun NumberField(
         }
     } else {
         androidx.compose.material3.TextField(
-            value, onValueChange, modifier.heightIn(min = Dimens.button).then(border), label = {
+            value, onValueChange, fieldModifier.heightIn(min = Dimens.button).then(border), label = {
                 Text(label)
-            }, singleLine = true, enabled = enabled, readOnly = readOnly,
+            }, singleLine = true, readOnly = readOnly,
             textStyle = MaterialTheme.typography.titleLarge,
+            supportingText = supportingText?.let { { Text(it) } },
             colors = fieldColors(),
             shape = InShapeShapes.field,
             keyboardOptions = keyboard,

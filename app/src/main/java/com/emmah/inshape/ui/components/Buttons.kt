@@ -2,9 +2,9 @@ package com.emmah.inshape.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
@@ -39,6 +38,8 @@ private fun RowScope.ButtonLabel(text: String, icon: ImageVector?) {
     Text(text)
 }
 
+enum class ButtonSize { Medium, Large }
+
 @Composable
 fun PrimaryButton(
     text: String,
@@ -47,11 +48,12 @@ fun PrimaryButton(
     icon: ImageVector? = null,
     enabled: Boolean = true,
     trailingIcon: ImageVector? = null,
-    inverted: Boolean = false
+    inverted: Boolean = false,
+    size: ButtonSize = ButtonSize.Medium
 ) {
     Button(
         onClick,
-        modifier.heightIn(min = Dimens.button),
+        modifier.heightIn(min = if (size == ButtonSize.Large) Dimens.button else Dimens.touch),
         enabled,
         shape = InShapeShapes.button,
         elevation = null,
@@ -75,10 +77,17 @@ fun PrimaryButton(
 }
 
 @Composable
-fun OutlineButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, icon: ImageVector? = null) {
+fun OutlineButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    icon: ImageVector? = null,
+    size: ButtonSize = ButtonSize.Medium
+) {
     OutlinedButton(
         onClick,
-        modifier.heightIn(min = Dimens.touch),
+        modifier.heightIn(min = if (size == ButtonSize.Large) Dimens.button else Dimens.touch),
         enabled,
         shape = InShapeShapes.button,
         border = BorderStroke(Dimens.line, InShapeTheme.colors.outline),
@@ -101,7 +110,8 @@ fun TextAction(
         onClick,
         modifier.heightIn(min = Dimens.touch),
         enabled,
-        colors = ButtonDefaults.textButtonColors(contentColor = color)
+        colors = ButtonDefaults.textButtonColors(contentColor = color),
+        contentPadding = PaddingValues(horizontal = Dimens.zero, vertical = Dimens.innerSmall)
     ) {
         ProvideTextStyle(MaterialTheme.typography.labelLarge) { ButtonLabel(text, icon) }
     }

@@ -7,8 +7,15 @@ import android.net.Uri
 import android.os.ParcelFileDescriptor
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.SdkSuppress
 import com.emmah.inshape.AppContainer
+import com.emmah.inshape.data.BodyObservation
+import com.emmah.inshape.data.CheckIn
 import com.emmah.inshape.data.Exercise
+import com.emmah.inshape.data.JournalSnapshot
+import com.emmah.inshape.data.SessionItem
+import com.emmah.inshape.data.SessionSet
+import com.emmah.inshape.data.WorkoutEntity
 import com.emmah.inshape.data.WorkoutTiming
 import com.emmah.inshape.data.newId
 import java.io.File
@@ -22,6 +29,97 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ExportFlowTest {
+    @SdkSuppress(minSdkVersion = 35)
+    @Test
+    fun exportedPdfIncludesPrivateDetailsOnlyWhenSelected() {
+        val timestamp = "2026-11-13T10:00:00Z"
+        val workout = WorkoutEntity(
+            title = "Strength training",
+            state = "COMPLETED",
+            activeKey = null,
+            journalDate = "2026-11-13",
+            start = timestamp,
+            end = "2026-11-13T10:42:15Z",
+            zoneId = "UTC",
+            durationSeconds = 2535,
+            note = "WorkoutMemo",
+            createdAt = timestamp,
+            modifiedAt = timestamp
+        )
+        val recovery = workout.copy(id = newId(), title = "Recovery day", end = null, durationSeconds = null, note = "")
+        val exercise = SessionItem(
+            workoutId = workout.id,
+            exerciseId = "exercise",
+            equipmentId = "machine",
+            name = "Cable row",
+            equipmentName = "Cable machine",
+            category = "Machine",
+            basis = "kg",
+            disposition = "DEFERRED",
+            durationSeconds = 45,
+            discomfort = true,
+            note = "ExerciseMemo"
+        )
+        val checkIn = CheckIn(
+            workoutId = workout.id,
+            phase = "AFTER",
+            observedAt = "2026-11-13T10:43:00Z",
+            zoneId = "UTC",
+            energy = "GOOD",
+            effort = 8,
+            feelings = "EnergyMemo",
+            note = "CheckInMemo"
+        )
+        val before = CheckIn(workoutId = workout.id, phase = "BEFORE", observedAt = timestamp, zoneId = "UTC")
+        val data = JournalSnapshot(
+            workouts = listOf(workout, recovery, recovery.copy(id = newId(), title = "Unselected session")),
+            items = listOf(
+                exercise,
+                exercise.copy(id = newId(), name = "Stretch", disposition = "DONE", note = "", quickCompletedAt = timestamp)
+            ),
+            sets = listOf(
+                SessionSet(itemId = exercise.id, load = "22.5", reps = 8, completedAt = timestamp),
+                SessionSet(itemId = exercise.id, position = 1, reps = 7, completedAt = timestamp),
+                SessionSet(itemId = exercise.id, position = 2, load = "20", completedAt = timestamp)
+            ),
+            checkIns = listOf(checkIn, before),
+            observations = listOf(
+                BodyObservation(checkIn.id, "left_knee", pain = 2, note = "ObservationMemo"),
+                BodyObservation(before.id, "lower_back", stiffness = 5)
+            )
+        )
+        val ids = setOf(workout.id, recovery.id)
+        val privateNotes = listOf("WorkoutMemo", "ExerciseMemo", "CheckInMemo", "ObservationMemo")
+        val checkInDetails = listOf("EnergyMemo", "before check-in", "after check-in")
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val file = File.createTempFile("journal-export-", ".pdf", context.cacheDir)
+        try {
+            fun verify(selection: ExportSelection, included: List<String>, excluded: List<String>) {
+                file.outputStream().use { PdfExporter.write(data, selection, it) }
+                PdfRenderer(ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)).use { renderer ->
+                    val queries = included + excluded
+                    val found = buildSet {
+                        repeat(renderer.pageCount) { index ->
+                            renderer.openPage(index).use { page ->
+                                addAll(queries.filter { page.searchText(it).isNotEmpty() })
+                            }
+                        }
+                    }
+                    assertEquals(included.toSet(), found)
+                }
+            }
+            verify(
+                ExportSelection(ids, includeNotes = true, includeCheckIns = true),
+                privateNotes + checkInDetails + listOf("42 min 15 s", "22.5 kg", "Note-only entry", "reps not recorded"),
+                listOf("Unselected session")
+            )
+            verify(ExportSelection(ids, includeCheckIns = true), checkInDetails, privateNotes)
+            verify(ExportSelection(ids), listOf("Strength training", "Recovery day"), privateNotes + checkInDetails)
+        } finally {
+            file.delete()
+        }
+    }
+
     @Test fun multipageUnicodePdfAndCsvCanBeReadThroughNormalContentUris() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "export-test-${newId()}.db"

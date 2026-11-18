@@ -1,15 +1,13 @@
 package com.emmah.inshape.feature.history
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -18,19 +16,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
-import androidx.compose.material3.VerticalDivider
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,7 +37,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.selected
@@ -48,25 +47,31 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import com.emmah.inshape.JournalViewModel
+import com.emmah.inshape.R
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.Workout
 import com.emmah.inshape.data.monthGrid
+import com.emmah.inshape.feature.checkin.BodyLevelPills
+import com.emmah.inshape.feature.checkin.bodyRegions
 import com.emmah.inshape.feature.progress.ProgressScreen
 import com.emmah.inshape.feature.workout.SetRow
 import com.emmah.inshape.feature.workout.itemSummary
-import com.emmah.inshape.ui.components.ActionRow
+import com.emmah.inshape.ui.components.AppMenu
 import com.emmah.inshape.ui.components.ConfirmDialog
 import com.emmah.inshape.ui.components.EmptyState
-import com.emmah.inshape.ui.components.InShapeCard
+import com.emmah.inshape.ui.components.KeyValueRow
 import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListRow
+import com.emmah.inshape.ui.components.MenuAction
 import com.emmah.inshape.ui.components.OutlineButton
 import com.emmah.inshape.ui.components.Page
 import com.emmah.inshape.ui.components.Pill
 import com.emmah.inshape.ui.components.PrimaryButton
+import com.emmah.inshape.ui.components.PushedHeader
+import com.emmah.inshape.ui.components.RecordedDatePicker
 import com.emmah.inshape.ui.components.ResponsiveRow
 import com.emmah.inshape.ui.components.ScreenHeader
-import com.emmah.inshape.ui.components.SectionLabel
+import com.emmah.inshape.ui.components.SectionHeader
 import com.emmah.inshape.ui.components.SegmentedControl
 import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.components.TextField
@@ -78,14 +83,10 @@ import com.emmah.inshape.ui.theme.displayDate
 import com.emmah.inshape.ui.theme.formatDuration
 import com.emmah.inshape.ui.theme.instantLabel
 import com.emmah.inshape.ui.theme.journalDateLabel
-import com.emmah.inshape.ui.theme.observationText
 import java.time.Duration
-import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
-import java.time.ZoneOffset
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -105,8 +106,10 @@ fun HistoryScreen(
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
     var datePicker by rememberSaveable { mutableStateOf(false) }
     var past by remember { mutableStateOf(false) }
+    var pastPicker by remember { mutableStateOf(false) }
     var pastDate by remember { mutableStateOf(today.toString()) }
     var pastTitle by remember { mutableStateOf("") }
+    var showPastTitleError by remember { mutableStateOf(false) }
     var creatingPastWorkout by remember { mutableStateOf(false) }
     val colors = InShapeTheme.colors
     val monthRecords = data.history.filter {
@@ -132,6 +135,7 @@ fun HistoryScreen(
                 if (!creatingPastWorkout && !past) {
                     pastDate = today.toString()
                     pastTitle = ""
+                    showPastTitleError = false
                     past = true
                 }
             }, enabled = !creatingPastWorkout, icon = Icons.Outlined.Add)
@@ -274,9 +278,9 @@ fun HistoryScreen(
                 }
             }
             val summaries = listOfNotNull(
-                qualifying.size.toString() to "workouts",
-                (if (durations.isEmpty()) "None" else formatDuration(durations.sum())) to "total time",
-                if (durations.isEmpty()) null else formatDuration(durations.average().toLong()) to "average"
+                qualifying.size.toString() to pluralStringResource(R.plurals.workout_count_label, qualifying.size),
+                formatDuration(durations.sum()) to "total time",
+                (durations.takeIf { it.isNotEmpty() }?.average()?.toLong()?.let(::formatDuration) ?: "0 min") to "average"
             )
             ResponsiveRow {
                 summaries.forEach { (value, label) -> HistorySummary(value, label, Modifier.weight(1f)) }
@@ -290,7 +294,7 @@ fun HistoryScreen(
                     color = colors.textSecondary
                 )
             }
-            SectionLabel(if (selected == null) month.atDay(1).displayDate("MMMM") else selected!!.journalDateLabel(), quiet = true)
+            SectionHeader(if (selected == null) month.atDay(1).displayDate("MMMM") else selected!!.journalDateLabel(), quiet = true)
             if (records.isEmpty()) {
                 EmptyState("No workouts in this period", "Pick another month or add a past workout.")
             } else {
@@ -317,29 +321,12 @@ fun HistoryScreen(
         }
     }
     if (datePicker) {
-        val state =
-            rememberDatePickerState(
-                initialSelectedDateMillis = (
-                    selected?.let(LocalDate::parse)
-                        ?: month.atDay(1)
-                    ).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-            )
-        DatePickerDialog(onDismissRequest = { datePicker = false }, confirmButton = {
-            TextAction("Select date", {
-                state.selectedDateMillis?.let { millis ->
-                    val date = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
-                    monthText =
-                        YearMonth.from(date).toString()
-                    selected = date.toString()
-                }
-                datePicker = false
-            }, enabled = state.selectedDateMillis != null)
-        }, dismissButton = {
-            TextAction("Cancel", {
-                datePicker =
-                    false
-            })
-        }) { DatePicker(state) }
+        val initial = selected ?: if (YearMonth.from(today) == month) today.toString() else month.atDay(1).toString()
+        RecordedDatePicker("Select date", initial, today.toString(), { value ->
+            monthText = YearMonth.from(LocalDate.parse(value)).toString()
+            selected = value
+            datePicker = false
+        }, { datePicker = false }, confirm = "Select date")
     }
     if (past) {
         AlertDialog(
@@ -348,14 +335,21 @@ fun HistoryScreen(
             },
             title = { Text("Add past workout") },
             text = {
-                Column {
-                    TextField(pastDate, "Actual date (YYYY-MM-DD)", { pastDate = it })
-                    TextField(pastTitle, "Workout name", { pastTitle = it })
+                Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
+                    KeyValueRow("Workout date", pastDate.journalDateLabel("EEE d MMM yyyy"), onClick = { pastPicker = true })
+                    TextField(
+                        pastTitle,
+                        "Workout name",
+                        { pastTitle = it },
+                        error = "Enter a workout name".takeIf { showPastTitleError && pastTitle.isBlank() }
+                    )
                 }
             },
             confirmButton = {
                 TextAction("Add exercises", {
-                    if (past && !creatingPastWorkout) {
+                    if (past && !creatingPastWorkout && pastTitle.isBlank()) {
+                        showPastTitleError = true
+                    } else if (past && !creatingPastWorkout) {
                         val date = pastDate
                         val title = pastTitle
                         creatingPastWorkout = true
@@ -374,6 +368,12 @@ fun HistoryScreen(
             dismissButton = { TextAction("Cancel", { past = false }) }
         )
     }
+    if (pastPicker) {
+        RecordedDatePicker("Workout date", pastDate, today.toString(), { value ->
+            pastDate = value
+            pastPicker = false
+        }, { pastPicker = false })
+    }
 }
 
 @Composable
@@ -389,7 +389,11 @@ fun WorkoutDetailScreen(
     modifier: Modifier = Modifier
 ) {
     val workout = data.workout(id) ?: return
+    val uses24Hours = DateFormat.is24HourFormat(LocalContext.current)
     var deletion by remember { mutableStateOf(false) }
+    var menu by remember { mutableStateOf(false) }
+    var editingNote by remember { mutableStateOf(false) }
+    var note by rememberSaveable(id) { mutableStateOf(workout.row.note) }
     var editing by rememberSaveable(id) { mutableStateOf(false) }
     val colors = InShapeTheme.colors
     Page(modifier, bottomBar = {
@@ -398,6 +402,25 @@ fun WorkoutDetailScreen(
             onRepeat,
             Modifier.fillMaxWidth().heightIn(min = Dimens.button)
         )
+    }, topBar = {
+        PushedHeader(onBack = onDelete) {
+            IconButton({ menu = true }) { Icon(Icons.Outlined.MoreVert, "Workout options") }
+            AppMenu(menu, { menu = false }) {
+                MenuAction("Fix time", Icons.Outlined.Schedule, {
+                    menu = false
+                    onTiming()
+                })
+                MenuAction("Edit note", Icons.Outlined.EditNote, {
+                    menu = false
+                    note = workout.row.note
+                    editingNote = true
+                })
+                MenuAction(if (editing) "Finish editing sets" else "Edit sets", Icons.Outlined.Edit, {
+                    menu = false
+                    editing = !editing
+                })
+            }
+        }
     }) {
         Text(workout.row.title, style = MaterialTheme.typography.headlineMedium)
         Text(
@@ -414,15 +437,10 @@ fun WorkoutDetailScreen(
             )
         }
         if (workout.row.note.isNotBlank()) {
-            SectionLabel("Workout note")
+            SectionHeader("Workout note")
             Text(workout.row.note)
         }
-        ListRow("Fix time or note", onClick = onTiming)
-        OutlineButton(if (editing) "Finish editing sets" else "Edit recorded sets", {
-            editing =
-                !editing
-        })
-        SectionLabel("Exercises")
+        SectionHeader("Exercises")
         ListCard {
             workout.items.forEach { exercise ->
                 item {
@@ -433,13 +451,10 @@ fun WorkoutDetailScreen(
                         Modifier.padding(bottom = Dimens.innerSmall),
                         verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)
                     ) {
-                        Text(
-                            exercise.row.disposition.lowercase().replaceFirstChar {
-                                it.titlecase()
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.textSecondary
-                        )
+                        when (exercise.row.disposition) {
+                            "SKIPPED" -> Pill("Skipped")
+                            "PLANNED", "IN_PROGRESS", "INCOMPLETE" -> Pill("Incomplete")
+                        }
                         if (exercise.row.setup.isNotBlank()) {
                             Text(
                                 exercise.row.setup,
@@ -468,7 +483,7 @@ fun WorkoutDetailScreen(
                 }
             }
         }
-        SectionLabel("Check-ins")
+        SectionHeader("Check-ins")
         ListCard {
             listOf(
                 "BEFORE" to "Before workout",
@@ -479,24 +494,27 @@ fun WorkoutDetailScreen(
                     val check = workout.checkIns.find { it.phase == phase }
                     val summary = check?.let {
                         buildList {
-                            add("Observed ${it.observedAt.instantLabel(ZoneId.of(it.zoneId))}")
+                            add("Observed ${it.observedAt.instantLabel(ZoneId.of(it.zoneId), uses24Hours)}")
                             it.energy?.let { energy -> add("Energy: ${energy.lowercase()}") }
                             it.effort?.let { effort -> add(com.emmah.inshape.feature.checkin.effortLevelOf(effort)!!.label) }
                             if (it.feelings.isNotBlank()) add(it.feelings)
                             if (it.note.isNotBlank()) add(it.note)
-                            data.observations.filter { observation ->
-                                observation.checkInId == it.id
-                            }.forEach { observation ->
-                                add(
-                                    "${observation.region.replace(
-                                        '_',
-                                        ' '
-                                    )}: ${com.emmah.inshape.feature.checkin.bodyLevelSummary(observation).lowercase()}"
-                                )
-                            }
                         }.joinToString("\n")
                     } ?: "Add"
                     ListRow(label, subtitle = summary, onClick = { onCheckIn(phase) })
+                    if (check != null) {
+                        data.observations.filter { it.checkInId == check.id }.forEach { observation ->
+                            val region = bodyRegions.find { it.id == observation.region }?.label
+                                ?: observation.region.replace('_', ' ').replaceFirstChar(Char::titlecase)
+                            Column(
+                                Modifier.padding(bottom = Dimens.itemGap),
+                                verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)
+                            ) {
+                                Text(region, style = MaterialTheme.typography.bodyLarge)
+                                BodyLevelPills(observation.pain, observation.stiffness)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -504,6 +522,23 @@ fun WorkoutDetailScreen(
         TextAction("Delete workout", {
             deletion = true
         }, Modifier.align(Alignment.CenterHorizontally), color = colors.error)
+    }
+    if (editingNote) {
+        AlertDialog(
+            onDismissRequest = { editingNote = false },
+            title = { Text("Edit note") },
+            text = { TextField(note, "Workout note", { note = it }) },
+            confirmButton = {
+                TextAction("Save", {
+                    val value = note
+                    vm.write {
+                        saveWorkoutNote(id, value)
+                        editingNote = false
+                    }
+                })
+            },
+            dismissButton = { TextAction("Cancel", { editingNote = false }) }
+        )
     }
     if (deletion) {
         ConfirmDialog(

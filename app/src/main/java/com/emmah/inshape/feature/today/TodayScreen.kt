@@ -1,5 +1,6 @@
 package com.emmah.inshape.feature.today
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,27 +22,29 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import com.emmah.inshape.R
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.Routine
 import com.emmah.inshape.data.StartSource
 import com.emmah.inshape.data.Workout
 import com.emmah.inshape.data.parseWorkoutInstant
 import com.emmah.inshape.data.weekStart
-import com.emmah.inshape.ui.components.EmptyState
 import com.emmah.inshape.ui.components.IconCircleButton
 import com.emmah.inshape.ui.components.InShapeCard
 import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListRow
-import com.emmah.inshape.ui.components.OutlineButton
 import com.emmah.inshape.ui.components.Page
 import com.emmah.inshape.ui.components.PrimaryButton
 import com.emmah.inshape.ui.components.ProgressSegments
 import com.emmah.inshape.ui.components.ProgressState
 import com.emmah.inshape.ui.components.ResponsiveRow
-import com.emmah.inshape.ui.components.SectionLabel
+import com.emmah.inshape.ui.components.ScreenHeader
+import com.emmah.inshape.ui.components.SectionHeader
 import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
@@ -71,12 +74,13 @@ fun TodayScreen(
     today: LocalDate,
     onSettings: () -> Unit,
     onStart: (StartSource) -> Unit,
-    onLibrary: () -> Unit,
     onWorkout: (String) -> Unit,
     clock: Clock,
+    onOpenRoutine: (String?) -> Unit,
     modifier: Modifier = Modifier,
     healthContext: @Composable () -> Unit = {}
 ) {
+    val uses24Hours = DateFormat.is24HourFormat(LocalContext.current)
     val colors = InShapeTheme.colors
     val history = data.history.sortedWith(
         compareByDescending<Workout> {
@@ -90,55 +94,46 @@ fun TodayScreen(
     }
     val largeText = LocalDensity.current.fontScale >= 1.3f
     val active = data.active
-    val routine = suggestedRoutine(data.routines, history)
+    val populatedRoutines = data.routineItems.mapTo(mutableSetOf()) { it.routineId }
+    val routine = suggestedRoutine(data.routines.filter { it.id in populatedRoutines }, history)
     Page(modifier) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Dimens.innerSmall),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    today.displayDate("EEEE d MMMM"),
-                    color = colors.textSecondary,
-                    style = MaterialTheme.typography.labelSmall
-                )
-                Text(
-                    if (data.preferences.name.isBlank()) "Hello" else "Hi ${data.preferences.name}",
-                    style = MaterialTheme.typography.headlineMedium
-                )
-            }
-            IconCircleButton(Icons.Outlined.Settings, "Settings", onSettings)
-        }
+        ScreenHeader(
+            if (data.preferences.name.isBlank()) "Today" else "Hi ${data.preferences.name}",
+            trailing = { IconCircleButton(Icons.Outlined.Settings, "Settings", onSettings) }
+        )
+        Text(today.displayDate("EEEE d MMMM"), color = colors.textSecondary, style = MaterialTheme.typography.labelSmall)
         val recordedStart = active?.row?.start?.takeUnless { active.row.timingNeedsReview }
             ?.let { runCatching { parseWorkoutInstant(it) }.getOrNull() }
         val elapsed by rememberElapsedSeconds(recordedStart, clock)
+        val accent = active != null && !colors.isDark
         InShapeCard(
             Modifier.padding(top = Dimens.itemGap),
-            color = if (active != null) colors.ink else colors.background,
+            color = if (accent) {
+                colors.ink
+            } else if (active != null) {
+                colors.surface
+            } else {
+                colors.background
+            },
             gap = Dimens.itemGap
         ) {
-            val text = if (active != null) colors.onInk else colors.text
-            val secondary = if (active != null) colors.onInk.copy(alpha = .72f) else colors.textSecondary
-            ResponsiveRow {
-                Text(
-                    if (active != null) {
-                        "In progress"
-                    } else if (routine != null) {
-                        "Next up"
-                    } else {
-                        "Ready when you are"
-                    },
-                    Modifier.weight(1f),
-                    color = secondary,
-                    style = MaterialTheme.typography.labelSmall
-                )
-                if (active != null && recordedStart != null) {
+            val text = if (accent) colors.onInk else colors.text
+            val secondary = if (accent) colors.onInk.copy(alpha = .72f) else colors.textSecondary
+            if (active != null || routine != null) {
+                ResponsiveRow {
                     Text(
-                        "Started ${recordedStart.workoutTime(ZoneId.of(active.row.zoneId))}",
+                        if (active != null) "In progress" else "Next up",
+                        Modifier.weight(1f),
                         color = secondary,
                         style = MaterialTheme.typography.labelSmall
                     )
+                    if (active != null && recordedStart != null) {
+                        Text(
+                            "Started ${recordedStart.workoutTime(ZoneId.of(active.row.zoneId), uses24Hours)}",
+                            color = secondary,
+                            style = InShapeType.numeric
+                        )
+                    }
                 }
             }
             Text(active?.row?.title ?: routine?.title ?: "Start a workout", color = text, style = MaterialTheme.typography.titleLarge)
@@ -161,7 +156,7 @@ fun TodayScreen(
                         }
                     },
                     "${active.doneCount} of ${active.items.size} exercises done",
-                    onAccent = true
+                    onAccent = accent
                 )
                 Text(
                     "${active.doneCount} of ${active.items.size} exercises done",
@@ -171,20 +166,21 @@ fun TodayScreen(
             } else {
                 Text(
                     routine?.let {
-                        "${data.routineItems.count { item -> item.routineId == it.id }} exercises" +
+                        val count = data.routineItems.count { item -> item.routineId == it.id }
+                        pluralStringResource(R.plurals.exercise_count, count, count) +
                             (it.durationMinutes?.let { minutes -> ", about $minutes min" } ?: "")
-                    } ?: "Add exercises as you go",
+                    } ?: "Pick a routine below or add exercises as you go.",
                     color = secondary,
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
-            PrimaryButton(if (active == null) "Start workout" else "Resume workout", {
+            PrimaryButton(if (active == null) (if (routine == null) "Start" else "Start workout") else "Resume workout", {
                 if (active != null) {
                     onWorkout(active.row.id)
                 } else {
                     onStart(routine?.let { StartSource.Routine(it.id) } ?: StartSource.Empty)
                 }
-            }, Modifier.fillMaxWidth(), icon = if (active == null) Icons.Outlined.PlayArrow else null, inverted = active != null)
+            }, Modifier.fillMaxWidth(), icon = if (active == null) Icons.Outlined.PlayArrow else null, inverted = accent)
         }
         if (active == null && routine != null) {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -195,7 +191,8 @@ fun TodayScreen(
             ResponsiveRow {
                 Text("This week", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
                 Text(
-                    data.preferences.weeklyGoal?.let { "${thisWeek.size} of $it" } ?: "${thisWeek.size} workouts",
+                    data.preferences.weeklyGoal?.let { "${thisWeek.size} of $it" }
+                        ?: pluralStringResource(R.plurals.workout_count, thisWeek.size, thisWeek.size),
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.textSecondary
                 )
@@ -256,26 +253,27 @@ fun TodayScreen(
                 }
             }
         }
-        SectionLabel("Routines", action = "See all", onAction = onLibrary)
+        SectionHeader("Routines", action = "See all", onAction = { onOpenRoutine(null) })
         if (data.routines.isEmpty()) {
-            ListRow("Create a routine", onClick = onLibrary)
+            ListRow("Create a routine", onClick = { onOpenRoutine(null) })
         } else {
             ListCard {
                 data.routines.filter { active != null || it.id != routine?.id }.take(3).forEach { saved ->
                     item {
+                        val count = data.routineItems.count { it.routineId == saved.id }
                         ListRow(saved.title, trailing = {
                             Text(
-                                "${data.routineItems.count { it.routineId == saved.id }} exercises",
+                                pluralStringResource(R.plurals.exercise_count, count, count),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = colors.textSecondary
                             )
-                        }, onClick = { onStart(StartSource.Routine(saved.id)) })
+                        }, onClick = { onOpenRoutine(saved.id) }, showChevron = true)
                     }
                 }
             }
         }
         history.firstOrNull()?.let { last ->
-            SectionLabel("Last workout")
+            SectionHeader("Last workout")
             ListCard {
                 item {
                     val date = LocalDate.parse(last.row.journalDate)
@@ -284,7 +282,7 @@ fun TodayScreen(
                         subtitle = date.displayDate("EEE d MMM"),
                         trailing = {
                             last.row.durationSeconds?.let {
-                                Text(formatDuration(it), style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+                                Text(formatDuration(it), style = InShapeType.numeric, color = colors.textSecondary)
                             }
                         },
                         onClick = { onWorkout(last.row.id) }

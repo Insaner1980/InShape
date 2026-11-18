@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -117,8 +118,8 @@ fun WorkoutTimingEditor(
         form = value
         vm.saveDraft(key, "timing", Json.encodeToString(value))
     }
-    var picker by remember { mutableStateOf<String?>(null) }
-    var endpoint by remember { mutableStateOf<String?>(null) }
+    var picker by rememberSaveable { mutableStateOf<String?>(null) }
+    var endpoint by rememberSaveable { mutableStateOf<String?>(null) }
     fun dateLabel(date: String) = runCatching { date.journalDateLabel("EEE d MMM yyyy") }.getOrDefault("Invalid date")
     fun timeLabel(time: String) = runCatching { LocalTime.parse(time.take(5)).workoutTime(uses24Hours) }.getOrDefault("Not recorded")
     val computedDuration = if (form.unknownTimes) {
@@ -127,7 +128,7 @@ fun WorkoutTimingEditor(
         runCatching {
             val start = resolveRecordedTime(form.startDate, form.startTime, zone, form.originalStart)
             val end = resolveRecordedTime(form.endDate, form.endTime, zone, form.originalEnd)
-            Duration.between(start, end).seconds.takeIf { it >= 0 }
+            Duration.between(start, end).seconds
         }.getOrNull()
     }
     val stale = form.revision != workout.row.revision
@@ -222,7 +223,12 @@ fun WorkoutTimingEditor(
                 KeyValueRow("Finished", "${dateLabel(form.endDate)}, ${timeLabel(form.endTime)}", numeric = true) {
                     endpoint = "Finished"
                 }
-                KeyValueRow("Elapsed time", computedDuration?.let(::formatDuration) ?: "Not recorded", numeric = true)
+                val elapsed = when {
+                    computedDuration == null -> "Not recorded"
+                    computedDuration < 0 -> "Finish is before start"
+                    else -> formatDuration(computedDuration)
+                }
+                KeyValueRow("Elapsed time", elapsed, numeric = true)
             }
             NumberField(
                 form.duration,

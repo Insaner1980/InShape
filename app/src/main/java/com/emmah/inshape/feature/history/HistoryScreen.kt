@@ -105,11 +105,11 @@ fun HistoryScreen(
     val month = YearMonth.parse(monthText)
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
     var datePicker by rememberSaveable { mutableStateOf(false) }
-    var past by remember { mutableStateOf(false) }
-    var pastPicker by remember { mutableStateOf(false) }
-    var pastDate by remember { mutableStateOf(today.toString()) }
-    var pastTitle by remember { mutableStateOf("") }
-    var showPastTitleError by remember { mutableStateOf(false) }
+    var past by rememberSaveable { mutableStateOf(false) }
+    var pastPicker by rememberSaveable { mutableStateOf(false) }
+    var pastDate by rememberSaveable { mutableStateOf(today.toString()) }
+    var pastTitle by rememberSaveable { mutableStateOf("") }
+    var showPastTitleError by rememberSaveable { mutableStateOf(false) }
     var creatingPastWorkout by remember { mutableStateOf(false) }
     val colors = InShapeTheme.colors
     val monthRecords = data.history.filter {

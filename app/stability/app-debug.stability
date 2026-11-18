@@ -132,14 +132,14 @@ public fun com.emmah.inshape.feature.library.LibraryScreen(data: com.emmah.insha
     - modifier: STABLE (marked @Stable or @Immutable)
 
 @Composable
-public fun com.emmah.inshape.feature.library.PhotoImage(asset: com.emmah.inshape.data.PhotoAsset, store: com.emmah.inshape.media.PhotoStore, modifier: androidx.compose.ui.Modifier, fullSize: kotlin.Boolean): kotlin.Unit
+public fun com.emmah.inshape.feature.library.PhotoImage(asset: com.emmah.inshape.data.PhotoAsset, store: com.emmah.inshape.media.PhotoStore, modifier: androidx.compose.ui.Modifier, maxSize: kotlin.Int): kotlin.Unit
   skippable: true
   restartable: true
   params:
     - asset: STABLE (class with no mutable properties)
     - store: UNSTABLE (has mutable properties or unstable members)
     - modifier: STABLE (marked @Stable or @Immutable)
-    - fullSize: STABLE (primitive type)
+    - maxSize: STABLE (primitive type)
 
 @Composable
 public fun com.emmah.inshape.feature.library.RoutineEditor(id: kotlin.String, data: com.emmah.inshape.data.JournalSnapshot, vm: com.emmah.inshape.JournalViewModel, onSave: kotlin.Function0<kotlin.Unit>, onStart: kotlin.Function1<kotlin.String, kotlin.Unit>, onCreateExercise: kotlin.Function0<kotlin.Unit>, modifier: androidx.compose.ui.Modifier): kotlin.Unit

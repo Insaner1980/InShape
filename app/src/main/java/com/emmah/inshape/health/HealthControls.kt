@@ -135,7 +135,7 @@ fun ColumnScope.HealthSettings(data: JournalSnapshot, vm: JournalViewModel) {
                             ) {
                                 request.launch(setOf(capability.permission))
                             }
-                        }, capability.label, enabled = available)
+                        }, capability.label, enabled = available || enabled)
                     }
                 )
                 if (enabled && available &&

@@ -21,6 +21,9 @@ class TransferController(private val container: AppContainer, private val scope:
     private val mutableState = MutableStateFlow(TransferState())
     val state = mutableState.asStateFlow()
 
+    fun consumeMessage(expected: TransferState): Boolean =
+        !expected.busy && !expected.isError && mutableState.compareAndSet(expected, expected.copy(message = ""))
+
     // UI boundary: display provider/storage errors while preserving cancellation and the draft.
     @Suppress("TooGenericExceptionCaught")
     fun run(label: String, action: suspend () -> String) {

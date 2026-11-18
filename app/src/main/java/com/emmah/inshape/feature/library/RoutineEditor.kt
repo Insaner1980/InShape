@@ -375,6 +375,18 @@ fun RoutineEditor(
                                             )
                                         }
                                         AppMenu(menu == entry.id, { menu = null }) {
+                                            if (index > 0) {
+                                                DropdownMenuItem({ Text("Move up") }, {
+                                                    menu = null
+                                                    move(entry.id, -1)
+                                                })
+                                            }
+                                            if (index < draft.items.lastIndex) {
+                                                DropdownMenuItem({ Text("Move down") }, {
+                                                    menu = null
+                                                    move(entry.id, 1)
+                                                })
+                                            }
                                             DropdownMenuItem({ Text("Edit targets and note") }, {
                                                 menu =
                                                     null

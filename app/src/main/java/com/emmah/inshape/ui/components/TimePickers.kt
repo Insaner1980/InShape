@@ -34,6 +34,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -155,7 +157,15 @@ fun RecordedDatePicker(
     confirm: String = "Done"
 ) {
     val date = initial.pickerDate() ?: fallback.pickerDate() ?: LocalDate.now()
-    val state = remember(date) { DatePickerState(Locale.UK, initialSelectedDateMillis = date.pickerMillis()) }
+    val state = rememberSaveable(
+        date,
+        saver = listSaver<DatePickerState, Long?>(
+            save = { listOf(it.selectedDateMillis, it.displayedMonthMillis) },
+            restore = { DatePickerState(Locale.UK, initialSelectedDateMillis = it[0], initialDisplayedMonthMillis = it[1]) }
+        )
+    ) {
+        DatePickerState(Locale.UK, initialSelectedDateMillis = date.pickerMillis())
+    }
     PickerDialog(onDismiss, modifier = modifier, confirm = {
         TextAction(
             confirm,
@@ -186,7 +196,22 @@ fun RecordedDateRangePicker(
 ) {
     val from = start.pickerDate()
     val to = end.pickerDate()
-    val state = remember(from, to, today) {
+    val state = rememberSaveable(
+        from,
+        to,
+        today,
+        saver = listSaver<DateRangePickerState, Long?>(
+            save = { listOf(it.selectedStartDateMillis, it.selectedEndDateMillis, it.displayedMonthMillis) },
+            restore = {
+                DateRangePickerState(
+                    Locale.UK,
+                    initialSelectedStartDateMillis = it[0],
+                    initialSelectedEndDateMillis = it[1],
+                    initialDisplayedMonthMillis = it[2]
+                )
+            }
+        )
+    ) {
         DateRangePickerState(
             Locale.UK,
             initialSelectedStartDateMillis = (from ?: today).pickerMillis(),

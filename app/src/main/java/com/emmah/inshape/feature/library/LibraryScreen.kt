@@ -102,7 +102,7 @@ fun LibraryScreen(
     var segment by rememberSaveable { mutableIntStateOf(0) }
     var search by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf("All") }
-    var location by rememberSaveable { mutableStateOf("All locations") }
+    var location by rememberSaveable { mutableStateOf<String?>(null) }
     var favorites by rememberSaveable { mutableStateOf(false) }
     var locationsMenu by rememberSaveable { mutableStateOf(false) }
     val history = data.history
@@ -168,15 +168,25 @@ fun LibraryScreen(
                 }
             }
             val locations = data.exercises.filter { !it.archived && it.location.isNotBlank() }.map { it.location }.distinct()
+            val activeLocation = location?.takeIf { it in locations }
             Row(
                 Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(Dimens.innerSmall)
             ) {
                 if (locations.isNotEmpty()) {
                     Box {
-                        FilterPill(location, location != "All locations", { locationsMenu = true }, showDropdown = true)
+                        FilterPill(
+                            activeLocation ?: "All locations",
+                            activeLocation != null,
+                            { locationsMenu = true },
+                            showDropdown = true
+                        )
                         AppMenu(locationsMenu, { locationsMenu = false }) {
-                            (listOf("All locations") + locations).forEach { label ->
+                            DropdownMenuItem({ Text("All locations") }, {
+                                location = null
+                                locationsMenu = false
+                            })
+                            locations.forEach { label ->
                                 DropdownMenuItem({ Text(label) }, {
                                     location = label
                                     locationsMenu = false
@@ -198,7 +208,7 @@ fun LibraryScreen(
             val matching = data.exercises.filter {
                 !it.archived && (!favorites || it.favorite) &&
                     (category == "All" || it.category == category) &&
-                    (location !in locations || it.location == location) &&
+                    (activeLocation == null || it.location == activeLocation) &&
                     listOf(it.name, it.nickname, it.equipmentName).any { value ->
                         value.contains(search, true)
                     }
@@ -219,7 +229,14 @@ fun LibraryScreen(
                                     ).filter(String::isNotBlank).joinToString(", ")
                                 },
                                 leading = data.photos.firstOrNull { it.exerciseId == exercise.id }?.let { photo ->
-                                    { PhotoImage(photo, vm.container.photos, Modifier.size(Dimens.touch).clip(InShapeShapes.field)) }
+                                    {
+                                        PhotoImage(
+                                            photo,
+                                            vm.container.photos,
+                                            Modifier.size(Dimens.touch).clip(InShapeShapes.field),
+                                            maxSize = 256
+                                        )
+                                    }
                                 },
                                 trailing = last?.let {
                                     {

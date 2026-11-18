@@ -54,8 +54,13 @@ fun ColumnScope.BackupControls(vm: JournalViewModel, lastBackupAt: String?, addi
                 transfer.pickerCancelled()
             }
         }
-    LaunchedEffect(state.message) {
-        if (state.message == "Backup saved successfully.") snackbar?.showSnackbar(state.message)
+    LaunchedEffect(transfer, snackbar) {
+        if (snackbar == null) return@LaunchedEffect
+        transfer.state.collect { result ->
+            if (result.message == "Backup saved successfully." && transfer.consumeMessage(result)) {
+                snackbar.showSnackbar(result.message)
+            }
+        }
     }
     ListCard {
         item {

@@ -6,6 +6,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.WindowInfo
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
@@ -15,6 +16,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpSize
@@ -94,6 +96,13 @@ class WorkoutTimingEditorTest {
         val saved = workout()
         assertEquals("2026-10-25T00:30:00Z", saved.start)
         assertEquals("2026-10-25T01:30:00Z", saved.end)
+    }
+
+    @Test fun finishBeforeStartShowsAnExplanation() {
+        launchTimingDraft {
+            it.copy(startTime = "18:00", endTime = "17:30", unknownTimes = false)
+        }
+        compose.onNodeWithText("Finish is before start").performScrollTo().assertIsDisplayed()
     }
 
     @Test fun liveFinishCanEndAtAnEarlierClockTimeDuringAnOverlap() {

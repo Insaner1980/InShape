@@ -239,6 +239,9 @@ class EndToEndJournalTest {
         click("Start")
         click("Finish workout")
         val id = runBlocking { requireNotNull(container.repository.snapshot().active).row.id }
+        compose.waitUntil(10_000) {
+            runBlocking { container.repository.snapshot().drafts.any { it.id == "finish:$id" } }
+        }
         click("Discard workout")
         compose.onNodeWithText("Discard this workout?").assertExists()
         click("Cancel")

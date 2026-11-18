@@ -39,6 +39,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.emmah.inshape.JournalViewModel
 import com.emmah.inshape.data.JournalSnapshot
+import com.emmah.inshape.data.newId
 import com.emmah.inshape.health.HealthPrivacyActivity
 import com.emmah.inshape.health.HealthSettings
 import com.emmah.inshape.reminders.ReminderScheduler
@@ -70,7 +71,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifier = Modifier, onExport: () -> Unit = {}) {
     var name by rememberSaveable { mutableStateOf(data.preferences.name) }
-    var editingName by rememberSaveable { mutableStateOf(false) }
+    var nameEditSession by rememberSaveable { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val colors = InShapeTheme.colors
     val scope = rememberCoroutineScope()
@@ -121,7 +122,7 @@ fun SettingsScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifi
             item {
                 KeyValueRow("Name", preferences.name.ifBlank { "Add name" }, onClick = {
                     name = preferences.name
-                    editingName = true
+                    nameEditSession = newId()
                 })
             }
             item {
@@ -299,9 +300,10 @@ fun SettingsScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifi
             }
         }
     }
-    if (editingName) {
+    val session = nameEditSession
+    if (session != null) {
         AlertDialog(
-            onDismissRequest = { editingName = false },
+            onDismissRequest = { nameEditSession = null },
             title = { Text("Name") },
             text = { TextField(name, "Name", { name = it }, singleLine = true) },
             confirmButton = {
@@ -309,11 +311,11 @@ fun SettingsScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifi
                     val value = name
                     vm.write {
                         updatePreferences(snapshot().preferences.copy(name = value))
-                        editingName = false
+                        if (nameEditSession == session && name == value) nameEditSession = null
                     }
                 })
             },
-            dismissButton = { TextAction("Cancel", { editingName = false }) }
+            dismissButton = { TextAction("Cancel", { nameEditSession = null }) }
         )
     }
     if (editReminderTime) {

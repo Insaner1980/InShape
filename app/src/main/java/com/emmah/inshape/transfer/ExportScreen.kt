@@ -81,8 +81,13 @@ fun ExportScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifier
             }
         }
     }
-    LaunchedEffect(state.message) {
-        if (state.message == "Export cancelled.") snackbar?.showSnackbar(state.message)
+    LaunchedEffect(transfers, snackbar) {
+        if (snackbar == null) return@LaunchedEffect
+        transfers.state.collect { result ->
+            if (result.message == "Export cancelled." && transfers.consumeMessage(result)) {
+                snackbar.showSnackbar(result.message)
+            }
+        }
     }
     val current = data.history.filter { it.row.id in selected }
     val formats = listOf("PDF", "CSV")

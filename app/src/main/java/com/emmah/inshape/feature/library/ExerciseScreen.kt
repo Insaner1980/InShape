@@ -352,7 +352,7 @@ fun ExerciseScreen(
                 IconButton({ fullPhoto = null }, Modifier.size(Dimens.touch)) {
                     Icon(Icons.Outlined.Close, "Close photo", tint = LightColors.onInk)
                 }
-                PhotoImage(photo, vm.container.photos, Modifier.fillMaxWidth().weight(1f), fullSize = true)
+                PhotoImage(photo, vm.container.photos, Modifier.fillMaxWidth().weight(1f), maxSize = 2048)
             }
         }
     }
@@ -378,11 +378,11 @@ internal fun JournalViewModel.importExercisePhotos(exerciseId: String, uris: Lis
 }
 
 @Composable
-fun PhotoImage(asset: PhotoAsset, store: PhotoStore, modifier: Modifier = Modifier, fullSize: Boolean = false) {
+fun PhotoImage(asset: PhotoAsset, store: PhotoStore, modifier: Modifier = Modifier, maxSize: Int = 1024) {
     var failed by remember(asset.path) { mutableStateOf(false) }
-    val bitmap by produceState<android.graphics.Bitmap?>(null, asset.path, fullSize) {
+    val bitmap by produceState<android.graphics.Bitmap?>(null, asset.path, maxSize) {
         try {
-            value = if (fullSize) store.thumbnail(asset, maxSize = 2048) else store.thumbnail(asset)
+            value = store.thumbnail(asset, maxSize)
             failed = value == null
         } catch (
             cancelled: kotlinx.coroutines.CancellationException

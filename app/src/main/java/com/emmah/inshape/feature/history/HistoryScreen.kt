@@ -2,10 +2,14 @@ package com.emmah.inshape.feature.history
 
 import android.text.format.DateFormat
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -16,6 +20,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.MoreVert
@@ -36,28 +42,35 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import com.emmah.inshape.JournalViewModel
 import com.emmah.inshape.R
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.Workout
 import com.emmah.inshape.data.monthGrid
 import com.emmah.inshape.feature.checkin.BodyLevelPills
+import com.emmah.inshape.feature.checkin.EnergyLevel
 import com.emmah.inshape.feature.checkin.bodyRegions
 import com.emmah.inshape.feature.progress.ProgressScreen
 import com.emmah.inshape.feature.workout.SetRow
+import com.emmah.inshape.feature.workout.SetTableHeader
 import com.emmah.inshape.feature.workout.itemSummary
 import com.emmah.inshape.ui.components.AppMenu
 import com.emmah.inshape.ui.components.ConfirmDialog
+import com.emmah.inshape.ui.components.DialogAction
 import com.emmah.inshape.ui.components.EmptyState
 import com.emmah.inshape.ui.components.KeyValueRow
 import com.emmah.inshape.ui.components.ListCard
@@ -71,16 +84,18 @@ import com.emmah.inshape.ui.components.PushedHeader
 import com.emmah.inshape.ui.components.RecordedDatePicker
 import com.emmah.inshape.ui.components.ResponsiveRow
 import com.emmah.inshape.ui.components.ScreenHeader
+import com.emmah.inshape.ui.components.ScreenTabs
 import com.emmah.inshape.ui.components.SectionHeader
-import com.emmah.inshape.ui.components.SegmentedControl
 import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.components.TextField
+import com.emmah.inshape.ui.theme.ArtworkWash
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.InShapeType
 import com.emmah.inshape.ui.theme.displayDate
 import com.emmah.inshape.ui.theme.formatDuration
+import com.emmah.inshape.ui.theme.hasArtworkColumns
 import com.emmah.inshape.ui.theme.instantLabel
 import com.emmah.inshape.ui.theme.journalDateLabel
 import java.time.Duration
@@ -140,7 +155,7 @@ fun HistoryScreen(
                 }
             }, enabled = !creatingPastWorkout, icon = Icons.Outlined.Add)
         })
-        SegmentedControl(
+        ScreenTabs(
             listOf("Calendar", "Progress"),
             if (view ==
                 "progress"
@@ -182,80 +197,82 @@ fun HistoryScreen(
                         )
                     }
                 }
-                monthGrid(month).chunked(7).forEach { week ->
-                    Row(Modifier.fillMaxWidth()) {
-                        week.forEach { date ->
-                            Box(
-                                Modifier.weight(1f).heightIn(min = Dimens.calendarDay).then(
-                                    if (date ==
-                                        null
-                                    ) {
-                                        Modifier
-                                    } else {
-                                        Modifier.clickable { selected = date.toString() }.semantics {
-                                            contentDescription =
-                                                date.displayDate("EEEE d MMMM") +
-                                                (
-                                                    if (monthRecords.any {
-                                                            it.row.journalDate == date.toString() &&
-                                                                it.qualifiesForAttendance
-                                                        }
-                                                    ) {
-                                                        ", workout recorded"
-                                                    } else {
-                                                        ""
-                                                    }
-                                                    ) +
-                                                (if (date == today) ", today" else "")
-                                            this.selected = selected == date.toString()
-                                        }
-                                    }
-                                ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (date != null) {
-                                    val recorded = monthRecords.any {
-                                        it.row.journalDate == date.toString() &&
-                                            it.qualifiesForAttendance
-                                    }
-                                    val chosen = selected == date.toString()
-                                    Surface(
-                                        Modifier.sizeIn(
-                                            minHeight = Dimens.weekDay,
-                                            minWidth = Dimens.weekDay
-                                        ),
-                                        shape = InShapeShapes.pill,
-                                        color = if (recorded) {
-                                            colors.ink
-                                        } else if (chosen) {
-                                            colors.surfaceStrong
-                                        } else {
-                                            Color.Transparent
-                                        },
-                                        border = if (recorded &&
-                                            (chosen || date == today)
-                                        ) {
-                                            BorderStroke(Dimens.ring, colors.text)
-                                        } else if (date ==
-                                            today
-                                        ) {
-                                            BorderStroke(Dimens.ring, colors.ink)
-                                        } else {
+                Column {
+                    monthGrid(month).chunked(7).forEach { week ->
+                        Row(Modifier.fillMaxWidth()) {
+                            week.forEach { date ->
+                                Box(
+                                    Modifier.weight(1f).heightIn(min = Dimens.calendarDay).then(
+                                        if (date ==
                                             null
+                                        ) {
+                                            Modifier
+                                        } else {
+                                            Modifier.clickable { selected = date.toString() }.semantics {
+                                                contentDescription =
+                                                    date.displayDate("EEEE d MMMM") +
+                                                    (
+                                                        if (monthRecords.any {
+                                                                it.row.journalDate == date.toString() &&
+                                                                    it.qualifiesForAttendance
+                                                            }
+                                                        ) {
+                                                            ", workout recorded"
+                                                        } else {
+                                                            ""
+                                                        }
+                                                        ) +
+                                                    (if (date == today) ", today" else "")
+                                                this.selected = selected == date.toString()
+                                            }
                                         }
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text(
-                                                date.dayOfMonth.toString(),
-                                                color = if (recorded) colors.onInk else colors.text,
-                                                style = if (recorded ||
-                                                    date == today
-                                                ) {
-                                                    MaterialTheme.typography.labelMedium
-                                                } else {
-                                                    MaterialTheme.typography.bodyMedium
-                                                }
-                                            )
+                                    ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (date != null) {
+                                        val recorded = monthRecords.any {
+                                            it.row.journalDate == date.toString() &&
+                                                it.qualifiesForAttendance
+                                        }
+                                        val chosen = selected == date.toString()
+                                        Surface(
+                                            Modifier.sizeIn(
+                                                minHeight = Dimens.weekDay,
+                                                minWidth = Dimens.weekDay
+                                            ),
+                                            shape = InShapeShapes.pill,
+                                            color = if (recorded) {
+                                                colors.ink
+                                            } else if (chosen) {
+                                                colors.surfaceStrong
+                                            } else {
+                                                Color.Transparent
+                                            },
+                                            border = if (recorded &&
+                                                (chosen || date == today)
+                                            ) {
+                                                BorderStroke(Dimens.ring, colors.text)
+                                            } else if (date ==
+                                                today
+                                            ) {
+                                                BorderStroke(Dimens.ring, colors.ink)
+                                            } else {
+                                                null
+                                            }
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text(
+                                                    date.dayOfMonth.toString(),
+                                                    color = if (recorded) colors.onInk else colors.text,
+                                                    style = if (recorded ||
+                                                        date == today
+                                                    ) {
+                                                        MaterialTheme.typography.labelMedium
+                                                    } else {
+                                                        MaterialTheme.typography.bodyMedium
+                                                    }
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -263,7 +280,7 @@ fun HistoryScreen(
                         }
                     }
                 }
-                if (selected != null) TextAction("Show whole month", { selected = null })
+                if (selected != null) TextAction("Show whole month", { selected = null }, icon = Icons.Outlined.CalendarMonth)
             }
             val drafts = data.workouts.filter { it.state == "DRAFT" }
             if (drafts.isNotEmpty()) {
@@ -282,8 +299,22 @@ fun HistoryScreen(
                 formatDuration(durations.sum()) to "total time",
                 (durations.takeIf { it.isNotEmpty() }?.average()?.toLong()?.let(::formatDuration) ?: "0 min") to "average"
             )
-            ResponsiveRow {
-                summaries.forEach { (value, label) -> HistorySummary(value, label, Modifier.weight(1f)) }
+            BoxWithConstraints(
+                Modifier.fillMaxWidth().clip(InShapeShapes.card).background(ArtworkWash.Paper.brush())
+                    .padding(PaddingValues(horizontal = Dimens.inner, vertical = Dimens.itemGap))
+            ) {
+                val ornament = records.isNotEmpty() && hasArtworkColumns() && summaries.all { (value, _) -> value.length <= 7 }
+                ResponsiveRow(Modifier.padding(end = if (ornament) 54.dp else 0.dp)) {
+                    summaries.forEach { (value, label) -> HistorySummary(value, label, Modifier.weight(1f)) }
+                }
+                if (ornament) {
+                    Image(
+                        painterResource(R.drawable.art_history_paper_calendar),
+                        null,
+                        Modifier.align(Alignment.BottomEnd).size(54.dp, 40.dp),
+                        alpha = if (colors.isDark) .22f else .65f
+                    )
+                }
             }
             if (durations.size <
                 qualifying.size
@@ -294,7 +325,7 @@ fun HistoryScreen(
                     color = colors.textSecondary
                 )
             }
-            SectionHeader(if (selected == null) month.atDay(1).displayDate("MMMM") else selected!!.journalDateLabel(), quiet = true)
+            SectionHeader(if (selected == null) "${month.atDay(1).displayDate("MMMM")} workouts" else selected!!.journalDateLabel())
             if (records.isEmpty()) {
                 EmptyState("No workouts in this period", "Pick another month or add a past workout.")
             } else {
@@ -346,7 +377,7 @@ fun HistoryScreen(
                 }
             },
             confirmButton = {
-                TextAction("Add exercises", {
+                DialogAction("Add exercises", {
                     if (past && !creatingPastWorkout && pastTitle.isBlank()) {
                         showPastTitleError = true
                     } else if (past && !creatingPastWorkout) {
@@ -365,7 +396,7 @@ fun HistoryScreen(
                     }
                 })
             },
-            dismissButton = { TextAction("Cancel", { past = false }) }
+            dismissButton = { DialogAction("Cancel", { past = false }) }
         )
     }
     if (pastPicker) {
@@ -462,7 +493,8 @@ fun WorkoutDetailScreen(
                                 color = colors.textSecondary
                             )
                         }
-                        if (editing) {
+                        if (editing && exercise.sets.isNotEmpty()) {
+                            SetTableHeader(exercise.row.basis)
                             exercise.sets.forEachIndexed { index, set ->
                                 SetRow(set, index + 1, exercise.row.basis, vm)
                             }
@@ -495,13 +527,18 @@ fun WorkoutDetailScreen(
                     val summary = check?.let {
                         buildList {
                             add("Observed ${it.observedAt.instantLabel(ZoneId.of(it.zoneId), uses24Hours)}")
-                            it.energy?.let { energy -> add("Energy: ${energy.lowercase()}") }
                             it.effort?.let { effort -> add(com.emmah.inshape.feature.checkin.effortLevelOf(effort)!!.label) }
                             if (it.feelings.isNotBlank()) add(it.feelings)
                             if (it.note.isNotBlank()) add(it.note)
                         }.joinToString("\n")
                     } ?: "Add"
-                    ListRow(label, subtitle = summary, onClick = { onCheckIn(phase) })
+                    val energy = EnergyLevel.fromKey(check?.energy)
+                    ListRow(
+                        label,
+                        subtitle = summary,
+                        onClick = { onCheckIn(phase) },
+                        details = { if (energy != null) Pill("Energy ${energy.label}") }
+                    )
                     if (check != null) {
                         data.observations.filter { it.checkInId == check.id }.forEach { observation ->
                             val region = bodyRegions.find { it.id == observation.region }?.label
@@ -521,7 +558,7 @@ fun WorkoutDetailScreen(
         com.emmah.inshape.health.WorkoutHealthControls(workout, data, vm)
         TextAction("Delete workout", {
             deletion = true
-        }, Modifier.align(Alignment.CenterHorizontally), color = colors.error)
+        }, Modifier.align(Alignment.CenterHorizontally), color = colors.error, icon = Icons.Outlined.Delete)
     }
     if (editingNote) {
         AlertDialog(
@@ -529,7 +566,7 @@ fun WorkoutDetailScreen(
             title = { Text("Edit note") },
             text = { TextField(note, "Workout note", { note = it }) },
             confirmButton = {
-                TextAction("Save", {
+                DialogAction("Save", {
                     val value = note
                     vm.write {
                         saveWorkoutNote(id, value)
@@ -537,15 +574,15 @@ fun WorkoutDetailScreen(
                     }
                 })
             },
-            dismissButton = { TextAction("Cancel", { editingNote = false }) }
+            dismissButton = { DialogAction("Cancel", { editingNote = false }) }
         )
     }
     if (deletion) {
         ConfirmDialog(
             "Delete workout?",
-            "Delete this local record. If a shared copy exists, its deletion will stay pending until " +
-                "Health Connect access is available.",
+            stringResource(R.string.delete_workout_message),
             "Delete",
+            destructive = true,
             {
                 vm.write {
                     deleteWorkout(id)

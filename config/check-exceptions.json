@@ -2,6 +2,40 @@
   "schemaVersion": 1,
   "exceptions": [
     {
+      "id": "inshape-music-header-lazy-item-identity",
+      "tool": "mobsfscan",
+      "rule": "android_kotlin_hardcoded",
+      "scope": "app/src/main/java/com/emmah/inshape/feature/music/MusicScreens.kt",
+      "reason": "The Compose LazyColumn music header uses a fixed local item identity to retain its state when the list changes. The identity is public UI metadata.",
+      "owner": "InShape maintainers",
+      "added": "2026-11-19",
+      "expires": "2027-11-19",
+      "tracking": "Android script rerun: confirmed a Compose LazyColumn item key in current source",
+      "sourcePath": "app/src/main/java/com/emmah/inshape/feature/music/MusicScreens.kt",
+      "selector": "item(key = \"music-header\")",
+      "findingPath": "app/src/main/java/com/emmah/inshape/feature/music/MusicScreens.kt",
+      "findingSelectors": [
+        "key = \"music-header\""
+      ]
+    },
+    {
+      "id": "inshape-playlist-header-lazy-item-identity",
+      "tool": "mobsfscan",
+      "rule": "android_kotlin_hardcoded",
+      "scope": "app/src/main/java/com/emmah/inshape/feature/music/MusicScreens.kt",
+      "reason": "The Compose LazyColumn playlist header uses a fixed local item identity to retain its state when the list changes. The identity is public UI metadata.",
+      "owner": "InShape maintainers",
+      "added": "2026-11-19",
+      "expires": "2027-11-19",
+      "tracking": "Android script rerun: confirmed a Compose LazyColumn item key in current source",
+      "sourcePath": "app/src/main/java/com/emmah/inshape/feature/music/MusicScreens.kt",
+      "selector": "item(key = \"playlist-header\")",
+      "findingPath": "app/src/main/java/com/emmah/inshape/feature/music/MusicScreens.kt",
+      "findingSelectors": [
+        "key = \"playlist-header\""
+      ]
+    },
+    {
       "id": "inshape-draft-identity",
       "tool": "mobsfscan",
       "rule": "android_kotlin_hardcoded",

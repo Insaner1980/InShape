@@ -56,7 +56,8 @@ fun TextField(
     onChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     singleLine: Boolean = false,
-    error: String? = null
+    error: String? = null,
+    placeholder: String? = null
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -74,9 +75,8 @@ fun TextField(
                 Modifier
             }
         ),
-        label = {
-            Text(label)
-        },
+        label = label.takeUnless(String::isBlank)?.let { title -> { Text(title) } },
+        placeholder = placeholder?.let { hint -> { Text(hint) } },
         shape = InShapeShapes.field,
         singleLine = singleLine,
         isError = error != null,

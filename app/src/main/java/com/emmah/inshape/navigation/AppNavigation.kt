@@ -13,12 +13,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -39,6 +42,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -69,6 +73,13 @@ import com.emmah.inshape.feature.library.ExerciseEditor
 import com.emmah.inshape.feature.library.ExerciseScreen
 import com.emmah.inshape.feature.library.LibraryScreen
 import com.emmah.inshape.feature.library.RoutineEditor
+import com.emmah.inshape.feature.music.MiniPlayer
+import com.emmah.inshape.feature.music.MusicCatalog
+import com.emmah.inshape.feature.music.MusicHome
+import com.emmah.inshape.feature.music.MusicTrack
+import com.emmah.inshape.feature.music.NowPlaying
+import com.emmah.inshape.feature.music.PlaylistDetail
+import com.emmah.inshape.feature.music.rememberMusicPlayback
 import com.emmah.inshape.feature.settings.SettingsScreen
 import com.emmah.inshape.feature.today.TodayScreen
 import com.emmah.inshape.feature.workout.FinishScreen
@@ -83,7 +94,7 @@ import java.time.Duration
 import java.time.LocalDate
 import kotlinx.coroutines.delay
 
-enum class Destination { Today, History, Library, Settings }
+enum class Destination { Today, History, Library, Music, Settings }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,6 +104,8 @@ fun AppNavigation(
     entryAction: Pair<String, Long>? = null,
     consumeEntry: () -> Unit = {},
     initialRoute: String = "Today",
+    musicFixture: MusicCatalog? = null,
+    initialMusic: List<MusicTrack> = emptyList(),
     vm: JournalViewModel = viewModel(
         factory = remember(container) { viewModelFactory { initializer { JournalViewModel(container) } } }
     )
@@ -115,15 +128,26 @@ fun AppNavigation(
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route ?: "Today"
     val tabs =
-        listOf(Destination.Today, Destination.History, Destination.Library)
-    val labels = listOf(R.string.today, R.string.history, R.string.library)
+        listOf(Destination.Today, Destination.History, Destination.Library, Destination.Music)
+    val labels = listOf(R.string.today, R.string.history, R.string.library, R.string.music)
     val icons =
         listOf(
             Icons.Outlined.Home,
             Icons.Outlined.CalendarMonth,
-            Icons.Outlined.FitnessCenter
+            Icons.Outlined.FitnessCenter,
+            Icons.Outlined.MusicNote
         )
-    val isMain = route in tabs.map { it.name } || route.startsWith("History?")
+    val selectedTab = when {
+        route.startsWith("History?") -> Destination.History
+        route.startsWith("music-playlist/") || route == "music-now-playing" -> Destination.Music
+        else -> tabs.firstOrNull { it.name == route }
+    }
+    val isMain = selectedTab != null
+    val playback = rememberMusicPlayback(
+        container,
+        initialMusic,
+        observe = selectedTab == Destination.Music || route.startsWith("workout/")
+    )
     var today by remember { mutableStateOf(LocalDate.now(container.clock)) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         today = LocalDate.now(container.clock)
@@ -148,7 +172,7 @@ fun AppNavigation(
         }
     }
     fun finishRoute(id: String): String = if (data?.workout(id)?.row?.timingNeedsReview == true ||
-        data?.workout(id)?.row?.kind == "PAST"
+        data?.workout(id)?.isPastEntry == true
     ) {
         "timing/$id/finish"
     } else {
@@ -182,6 +206,8 @@ fun AppNavigation(
                         }
                     }
                 }
+
+                MainActivity.OPEN_MUSIC -> nav.navigate("Music") { launchSingleTop = true }
 
                 else -> nav.navigate("Today") { popUpTo("Today") { inclusive = true } }
             }
@@ -220,6 +246,19 @@ fun AppNavigation(
         },
         bottomBar = {
             Column {
+                if (selectedTab == Destination.Music && route != "music-now-playing") {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        MiniPlayer(
+                            playback,
+                            "Open Now playing",
+                            { nav.navigate("music-now-playing") },
+                            Modifier.widthIn(max = Dimens.maxPageWidth).padding(
+                                horizontal = Dimens.screenPadding,
+                                vertical = Dimens.innerSmall
+                            )
+                        )
+                    }
+                }
                 if (isMain) HorizontalDivider(color = InShapeTheme.colors.divider)
                 if (isMain) {
                     NavigationBar(
@@ -231,29 +270,21 @@ fun AppNavigation(
                     ) {
                         tabs.forEachIndexed { i, tab ->
                             NavigationBarItem(
-                                route == tab.name ||
-                                    (tab == Destination.History && route.startsWith("History?")),
+                                selectedTab == tab,
                                 {
-                                    nav.navigate(tab.name) {
-                                        popUpTo(nav.graph.startDestinationId) {
-                                            saveState =
-                                                true
+                                    if (selectedTab != tab || tab != Destination.Music) {
+                                        nav.navigate(tab.name) {
+                                            popUpTo(nav.graph.startDestinationId) { saveState = true }
+                                            launchSingleTop = true
+                                            restoreState = true
                                         }
-                                        launchSingleTop = true
-                                        restoreState = true
                                     }
                                 },
                                 icon = { Icon(icons[i], null) },
                                 label = {
                                     Text(
                                         stringResource(labels[i]),
-                                        style = if (route ==
-                                            tab.name ||
-                                            (
-                                                tab == Destination.History &&
-                                                    route.startsWith("History?")
-                                                )
-                                        ) {
+                                        style = if (selectedTab == tab) {
                                             InShapeType.navSelected
                                         } else {
                                             InShapeType.nav
@@ -334,6 +365,17 @@ fun AppNavigation(
                             exercise(it)
                         }, { nav.navigate("routine/$it") }, vm)
                     }
+                    composable("Music") {
+                        MusicHome(container.music, playback, { nav.navigate("music-playlist/$it") }, musicFixture)
+                    }
+                    composable("music-playlist/{id}") { backStack ->
+                        PlaylistDetail(backStack.arguments!!.getString("id")!!, container.music, playback, {
+                            if (!nav.popBackStack()) nav.navigate("Music")
+                        }, musicFixture)
+                    }
+                    composable("music-now-playing") {
+                        NowPlaying(playback) { nav.popBackStack() }
+                    }
                     composable("Settings") { SettingsScreen(state, vm) { nav.navigate("Export") } }
                     composable("Export") { com.emmah.inshape.transfer.ExportScreen(state, vm) }
                     composable("exercise/{id}?item={item}") { backStack ->
@@ -361,11 +403,15 @@ fun AppNavigation(
                     }
                     composable("workout/{id}") { backStack ->
                         val id = backStack.arguments!!.getString("id")!!
-                        WorkoutScreen(id, state, vm, { exerciseId, item ->
-                            exercise(exerciseId, item)
-                        }, {
-                            nav.navigate("checkin/$id/BEFORE")
-                        }, { nav.navigate(finishRoute(id)) }, { nav.popBackStack("Today", false) }, { nav.popBackStack() })
+                        WorkoutScreen(
+                            id, state, vm, { exerciseId, item ->
+                                exercise(exerciseId, item)
+                            }, {
+                                nav.navigate("checkin/$id/BEFORE")
+                            }, { nav.navigate(finishRoute(id)) }, { nav.popBackStack("Today", false) }, { nav.popBackStack() },
+                            musicPlayback = playback.takeIf { state.active?.row?.id == id },
+                            musicFixture = musicFixture
+                        )
                     }
                     composable("finish/{id}") { backStack ->
                         val id = backStack.arguments!!.getString("id")!!

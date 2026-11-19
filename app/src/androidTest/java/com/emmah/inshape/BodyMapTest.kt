@@ -11,7 +11,9 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.emmah.inshape.data.BodyObservation
 import com.emmah.inshape.feature.checkin.BodyMap
+import com.emmah.inshape.feature.checkin.bodyArtwork
 import com.emmah.inshape.feature.checkin.bodyRegionAt
+import com.emmah.inshape.feature.checkin.bodyRegions
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.ThemeMode
@@ -26,11 +28,31 @@ class BodyMapTest {
     @get:Rule val compose = createComposeRule()
 
     @Test fun frontAndBackKeepAnatomicalRightKnee() {
-        assertEquals("right_knee", bodyRegionAt(42f, 168f, false))
-        assertEquals("right_knee", bodyRegionAt(57f, 168f, true))
-        assertEquals("left_knee", bodyRegionAt(57f, 168f, false))
-        assertEquals("lower_back", bodyRegionAt(50f, 88f, true))
+        assertEquals("right_knee", bodyRegionAt(98f, 285f, false))
+        assertEquals("right_knee", bodyRegionAt(142f, 285f, true))
+        assertEquals("left_knee", bodyRegionAt(142f, 285f, false))
+        assertEquals("lower_back", bodyRegionAt(120f, 150f, true))
         assertNull(bodyRegionAt(5f, 5f, true))
+    }
+
+    @Test fun everyRecordedRegionHasAnExactHitOnTheCorrectFace() {
+        val reached = mutableSetOf<String>()
+        for (back in listOf(false, true)) {
+            val shapes = bodyArtwork(back).filter { it.id != null }
+            assertEquals(21, shapes.size)
+            for (shape in shapes) {
+                val id = checkNotNull(shape.id)
+                val bounds = shape.bounds
+                val hit = (bounds.left.toInt()..bounds.right.toInt()).any { x ->
+                    (bounds.top.toInt()..bounds.bottom.toInt()).any { y ->
+                        bodyRegionAt(x.toFloat(), y.toFloat(), back) == id
+                    }
+                }
+                check(hit) { "$id is unreachable on back=$back" }
+                reached += id
+            }
+        }
+        assertEquals(bodyRegions.map { it.id }.toSet(), reached)
     }
 
     @Test fun tapTargetsIncludeTheAnatomicalShapeAndItsNearbyArea() {
@@ -49,16 +71,16 @@ class BodyMapTest {
         }
         fun tapAt(x: Float, y: Float) {
             compose.onNodeWithTag("body-map").performTouchInput {
-                val scale = minOf(width / 100f, canvasHeight / 240f)
-                click(Offset((width - scale * 100f) / 2f + x * scale, y * scale))
+                val scale = minOf(width / 240f, canvasHeight / 392f)
+                click(Offset((width - scale * 240f) / 2f + x * scale, (canvasHeight - scale * 392f) / 2f + y * scale))
             }
         }
-        tapAt(42f, 168f)
+        tapAt(98f, 285f)
         compose.runOnIdle { assertEquals(listOf("right_knee"), selected) }
-        assertNull(bodyRegionAt(66f, 168f, false))
-        tapAt(66f, 168f)
+        assertNull(bodyRegionAt(157f, 285f, false))
+        tapAt(157f, 285f)
         compose.runOnIdle { assertEquals(listOf("right_knee", "left_knee"), selected) }
-        tapAt(8f, 168f)
+        tapAt(40f, 285f)
         compose.runOnIdle { assertEquals(listOf("right_knee", "left_knee"), selected) }
     }
 }

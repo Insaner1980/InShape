@@ -15,14 +15,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -35,8 +39,10 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import com.emmah.inshape.ui.theme.DarkColors
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
@@ -45,30 +51,61 @@ import com.emmah.inshape.ui.theme.InShapeType
 enum class PillTone { Neutral, Accent }
 
 @Composable
-fun Pill(text: String, modifier: Modifier = Modifier, tone: PillTone = PillTone.Neutral, outlined: Boolean = false) {
+fun Pill(
+    text: String,
+    modifier: Modifier = Modifier,
+    tone: PillTone = PillTone.Neutral,
+    style: TextStyle = MaterialTheme.typography.labelMedium
+) {
     val colors = InShapeTheme.colors
+    val accent = tone == PillTone.Accent
     Surface(
-        modifier.heightIn(min = if (outlined) Dimens.setNumber else Dimens.weekCircle),
+        modifier.heightIn(min = Dimens.setNumber),
         shape = InShapeShapes.chip,
-        color = when {
-            outlined -> colors.background
-            tone == PillTone.Accent -> colors.ink
-            else -> colors.surface
-        },
-        border = if (outlined) BorderStroke(Dimens.line, colors.textSecondary) else null
+        color = if (accent) colors.ink else colors.surface,
+        contentColor = if (accent) colors.onInk else colors.text
     ) {
-        Text(
-            text,
-            Modifier.padding(horizontal = Dimens.itemGap, vertical = Dimens.innerTiny),
-            style = MaterialTheme.typography.labelMedium,
-            color = if (tone ==
-                PillTone.Accent
-            ) {
-                colors.onInk
-            } else {
-                colors.textSecondary
-            }
-        )
+        Box(contentAlignment = Alignment.Center) {
+            Text(text, Modifier.padding(horizontal = Dimens.pillPadding, vertical = Dimens.innerTiny), style = style)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ScreenTabs(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    val colors = InShapeTheme.colors
+    SecondaryTabRow(
+        selectedTabIndex = selected,
+        modifier = modifier,
+        containerColor = colors.background,
+        contentColor = colors.text,
+        indicator = {
+            TabRowDefaults.SecondaryIndicator(
+                Modifier.tabIndicatorOffset(selected, matchContentSize = false),
+                height = Dimens.tabIndicator,
+                color = colors.ink
+            )
+        },
+        divider = { HorizontalDivider(thickness = Dimens.line, color = colors.divider) }
+    ) {
+        options.forEachIndexed { index, option ->
+            Tab(
+                selected = selected == index,
+                onClick = { onSelect(index) },
+                modifier = Modifier.heightIn(min = Dimens.touch),
+                selectedContentColor = colors.text,
+                unselectedContentColor = colors.textSecondary,
+                text = {
+                    Text(
+                        option,
+                        Modifier.fillMaxWidth(),
+                        style = MaterialTheme.typography.labelLarge,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            )
+        }
     }
 }
 
@@ -246,7 +283,12 @@ fun Stepper(
 enum class ProgressState { Done, Current, Pending }
 
 @Composable
-fun ProgressSegments(states: List<ProgressState>, contentDescription: String, modifier: Modifier = Modifier, onAccent: Boolean = false) {
+fun ProgressSegments(
+    states: List<ProgressState>,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    onDarkSurface: Boolean = false
+) {
     val colors = InShapeTheme.colors
     Row(
         modifier.fillMaxWidth().semantics {
@@ -258,30 +300,24 @@ fun ProgressSegments(states: List<ProgressState>, contentDescription: String, mo
             Surface(
                 Modifier.weight(1f).height(Dimens.progressHeight),
                 shape = InShapeShapes.chip,
-                color =
-                    if (onAccent) {
-                        if (state ==
-                            ProgressState.Done
-                        ) {
-                            colors.onInk
-                        } else {
-                            colors.textTertiary.copy(
-                                alpha = if (state ==
-                                    ProgressState.Current
-                                ) {
-                                    .5f
-                                } else {
-                                    .35f
-                                }
-                            )
-                        }
-                    } else {
-                        when (state) {
-                            ProgressState.Done -> colors.ink
-                            ProgressState.Current -> colors.textTertiary
-                            ProgressState.Pending -> colors.surfaceStrong
-                        }
+                color = if (onDarkSurface) {
+                    when (state) {
+                        ProgressState.Done -> DarkColors.ink
+                        ProgressState.Current -> DarkColors.textSecondary
+                        ProgressState.Pending -> Color.Transparent
                     }
+                } else {
+                    when (state) {
+                        ProgressState.Done -> colors.ink
+                        ProgressState.Current -> colors.textTertiary
+                        ProgressState.Pending -> colors.surfaceStrong
+                    }
+                },
+                border = if (onDarkSurface && state == ProgressState.Pending) {
+                    BorderStroke(Dimens.line, DarkColors.textTertiary)
+                } else {
+                    null
+                }
             ) { }
         }
     }

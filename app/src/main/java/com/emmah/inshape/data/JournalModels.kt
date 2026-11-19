@@ -43,6 +43,7 @@ data class JournalSnapshot(
 data class Workout(val row: WorkoutEntity, val items: List<WorkoutItem>, val checkIns: List<CheckIn>) {
     val hasPerformedWork: Boolean get() = items.any { it.hasPerformedWork }
     val qualifiesForAttendance: Boolean get() = row.state == "COMPLETED" && hasPerformedWork
+    val isPastEntry: Boolean get() = row.kind == "PAST"
     val doneCount: Int get() = items.count { it.row.disposition == "DONE" }
     val performedCount: Int get() = items.count { it.hasPerformedWork }
 }

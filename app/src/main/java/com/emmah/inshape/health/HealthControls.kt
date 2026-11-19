@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,7 +35,6 @@ import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.Preferences
 import com.emmah.inshape.data.Workout
 import com.emmah.inshape.ui.components.ConfirmDialog
-import com.emmah.inshape.ui.components.GroupLabel
 import com.emmah.inshape.ui.components.InShapeCard
 import com.emmah.inshape.ui.components.InShapeSwitch
 import com.emmah.inshape.ui.components.ListCard
@@ -91,19 +92,14 @@ fun ColumnScope.HealthSettings(data: JournalSnapshot, vm: JournalViewModel) {
         }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { refresh() }
     LaunchedEffect(data.preferences.readHeartRate) { refresh() }
-    GroupLabel("Health Connect")
+    SectionHeader("Health Connect")
     if (!available) {
         Text(
-            if (gateway.availability() ==
-                HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED
-            ) {
-                "Install or update Health Connect to connect on this device."
-            } else {
-                "Health Connect is unavailable on this device."
-            },
-            style = MaterialTheme.typography.bodySmall,
+            "Health Connect is not available on this phone.",
+            style = MaterialTheme.typography.bodyMedium,
             color = InShapeTheme.colors.textSecondary
         )
+        return
     }
     ListCard {
         HealthCapability.entries.forEach { capability ->
@@ -220,9 +216,9 @@ fun ColumnScope.HealthSettings(data: JournalSnapshot, vm: JournalViewModel) {
             "A previously requested removal needs confirmation on this installation. Workout ${state.workoutId}",
             style = MaterialTheme.typography.bodySmall
         )
-        OutlineButton("Remove previously deleted shared workout", {
+        TextAction("Remove previously deleted shared workout", {
             heldRemoval = state.workoutId
-        }, enabled = available)
+        }, enabled = available, color = InShapeTheme.colors.error, icon = Icons.Outlined.Delete)
     }
     if (message.isNotEmpty()) {
         Text(
@@ -237,6 +233,7 @@ fun ColumnScope.HealthSettings(data: JournalSnapshot, vm: JournalViewModel) {
             "This removes only InShape's Health Connect summary for workout $id. No restored local " +
                 "workout is deleted. Access is required before removal can finish.",
             "Confirm removal",
+            destructive = true,
             {
                 heldRemoval =
                     null
@@ -368,10 +365,9 @@ fun WorkoutHealthControls(workout: Workout, data: JournalSnapshot, vm: JournalVi
         if (state?.platformId != null ||
             (state?.acknowledgedRevision ?: 0) > 0
         ) {
-            OutlineButton("Remove shared copy", {
-                remove =
-                    true
-            })
+            TextAction("Remove shared copy", {
+                remove = true
+            }, color = InShapeTheme.colors.error, icon = Icons.Outlined.Delete)
         }
         if (state?.restoredHold == true && data.preferences.shareWorkouts &&
             HealthSharing.eligible(workout)
@@ -388,6 +384,7 @@ fun WorkoutHealthControls(workout: Workout, data: JournalSnapshot, vm: JournalVi
             "Keep your local workout. Its Health Connect copy will be removed when access is " +
                 "available, and this workout will stay on hold.",
             "Remove shared copy",
+            destructive = true,
             {
                 remove =
                     false
@@ -402,6 +399,7 @@ fun WorkoutHealthControls(workout: Workout, data: JournalSnapshot, vm: JournalVi
             "Exercise-read access is needed to find this app's existing summary and preserve its " +
                 "identity. Only this selected workout will be queued for sharing.",
             "Continue",
+            destructive = false,
             {
                 reconcile =
                     false

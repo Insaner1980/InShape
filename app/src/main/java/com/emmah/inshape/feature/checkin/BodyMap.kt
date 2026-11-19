@@ -1,8 +1,5 @@
 package com.emmah.inshape.feature.checkin
 
-import android.graphics.Path
-import android.graphics.RectF
-import android.graphics.Region
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -16,72 +13,32 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asComposePath
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.dp
 import com.emmah.inshape.data.BodyObservation
 import com.emmah.inshape.ui.components.SelectField
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeTheme
 import kotlin.math.hypot
 
-data class BodyRegion(val id: String, val label: String)
-val bodyRegions: List<BodyRegion> =
-    listOf("neck", "upper_back", "lower_back", "chest", "abdomen").map {
-        BodyRegion(it, it.replace('_', ' ').replaceFirstChar(Char::titlecase))
-    } +
-        listOf("shoulder", "upper_arm", "elbow", "forearm_wrist", "hip", "thigh", "knee", "calf_shin", "ankle_foot").flatMap { part ->
-            listOf("left", "right").map { side ->
-                BodyRegion(
-                    "${side}_$part",
-                    "$side ${if (part == "forearm_wrist") {
-                        "wrist and forearm"
-                    } else {
-                        part.replace(
-                            '_',
-                            ' '
-                        )
-                    }}".replaceFirstChar(Char::titlecase)
-                )
-            }
-        }
+internal fun bodyArtwork(back: Boolean) = if (back) backBodyArtwork else frontBodyArtwork
 
-data class RegionShape(val id: String, val path: Path)
-fun bodyShapes(back: Boolean): List<RegionShape> = buildList {
-    fun shape(id: String, left: Float, top: Float, right: Float, bottom: Float) {
-        add(
-            RegionShape(
-                id,
-                Path().apply {
-                    addRoundRect(RectF(left, top, right, bottom), 3f, 3f, Path.Direction.CW)
-                }
-            )
-        )
-    }
-    shape("neck", 45f, 30f, 55f, 44f)
-    shape(if (back) "upper_back" else "chest", 36f, 44f, 64f, 73f)
-    shape(if (back) "lower_back" else "abdomen", 36f, 73f, 64f, 104f)
-    listOf(false, true).forEach { screenRight ->
-        val side = if (screenRight == back) "right" else "left"
-        val arm = if (screenRight) 66f else 25f
-        val leg = if (screenRight) 51f else 36f
-        shape("${side}_shoulder", arm, 44f, arm + 10, 57f)
-        shape("${side}_upper_arm", arm, 58f, arm + 9, 82f)
-        shape("${side}_elbow", arm, 83f, arm + 9, 93f)
-        shape("${side}_forearm_wrist", arm, 94f, arm + 9, 120f)
-        shape("${side}_hip", leg, 105f, leg + 13, 123f)
-        shape("${side}_thigh", leg, 124f, leg + 13, 160f)
-        shape("${side}_knee", leg, 161f, leg + 13, 176f)
-        shape("${side}_calf_shin", leg, 177f, leg + 13, 207f)
-        shape("${side}_ankle_foot", leg, 208f, leg + 13, 224f)
-    }
-}
-fun bodyRegionAt(x: Float, y: Float, back: Boolean): String? = bodyShapes(back).firstOrNull { shape ->
-    Region().apply {
-        setPath(shape.path, Region(0, 0, 100, 240))
-    }.contains(x.toInt(), y.toInt())
+fun bodyRegionAt(x: Float, y: Float, back: Boolean): String? = bodyArtwork(back).lastOrNull {
+    it.hitArea?.contains(kotlin.math.floor(x).toInt(), kotlin.math.floor(y).toInt()) == true
 }?.id
+
+private fun bodyScale(width: Float, height: Float) = minOf(width / BODY_WIDTH, height / BODY_HEIGHT)
+
+private fun bodyOrigin(width: Float, height: Float, scale: Float) =
+    Offset((width - BODY_WIDTH * scale) / 2f, (height - BODY_HEIGHT * scale) / 2f)
 
 @Composable
 fun BodyMap(
@@ -96,19 +53,20 @@ fun BodyMap(
     Column(
         modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)
+        verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)
     ) {
         controls()
         Canvas(
             Modifier.fillMaxWidth().height(Dimens.bodyHeight).pointerInput(back) {
                 detectTapGestures { point ->
-                    val scale = minOf(size.width / 100f, size.height / 240f)
-                    val x = (point.x - (size.width - 100f * scale) / 2f) / scale
-                    val y = point.y / scale
-                    val region = bodyRegionAt(x, y, back) ?: bodyShapes(back).mapNotNull { shape ->
-                        val bounds = RectF()
-                        shape.path.computeBounds(bounds, true)
-                        val target = Dimens.touch.toPx() / scale
+                    val scale = bodyScale(size.width.toFloat(), size.height.toFloat())
+                    val origin = bodyOrigin(size.width.toFloat(), size.height.toFloat(), scale)
+                    val x = (point.x - origin.x) / scale
+                    val y = (point.y - origin.y) / scale
+                    val target = Dimens.touch.toPx() / scale
+                    val region = bodyRegionAt(x, y, back) ?: bodyArtwork(back).mapNotNull { shape ->
+                        val id = shape.id ?: return@mapNotNull null
+                        val bounds = shape.bounds
                         val dx = x - bounds.centerX()
                         val dy = y - bounds.centerY()
                         if (kotlin.math.abs(dx) > maxOf(target, bounds.width()) / 2f ||
@@ -116,41 +74,61 @@ fun BodyMap(
                         ) {
                             null
                         } else {
-                            shape.id to hypot(dx, dy)
+                            id to hypot(dx, dy)
                         }
                     }.minByOrNull { it.second }?.first
                     region?.let(select)
                 }
             }
         ) {
-            val scale = minOf(size.width / 100f, size.height / 240f)
+            val scale = bodyScale(size.width, size.height)
+            val origin = bodyOrigin(size.width, size.height, scale)
+            val haloWidth = minOf(size.width * .72f, 250.dp.toPx())
+            val haloHeight = BODY_HEIGHT * scale * .82f
+            val halo = if (colors.isDark) {
+                Color(0xFF53665B).copy(alpha = .32f)
+            } else {
+                Color(0xFFE6EBDB).copy(alpha = .55f)
+            }
+            val haloCenter = Offset(size.width / 2f, origin.y + 168f * scale)
+            // Draw a radial gradient in a circle and scale it to the halo's ellipse.
+            withTransform({ scale(1f, haloHeight / haloWidth, pivot = haloCenter) }) {
+                drawOval(
+                    Brush.radialGradient(listOf(halo, halo.copy(alpha = 0f)), haloCenter, haloWidth / 2f),
+                    topLeft = haloCenter - Offset(haloWidth / 2f, haloWidth / 2f),
+                    size = Size(haloWidth, haloWidth)
+                )
+            }
             withTransform({
-                translate((size.width - 100f * scale) / 2f, 0f)
-                scale(scale, scale, pivot = androidx.compose.ui.geometry.Offset.Zero)
+                translate(origin.x, origin.y)
+                scale(scale, scale, pivot = Offset.Zero)
             }) {
-                val head = androidx.compose.ui.geometry.Offset(50f, 20f)
-                val outline = Stroke(Dimens.chartOutline.toPx() / scale)
-                drawCircle(colors.surfaceStrong, 10f, head)
-                drawCircle(colors.textSecondary, 10f, head, style = outline)
-                val silhouette = Path().apply {
-                    addRoundRect(RectF(45f, 29f, 55f, 47f), 2f, 2f, Path.Direction.CW)
-                    addRoundRect(RectF(36f, 43f, 64f, 124f), 10f, 10f, Path.Direction.CW)
-                    addRoundRect(RectF(25f, 44f, 34f, 120f), 4f, 4f, Path.Direction.CW)
-                    addRoundRect(RectF(66f, 44f, 75f, 120f), 4f, 4f, Path.Direction.CW)
-                    addRoundRect(RectF(36f, 121f, 49f, 224f), 6f, 6f, Path.Direction.CW)
-                    addRoundRect(RectF(51f, 121f, 64f, 224f), 6f, 6f, Path.Direction.CW)
+                val outline = Stroke(1.45f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                val ink = if (colors.isDark) Color(0xFFA8B7AB) else Color(0xFF576057)
+                val figure = bodyArtwork(back)
+                figure.forEach { part ->
+                    part.fill?.let { source ->
+                        val fill = if (!colors.isDark) {
+                            source
+                        } else if (source.red < .89f) {
+                            Color(0xFF34423D)
+                        } else {
+                            Color(0xFF405048)
+                        }
+                        drawPath(part.geometry, fill)
+                    }
+                    val stroke = if (part.detailInk != null && colors.isDark) Color(0xFF83978B) else part.detailInk ?: ink
+                    drawPath(part.geometry, stroke, style = outline)
                 }
-                drawPath(silhouette.asComposePath(), colors.surfaceStrong)
-                drawPath(silhouette.asComposePath(), colors.textSecondary, style = outline)
-                bodyShapes(back).forEach { region ->
-                    val observation = observations.find { it.region == region.id }
+                figure.forEach { part ->
+                    val observation = observations.find { it.region == part.id }
                     when {
-                        (observation?.pain ?: 0) > 0 -> drawPath(region.path.asComposePath(), colors.ink)
+                        (observation?.pain ?: 0) > 0 -> drawPath(part.geometry, colors.ink)
 
                         (observation?.stiffness ?: 0) > 0 -> drawPath(
-                            region.path.asComposePath(),
+                            part.geometry,
                             colors.ink,
-                            style = Stroke(Dimens.chartOutline.toPx() / scale)
+                            style = Stroke(2.dp.toPx() / scale, cap = StrokeCap.Round, join = StrokeJoin.Round)
                         )
                     }
                 }

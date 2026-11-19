@@ -31,16 +31,21 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import com.emmah.inshape.R
 import com.emmah.inshape.data.weekStart
+import com.emmah.inshape.feature.checkin.BodyLevel
+import com.emmah.inshape.feature.checkin.bodyLevelOf
+import com.emmah.inshape.ui.components.DisclosureRow
 import com.emmah.inshape.ui.components.KeyValueRow
 import com.emmah.inshape.ui.components.ResponsiveRow
-import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
@@ -83,7 +88,7 @@ fun ColumnScope.ExerciseChart(points: List<MetricPoint>, unit: String) {
         Canvas(
             Modifier.weight(1f).height(Dimens.chartExercise).padding(Dimens.innerSmall).semantics {
                 contentDescription =
-                    "Exercise history, $unit. Use View data values for all recorded points."
+                    "Exercise history, $unit. Use Data values for all recorded points."
             }.pointerInput(points) {
                 detectTapGestures { tap ->
                     selected =
@@ -163,7 +168,7 @@ fun ColumnScope.ExerciseChart(points: List<MetricPoint>, unit: String) {
             color = colors.textSecondary
         )
     }
-    TextAction(if (showData) "Hide data values" else "View data values", { showData = !showData })
+    DisclosureRow("Data values", showData, { showData = !showData })
     if (showData) {
         points.forEachIndexed { index, point ->
             val value = point.value?.stripTrailingZeros()?.toPlainString()?.let { "$it $unit" } ?: "Not recorded"
@@ -190,7 +195,7 @@ fun ColumnScope.AttendanceChart(weeks: List<WeekCount>, goal: Int?, today: Local
             Dimens.chartAttendance
         ).padding(top = Dimens.innerTiny).semantics {
             contentDescription =
-                "Weekly workout counts. The current week is incomplete. Use View weekly counts for all values."
+                "Weekly workout counts. The current week is incomplete. Use Weekly counts for all values."
         }
     ) {
         val slot = size.width / weeks.size.coerceAtLeast(1)
@@ -237,7 +242,7 @@ fun ColumnScope.AttendanceChart(weeks: List<WeekCount>, goal: Int?, today: Local
                     if (week.count == 0 ||
                         (goal != null && week.count < goal)
                     ) {
-                        colors.surfaceStrong
+                        colors.inactiveMark
                     } else {
                         colors.ink
                     },
@@ -260,13 +265,13 @@ fun ColumnScope.AttendanceChart(weeks: List<WeekCount>, goal: Int?, today: Local
         }
     }
     var details by remember { mutableStateOf(false) }
-    TextAction(if (details) "Hide weekly counts" else "View weekly counts", { details = !details })
+    DisclosureRow("Weekly counts", details, { details = !details })
     if (details) {
         weeks.forEach {
-            Text(
-                "Week of ${it.week.displayDate()}: ${pluralStringResource(R.plurals.workout_count, it.count, it.count)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.textSecondary
+            KeyValueRow(
+                "Week of ${it.week.displayDate()}",
+                pluralStringResource(R.plurals.workout_count, it.count, it.count),
+                modifier = Modifier.semantics(mergeDescendants = true) {}
             )
         }
     }
@@ -275,52 +280,66 @@ fun ColumnScope.AttendanceChart(weeks: List<WeekCount>, goal: Int?, today: Local
 @Composable
 fun ObservationChart(points: List<ObservationPoint>, modifier: Modifier = Modifier) {
     val colors = InShapeTheme.colors
+    val labelStyle = MaterialTheme.typography.labelSmall.copy(color = colors.textSecondary)
+    val measurer = rememberTextMeasurer()
+    val labels = BodyLevel.entries.associateWith { measurer.measure(it.label, style = labelStyle) }
+    val series = listOf(points.map { bodyLevelOf(it.pain) }, points.map { bodyLevelOf(it.stiffness) })
+    val lastLevels = series.mapNotNull { values ->
+        values.filterNotNull().distinct().singleOrNull()?.let { it to values.indexOfLast { level -> level != null } }
+    }.distinct()
+    val chartHeight = Dimens.chartObservation * maxOf(1f, LocalDensity.current.fontScale / 1.3f)
     Canvas(
-        modifier.fillMaxWidth().height(
-            Dimens.chartObservation
-        ).padding(Dimens.innerSmall).semantics {
+        modifier.fillMaxWidth().height(chartHeight).semantics {
             contentDescription =
-                "Pain, solid line. Stiffness, dashed line. Scale 0 to 10. Use View values for all observations."
+                "Pain, solid line. Stiffness, dashed line. Levels: none, mild, medium, strong. Use Values for all observations."
         }
     ) {
-        fun x(index: Int) = if (points.size ==
-            1
-        ) {
-            size.width / 2
-        } else {
-            index.toFloat() / points.lastIndex * size.width
+        val labelWidth = labels.values.maxOf { it.size.width }.toFloat()
+        val labelHeight = labels.values.maxOf { it.size.height }.toFloat()
+        val startX = labelWidth + Dimens.innerSmall.toPx()
+        val endX = size.width - if (lastLevels.isEmpty()) Dimens.chartDot.toPx() else labelWidth + Dimens.innerSmall.toPx()
+        val chartWidth = (endX - startX).coerceAtLeast(0f)
+        fun x(index: Int) = startX + chartWidth * if (points.size <= 1) .5f else index.toFloat() / points.lastIndex
+        fun y(level: BodyLevel) = labelHeight / 2 +
+            (size.height - labelHeight) * (1 - level.stored.toFloat() / BodyLevel.Strong.stored)
+        labels.forEach { (level, text) ->
+            val y = y(level)
+            drawText(text, topLeft = Offset(0f, y - text.size.height / 2f))
+            drawLine(colors.divider, Offset(startX, y), Offset(endX, y), Dimens.line.toPx())
         }
-        fun y(value: Int) = size.height * (1 - value / 10f)
-        drawChartGrid(colors.divider)
-        listOf(false, true).forEach { stiffness ->
-            val values = points.map { if (stiffness) it.stiffness else it.pain }
-            val color = colors.ink
-            val effect = if (stiffness) {
-                PathEffect.dashPathEffect(
-                    floatArrayOf(Dimens.chartDash.toPx(), Dimens.chartGap.toPx())
-                )
+        series.forEachIndexed { seriesIndex, values ->
+            val flat = values.filterNotNull().distinct().size <= 1
+            val last = values.indexOfLast { it != null }
+            val effect = if (seriesIndex == 1) {
+                PathEffect.dashPathEffect(floatArrayOf(Dimens.chartDash.toPx(), Dimens.chartGap.toPx()))
             } else {
                 null
             }
-            values.forEachIndexed { index, value ->
-                if (value != null) {
-                    values.getOrNull(index - 1)?.let { previous ->
+            values.forEachIndexed { index, level ->
+                if (level != null) {
+                    val point = Offset(x(index), y(level))
+                    val previous = values.getOrNull(index - 1)
+                    if (!flat && previous != null) {
                         drawLine(
-                            color,
+                            colors.ink,
                             Offset(x(index - 1), y(previous)),
-                            Offset(x(index), y(value)),
+                            point,
                             Dimens.chartLine.toPx(),
                             cap = StrokeCap.Round,
                             pathEffect = effect
                         )
                     }
-                    if (index == values.indexOfLast { it != null } ||
-                        (values.getOrNull(index - 1) == null && values.getOrNull(index + 1) == null)
-                    ) {
-                        drawCircle(color, Dimens.chartDot.toPx(), Offset(x(index), y(value)))
+                    val isolated = previous == null && values.getOrNull(index + 1) == null
+                    if (flat || index == last || isolated) {
+                        drawCircle(colors.ink, Dimens.chartDot.toPx(), point)
                     }
                 }
             }
+        }
+        lastLevels.groupBy { it.first }.forEach { (level, entries) ->
+            val text = labels.getValue(level)
+            val labelX = x(entries.maxOf { it.second }) + Dimens.innerSmall.toPx()
+            drawText(text, topLeft = Offset(labelX, y(level) - text.size.height / 2f))
         }
     }
 }

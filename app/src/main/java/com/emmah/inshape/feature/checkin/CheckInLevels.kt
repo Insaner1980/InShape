@@ -15,6 +15,16 @@ fun effortLevelOf(value: Int?): EffortLevel? = when (value) {
     else -> EffortLevel.Hard
 }
 
+enum class EnergyLevel(val key: String, val label: String) {
+    Low("LOW", "Low"),
+    Ok("OK", "OK"),
+    Good("GOOD", "Good");
+
+    companion object {
+        fun fromKey(key: String?): EnergyLevel? = entries.find { it.key == key }
+    }
+}
+
 enum class BodyLevel(val label: String, val stored: Int) { None("None", 0), Mild("Mild", 2), Medium("Medium", 5), Strong("Strong", 8) }
 fun bodyLevelOf(value: Int?): BodyLevel? = when (value) {
     null -> null
@@ -27,8 +37,8 @@ fun bodyLevelOf(value: Int?): BodyLevel? = when (value) {
 @Composable
 fun BodyLevelPills(pain: Int?, stiffness: Int?, modifier: Modifier = Modifier) {
     ActionRow(modifier) {
-        bodyLevelOf(pain)?.let { Pill("Pain ${it.label.lowercase()}", outlined = true) }
-        bodyLevelOf(stiffness)?.let { Pill("Stiffness ${it.label.lowercase()}", outlined = true) }
+        bodyLevelOf(pain)?.let { Pill("Pain ${it.label.lowercase()}") }
+        bodyLevelOf(stiffness)?.let { Pill("Stiffness ${it.label.lowercase()}") }
         if (pain == null && stiffness == null) Text("Not recorded", style = MaterialTheme.typography.bodyMedium)
     }
 }

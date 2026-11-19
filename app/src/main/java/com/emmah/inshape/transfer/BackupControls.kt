@@ -12,8 +12,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.emmah.inshape.JournalViewModel
+import com.emmah.inshape.R
 import com.emmah.inshape.ui.components.ConfirmDialog
 import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListCardScope
@@ -85,7 +88,8 @@ fun ColumnScope.BackupControls(vm: JournalViewModel, lastBackupAt: String?, addi
         additionalRows()
     }
     if (state.busy) LinearProgressIndicator()
-    if (state.message.isNotBlank() && state.message != "Backup saved successfully." && state.message != "Export cancelled.") {
+    val alreadyReported = state.message == "Backup saved successfully." || state.message == "Export cancelled."
+    if (state.message.isNotBlank() && !alreadyReported && state.backup == null) {
         Text(
             state.message,
             style = MaterialTheme.typography.bodySmall,
@@ -95,20 +99,23 @@ fun ColumnScope.BackupControls(vm: JournalViewModel, lastBackupAt: String?, addi
     val backup = state.backup
     if (backup != null && !state.busy) {
         val data = backup.staged.data
-        val activeMessage = if (data.active == null) {
-            "The backup has no active workout."
-        } else {
-            "The backup's unfinished workout will become active."
-        }
+        val workouts = data.workouts.size
+        val exercises = data.exercises.size
+        val routines = data.routines.size
+        val photos = data.photos.size
+        val active = if (data.active == null) "" else stringResource(R.string.backup_unfinished_workout)
         ConfirmDialog(
             "Replace the current journal?",
-            "Backup created ${backup.staged.manifest.createdAt.instantLabel(zone, uses24Hours)}. " +
-                "It contains ${data.workouts.size} workout records, ${data.exercises.size} exercises, " +
-                "${data.routines.size} routines and ${data.photos.size} photos.\n\n" +
-                "All current journal records and drafts will be replaced. $activeMessage\n\n" +
-                "Health sharing and read capabilities will be off. Restored reminders will stay paused " +
-                "until activated. Existing pending Health Connect deletions remain pending.",
+            stringResource(
+                R.string.backup_replace_message,
+                pluralStringResource(R.plurals.workout_count, workouts, workouts),
+                pluralStringResource(R.plurals.exercise_count, exercises, exercises),
+                pluralStringResource(R.plurals.routine_count, routines, routines),
+                pluralStringResource(R.plurals.photo_count, photos, photos),
+                active
+            ),
             "Replace journal",
+            destructive = true,
             { transfer.restore(backup) },
             transfer::cancelRestore
         )

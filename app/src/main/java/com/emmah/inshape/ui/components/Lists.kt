@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -23,7 +24,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
@@ -47,6 +52,8 @@ fun ListCard(modifier: Modifier = Modifier, content: ListCardScope.() -> Unit) {
     }
 }
 
+// Optional layout and content slots keep call sites explicit.
+@Suppress("LongParameterList")
 @Composable
 fun ListRow(
     title: String,
@@ -57,7 +64,8 @@ fun ListRow(
     onClick: (() -> Unit)? = null,
     enabled: Boolean = true,
     titleStyle: TextStyle = MaterialTheme.typography.bodyLarge,
-    showChevron: Boolean = trailing == null && onClick != null
+    showChevron: Boolean = trailing == null && onClick != null,
+    details: (@Composable () -> Unit)? = null
 ) {
     val large = LocalDensity.current.fontScale >= 1.3f
     val rowModifier = modifier.fillMaxWidth().heightIn(
@@ -95,6 +103,7 @@ fun ListRow(
                     color = InShapeTheme.colors.textSecondary
                 )
             }
+            details?.invoke()
             if (large) trailing?.invoke()
         }
         if (!large) trailing?.invoke()
@@ -127,5 +136,25 @@ fun InitialsTile(text: String, modifier: Modifier = Modifier) {
                 color = InShapeTheme.colors.textSecondary
             )
         }
+    }
+}
+
+@Composable
+fun DisclosureRow(label: String, expanded: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = InShapeTheme.colors
+    Row(
+        modifier.fillMaxWidth().heightIn(min = Dimens.rowMin)
+            .clickable(role = Role.Button, onClick = onToggle)
+            .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Dimens.itemGap)
+    ) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, color = colors.text)
+        Icon(
+            Icons.Outlined.KeyboardArrowDown,
+            null,
+            Modifier.rotate(if (expanded) 180f else 0f),
+            tint = colors.textSecondary
+        )
     }
 }

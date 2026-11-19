@@ -80,6 +80,8 @@ class DemoActivity : ComponentActivity() {
                     AppNavigation(
                         host.container,
                         initialRoute = DemoFixtures.route(requested),
+                        musicFixture = DemoMusic.catalog.takeIf { requested in DemoMusic.states },
+                        initialMusic = if (requested == "WorkoutWithMusic") DemoMusic.catalog.playlists.first().tracks else emptyList(),
                         vm = vm
                     )
                 } else {

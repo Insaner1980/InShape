@@ -15,8 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
@@ -37,21 +37,16 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import com.emmah.inshape.JournalViewModel
+import com.emmah.inshape.data.MeasurementBasis
 import com.emmah.inshape.data.SessionSet
 import com.emmah.inshape.ui.components.AppMenu
+import com.emmah.inshape.ui.components.DialogAction
+import com.emmah.inshape.ui.components.MenuAction
 import com.emmah.inshape.ui.components.NumberField
-import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.InShapeType
-
-private fun loadLabel(basis: String) = when (basis) {
-    "kg" -> "kg"
-    "assistance_kg" -> "Assistance kg"
-    "level" -> "Level"
-    else -> "Load"
-}
 
 @Composable
 fun SetTableHeader(basis: String, modifier: Modifier = Modifier) {
@@ -67,7 +62,7 @@ fun SetTableHeader(basis: String, modifier: Modifier = Modifier) {
                     color = InShapeTheme.colors.textSecondary
                 )
                 Text(
-                    loadLabel(basis),
+                    MeasurementBasis.fromKey(basis).columnLabel,
                     Modifier.weight(1f),
                     style = MaterialTheme.typography.labelSmall,
                     color = InShapeTheme.colors.textSecondary,
@@ -93,13 +88,21 @@ fun SetTableHeader(basis: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun SetRow(set: SessionSet, number: Int, basis: String, vm: JournalViewModel, modifier: Modifier = Modifier, highlighted: Boolean = false) {
+fun SetRow(
+    set: SessionSet,
+    number: Int,
+    basis: String,
+    vm: JournalViewModel,
+    modifier: Modifier = Modifier,
+    highlighted: Boolean = false,
+    onRemove: () -> Unit = {}
+) {
     var load by rememberSaveable(set.id) { mutableStateOf(set.rawLoad) }
     var reps by rememberSaveable(set.id) { mutableStateOf(set.rawReps) }
     var editing by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     val complete = set.completedAt != null
-    val unit = loadLabel(basis)
+    val unit = MeasurementBasis.fromKey(basis).columnLabel
     val colors = InShapeTheme.colors
 
     @Composable fun Options() {
@@ -119,10 +122,14 @@ fun SetRow(set: SessionSet, number: Int, basis: String, vm: JournalViewModel, mo
                 )
             }
             AppMenu(menu, { menu = false }) {
-                DropdownMenuItem({ Text("Remove set $number") }, {
+                MenuAction("Remove set $number", Icons.Outlined.Delete, {
                     menu = false
-                    vm.write { removeSet(set.id) }
-                })
+                    vm.write {
+                        removeSet(set.id)
+                        vm.container.markSetRemoved()
+                        onRemove()
+                    }
+                }, destructive = true)
             }
         }
     }
@@ -238,7 +245,7 @@ fun SetRow(set: SessionSet, number: Int, basis: String, vm: JournalViewModel, mo
                 NumberField(correctionReps, { correctionReps = it }, "Reps")
             }
         }, confirmButton = {
-            TextAction("Update", {
+            DialogAction("Update", {
                 vm.write {
                     correctCompletedSet(set.id, correctionLoad, correctionReps)
                     load =
@@ -248,7 +255,7 @@ fun SetRow(set: SessionSet, number: Int, basis: String, vm: JournalViewModel, mo
                 }
             })
         }, dismissButton = {
-            TextAction("Cancel", {
+            DialogAction("Cancel", {
                 editing =
                     false
             })

@@ -79,7 +79,7 @@ fun RecordedTimePicker(
         mutableStateOf(initialOffset?.takeIf { chosenTime == time && it in overlapOffsets })
     }
     val confirm: @Composable () -> Unit = {
-        TextAction(
+        DialogAction(
             "Done",
             {
                 val local = chosenTime.toString()
@@ -167,7 +167,7 @@ fun RecordedDatePicker(
         DatePickerState(Locale.UK, initialSelectedDateMillis = date.pickerMillis())
     }
     PickerDialog(onDismiss, modifier = modifier, confirm = {
-        TextAction(
+        DialogAction(
             confirm,
             { state.selectedDateMillis?.let { onDate(it.pickerDay().toString()) } },
             enabled = state.selectedDateMillis != null
@@ -222,8 +222,8 @@ fun RecordedDateRangePicker(
     val selectedStart = state.selectedStartDateMillis?.pickerDay()
     val selectedEnd = state.selectedEndDateMillis?.pickerDay()
     PickerDialog(onDismiss, modifier = modifier, fullHeight = true, confirm = {
-        TextAction(
-            "Select period",
+        DialogAction(
+            "Apply",
             { if (selectedStart != null && selectedEnd != null) onRange(selectedStart, selectedEnd) },
             enabled = selectedStart != null && selectedEnd != null
         )
@@ -265,7 +265,7 @@ private fun PickerDialog(
                     horizontalArrangement = Arrangement.spacedBy(Dimens.itemGap, Alignment.End),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextAction("Cancel", onDismiss)
+                    DialogAction("Cancel", onDismiss)
                     confirm()
                 }
             }

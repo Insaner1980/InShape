@@ -1,9 +1,14 @@
 package com.emmah.inshape.widget
 
 import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetProviderInfo.WIDGET_CATEGORY_HOME_SCREEN
 import android.content.ComponentName
 import android.content.Context
+import android.os.Build
+import android.util.Log
+import androidx.collection.intSetOf
 import androidx.glance.appwidget.GlanceAppWidgetManager
+import androidx.glance.appwidget.GlanceAppWidgetManager.Companion.SET_WIDGET_PREVIEWS_RESULT_RATE_LIMITED
 import androidx.glance.appwidget.updateAll
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -15,6 +20,7 @@ import androidx.work.WorkerParameters
 import java.time.Duration
 import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
 
 object WidgetUpdater {
     fun hasWidgets(context: Context) = AppWidgetManager.getInstance(
@@ -64,6 +70,30 @@ object WidgetUpdater {
             "widget-fallback"
         ).forEach(work::cancelUniqueWork)
     }
+
+    // Preview publishing is optional and platform failures must not prevent the widget from working.
+    @Suppress("TooGenericExceptionCaught")
+    suspend fun publishPreview(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return
+        val component = ComponentName(context, InShapeWidgetReceiver::class.java)
+        try {
+            val provider = AppWidgetManager.getInstance(context).installedProviders.firstOrNull { it.provider == component }
+            if (provider != null && provider.generatedPreviewCategories and WIDGET_CATEGORY_HOME_SCREEN == 0) {
+                val published = GlanceAppWidgetManager(context).setWidgetPreviews(
+                    InShapeWidgetReceiver::class,
+                    intSetOf(WIDGET_CATEGORY_HOME_SCREEN)
+                )
+                if (published == SET_WIDGET_PREVIEWS_RESULT_RATE_LIMITED) {
+                    Log.d("InShapeWidget", "Launcher preview update was rate limited")
+                }
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: RuntimeException) {
+            Log.w("InShapeWidget", "Could not publish launcher preview", failure)
+        }
+    }
+
     suspend fun requestPin(context: Context): Boolean = GlanceAppWidgetManager(context).requestPinGlanceAppWidget(
         InShapeWidgetReceiver::class.java,
         preview = InShapeWidget(previewOnly = true)

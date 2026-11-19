@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="392" viewBox="0 0 240 392">
+<g stroke="#576057" stroke-width="1.45" stroke-linejoin="round" stroke-linecap="round"><g><path id="left_shoulder" fill="#dce1cd" d="M88 78 Q80 78 73 84 Q65 92 64 105 Q70 108 76 105 Q83 102 87 94 Z"/>
+<path id="left_upper_arm" fill="#e9ecdf" d="M64 105 Q69 108 76 105 Q74 119 66 140 Q62 143 56 140 Q58 119 64 105Z"/>
+<path id="left_elbow" fill="#dce2d2" d="M56 140 Q61 143 66 140 L64 152 Q60 155 54 151Z"/>
+<path id="left_forearm_wrist" fill="#e8ebde" d="M54 151 Q60 155 64 152 Q64 167 57 183 L55 195 Q58 201 54 209 Q52 212 51 206 Q50 216 47 216 Q43 217 41 211 Q39 205 43 195 L46 190 Q47 170 54 151Z"/>
+<path id="left_hip" fill="#e0e5d6" d="M84 168 Q102 170 120 178 L120 194 Q114 194 110 199 Q98 193 80 194 Q79 181 84 168Z"/>
+<path id="left_thigh" fill="#e9ecde" d="M80 194 Q98 193 110 199 Q113 220 108 249 Q106 263 105 275 Q98 279 89 275 Q84 260 80 237 Q76 214 80 194Z"/>
+<path id="left_knee" fill="#f0f1e7" d="M89 275 Q98 279 105 275 Q108 285 105 295 Q98 299 91 295 Q88 286 89 275Z"/>
+<path id="left_calf_shin" fill="#e3e8d8" d="M91 295 Q98 299 105 295 Q109 307 106 322 Q103 338 102 353 Q98 356 93 353 Q94 339 90 324 Q86 306 91 295Z"/>
+<path id="left_ankle_foot" fill="#e9ecdf" d="M93 353 Q98 356 102 353 L103 366 Q105 371 104 375 Q101 379 95 379 L83 379 Q79 378 81 374 L89 365 Q92 361 93 353Z"/></g>
+<g transform="translate(240 0) scale(-1 1)"><path id="right_shoulder" fill="#dce1cd" d="M88 78 Q80 78 73 84 Q65 92 64 105 Q70 108 76 105 Q83 102 87 94 Z"/>
+<path id="right_upper_arm" fill="#e9ecdf" d="M64 105 Q69 108 76 105 Q74 119 66 140 Q62 143 56 140 Q58 119 64 105Z"/>
+<path id="right_elbow" fill="#dce2d2" d="M56 140 Q61 143 66 140 L64 152 Q60 155 54 151Z"/>
+<path id="right_forearm_wrist" fill="#e8ebde" d="M54 151 Q60 155 64 152 Q64 167 57 183 L55 195 Q58 201 54 209 Q52 212 51 206 Q50 216 47 216 Q43 217 41 211 Q39 205 43 195 L46 190 Q47 170 54 151Z"/>
+<path id="right_hip" fill="#e0e5d6" d="M84 168 Q102 170 120 178 L120 194 Q114 194 110 199 Q98 193 80 194 Q79 181 84 168Z"/>
+<path id="right_thigh" fill="#e9ecde" d="M80 194 Q98 193 110 199 Q113 220 108 249 Q106 263 105 275 Q98 279 89 275 Q84 260 80 237 Q76 214 80 194Z"/>
+<path id="right_knee" fill="#f0f1e7" d="M89 275 Q98 279 105 275 Q108 285 105 295 Q98 299 91 295 Q88 286 89 275Z"/>
+<path id="right_calf_shin" fill="#e3e8d8" d="M91 295 Q98 299 105 295 Q109 307 106 322 Q103 338 102 353 Q98 356 93 353 Q94 339 90 324 Q86 306 91 295Z"/>
+<path id="right_ankle_foot" fill="#e9ecdf" d="M93 353 Q98 356 102 353 L103 366 Q105 371 104 375 Q101 379 95 379 L83 379 Q79 378 81 374 L89 365 Q92 361 93 353Z"/></g><path id="upper_back" fill="#e2e6d7" d="M88 78 Q104 73 109 68 Q120 72 131 68 Q137 74 152 78 Q153 93 157 108 Q154 119 147 132 Q120 143 93 132 Q86 118 83 108 Q87 94 88 78Z"/>
+<path id="lower_back" fill="#edf0e4" d="M93 132 Q120 143 147 132 Q140 149 156 168 Q138 170 120 178 Q102 170 84 168 Q99 149 93 132Z"/><path id="neck" fill="#d9dfce" d="M110 49 Q112 61 109 68 Q120 78 131 68 Q128 62 130 49Z"/><path fill="#eceee4" d="M102 28 Q102 9 119 9 Q137 8 138 28 L137 41 Q135 51 128 56 Q120 61 112 56 Q104 51 103 42 Q99 40 100 34 Q100 31 102 32Z"/><path fill="#b5beaa" d="M102 32 Q100 10 117 9 Q135 7 138 24 L137 40 Q133 44 130 50 Q121 46 111 50 Q107 43 103 40Z"/><path fill="none" stroke="#bbc4b4" d="M104 88 Q107 97 110 102 M136 88 Q133 97 130 102 M120 90v30 M120 144v17"/></g>
+</svg>

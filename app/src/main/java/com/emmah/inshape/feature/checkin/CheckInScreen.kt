@@ -4,12 +4,12 @@
 package com.emmah.inshape.feature.checkin
 
 import android.text.format.DateFormat
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -21,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
@@ -31,6 +32,8 @@ import com.emmah.inshape.data.CheckIn
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.ui.components.ButtonSize
 import com.emmah.inshape.ui.components.ConfirmDialog
+import com.emmah.inshape.ui.components.DisclosureRow
+import com.emmah.inshape.ui.components.FilterPill
 import com.emmah.inshape.ui.components.InShapeCard
 import com.emmah.inshape.ui.components.Page
 import com.emmah.inshape.ui.components.PrimaryButton
@@ -175,10 +178,15 @@ fun CheckInScreen(
                     )
                 }
                 editingRegion = region
-            }, controls = { SegmentedControl(listOf("Front", "Back"), if (back) 1 else 0, { back = it == 1 }) })
+            }, controls = {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.innerSmall, Alignment.End)) {
+                    FilterPill("Front", !back, { back = false })
+                    FilterPill("Back", back, { back = true })
+                }
+            })
             form.observations.forEach { row ->
                 val expanded = editingRegion == row.region
-                InShapeCard(borderColor = if (expanded) colors.outline else colors.divider, gap = Dimens.innerSmall) {
+                InShapeCard(inset = true, gap = Dimens.innerSmall) {
                     com.emmah.inshape.ui.components.ListRow(
                         bodyRegions.find { it.id == row.region }?.label ?: row.region,
                         trailing = {
@@ -195,7 +203,7 @@ fun CheckInScreen(
                         onClick = {
                             editingRegion = if (expanded) null else row.region
                         },
-                        titleStyle = MaterialTheme.typography.bodyLarge
+                        titleStyle = MaterialTheme.typography.titleMedium
                     )
                     if (!expanded) BodyLevelPills(row.pain, row.stiffness)
                     if (expanded) {
@@ -240,14 +248,12 @@ fun CheckInScreen(
                 })
             }
         }
-        TextAction(if (more) "Hide energy and notes" else "Add energy and notes", {
-            more = !more
-        }, icon = if (more) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown)
+        DisclosureRow("Energy and notes", more, { more = !more })
         if (more) {
             SectionHeader("Energy")
-            val energies = listOf("LOW", "OK", "GOOD")
-            SegmentedControl(listOf("Low", "OK", "Good"), energies.indexOf(form.checkIn.energy), {
-                val selected = energies[it]
+            val energies = EnergyLevel.entries
+            SegmentedControl(energies.map { it.label }, energies.indexOfFirst { it.key == form.checkIn.energy }, {
+                val selected = energies[it].key
                 edit(form.copy(checkIn = form.checkIn.copy(energy = selected.takeUnless { it == form.checkIn.energy })))
             })
             val note = listOf(form.checkIn.feelings, form.checkIn.note).filter(String::isNotBlank).joinToString("\n")
@@ -261,6 +267,7 @@ fun CheckInScreen(
             "Remove ${form.observations.size} areas?",
             "The areas will be removed when you save this check-in.",
             "Remove",
+            destructive = true,
             {
                 edit(form.copy(observations = emptyList()))
                 showBody = false

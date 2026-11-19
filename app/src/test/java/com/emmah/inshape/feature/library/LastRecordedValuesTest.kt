@@ -57,7 +57,7 @@ class LastRecordedValuesTest {
 
     @Test fun supportsLevelDurationAndCompletionWithoutInventingLoads() {
         assertEquals(
-            "level 4",
+            "Level 4",
             lastRecordedValues(
                 listOf(workout("2026-11-13", "level", listOf("4")))
             )["exercise"]?.value

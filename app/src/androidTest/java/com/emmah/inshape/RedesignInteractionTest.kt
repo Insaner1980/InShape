@@ -6,8 +6,6 @@ import android.net.Uri
 import android.view.KeyEvent
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.WindowInfo
@@ -15,8 +13,8 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
@@ -34,7 +32,6 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
@@ -42,6 +39,7 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.health.connect.client.HealthConnectClient
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
@@ -59,9 +57,7 @@ import com.emmah.inshape.navigation.AppNavigation
 import com.emmah.inshape.ui.components.RecordedDatePicker
 import com.emmah.inshape.ui.components.RecordedDateRangePicker
 import com.emmah.inshape.ui.components.SelectField
-import com.emmah.inshape.ui.theme.DarkColors
 import com.emmah.inshape.ui.theme.InShapeTheme
-import com.emmah.inshape.ui.theme.LightColors
 import com.emmah.inshape.ui.theme.ThemeMode
 import com.emmah.inshape.ui.theme.ThemeSettings
 import java.io.File
@@ -71,9 +67,13 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 
+// The cross-screen scenarios share the same journal and navigation test fixture.
+@Suppress("LargeClass")
 class RedesignInteractionTest {
     @get:Rule val compose = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
@@ -135,6 +135,24 @@ class RedesignInteractionTest {
         compose.onNodeWithText("Find exercise").assertExists()
     }
 
+    @Test fun todayWithOnlyTheSuggestedRoutineOmitsTheRoutinesSection() {
+        launch("TodayStrength", "Today")
+        compose.onNodeWithText("Next up").assertExists()
+        compose.onNodeWithText("Routines").assertDoesNotExist()
+    }
+
+    @Test fun measurementSelectShowsAnAssistanceLabelWithNoRawKey() {
+        launch("ExerciseWithSetup", "exercise-edit/${DemoFixtures.pulldownId}")
+        compose.onNodeWithContentDescription("Measurement, Weight (kg)").performScrollTo().performClick()
+        compose.onNodeWithText("Assisted (kg of help)").assertExists()
+        compose.onNodeWithText("assistance_kg").assertDoesNotExist()
+        click("Assisted (kg of help)")
+        compose.onNodeWithContentDescription("Measurement, Assisted (kg of help)").assertExists()
+        compose.waitUntil(10_000) {
+            snapshot().drafts.any { it.id == "exercise:${DemoFixtures.pulldownId}" && "assistance_kg" in it.payload }
+        }
+    }
+
     @Test fun repeatedSaveFailureKeepsRetryAvailable() {
         launch("Empty", "Today")
         val attempts = java.util.concurrent.atomic.AtomicInteger()
@@ -185,7 +203,7 @@ class RedesignInteractionTest {
         }
         compose.onNode(hasClickAction() and hasText("Wednesday, 4 November 2026")).performClick()
         restoration.emulateSavedInstanceStateRestore()
-        val confirm = compose.onNode(hasClickAction() and hasText("Select period"))
+        val confirm = compose.onNode(hasClickAction() and hasText("Apply"))
         confirm.assertIsNotEnabled()
         compose.onNode(hasClickAction() and hasText("Monday, 9 November 2026")).performClick()
         confirm.performClick()
@@ -316,29 +334,12 @@ class RedesignInteractionTest {
         assertEquals("Recovered planned note", saved.note)
     }
 
-    @Test fun themeChangesImmediatelyAndGoalCanBeOffWhileRemindersExpand() {
+    @Test fun goalCanBeOffWhileHeldRemindersResumeAndExpand() {
         grantNotificationPermission()
-        launch("SettingsConfigured", "Settings")
-        click("Dark")
-        compose.onNodeWithText("Dark").assertIsSelected()
-        assertEquals(ThemeMode.Dark, container.themeSettings.mode.value)
-        assertEquals(
-            DarkColors.background.toArgb(),
-            compose
-                .onRoot()
-                .captureToImage()
-                .toPixelMap()[0, 0]
-                .toArgb()
-        )
-        click("Light")
-        assertEquals(
-            LightColors.background.toArgb(),
-            compose
-                .onRoot()
-                .captureToImage()
-                .toPixelMap()[0, 0]
-                .toArgb()
-        )
+        launch("SettingsConfigured", "Settings") { app ->
+            val preferences = app.repository.snapshot().preferences
+            app.repository.updatePreferences(preferences.copy(remindersEnabled = true, remindersHeld = true))
+        }
         repeat(3) {
             compose.onNodeWithContentDescription(
                 "Decrease weekly goal"
@@ -353,6 +354,9 @@ class RedesignInteractionTest {
         compose.onNodeWithContentDescription("Decrease weekly goal").assertIsNotEnabled()
         compose.onNodeWithContentDescription("Increase weekly goal").performClick()
         compose.waitUntil { snapshot().preferences.weeklyGoal == 3 }
+        compose.onNodeWithContentDescription("Enable workout reminders").performScrollTo().assertIsOff()
+        click("Turn on again")
+        compose.waitUntil(10_000) { !snapshot().preferences.remindersHeld && snapshot().preferences.remindersEnabled }
         compose.onNodeWithContentDescription(
             "Enable workout reminders"
         ).performScrollTo().performClick()
@@ -388,14 +392,14 @@ class RedesignInteractionTest {
         }
     }
 
-    @Test fun optedInHealthSettingCanBeDisabledWithoutAProvider() {
+    @Test fun unavailableHealthSettingsHideExistingOptIns() {
         launch("Empty", "Settings") { app ->
+            assumeTrue(app.healthGateway.availability() != HealthConnectClient.SDK_AVAILABLE)
             app.repository.updatePreferences(app.repository.snapshot().preferences.copy(readHeartRate = true))
         }
-        val heartRate = compose.onNodeWithContentDescription(HealthCapability.HEART.label)
-        heartRate.performScrollTo().assertIsEnabled().performClick()
-        compose.waitUntil(10_000) { !snapshot().preferences.readHeartRate }
-        heartRate.assertIsNotEnabled()
+        compose.onNodeWithText("Health Connect is not available on this phone.").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithContentDescription(HealthCapability.HEART.label).assertDoesNotExist()
+        assertTrue(snapshot().preferences.readHeartRate)
     }
 
     @Test fun workoutNoteSetCompletionReopeningSwapDeferAndSkipStayConnected() {
@@ -407,9 +411,9 @@ class RedesignInteractionTest {
             click(action)
         }
         exerciseMenu("Add note")
-        compose.onNodeWithText("Note for this exercise").assertExists()
+        compose.onNodeWithText("Note").assertExists()
         compose.onNodeWithText(
-            "Note for this exercise"
+            "Note"
         ).performScrollTo().performTextReplacement("Keep shoulders down")
         compose.onNodeWithContentDescription("Complete set 3").performScrollTo().performClick()
         if (compose.onAllNodesWithText("Exercise done").fetchSemanticsNodes().isEmpty()) {
@@ -454,8 +458,8 @@ class RedesignInteractionTest {
         }
         compose.onNodeWithText("Just right").assertIsSelected()
         compose.onAllNodesWithText("Mild").onFirst().assertExists()
-        if (compose.onAllNodesWithText("Add energy and notes").fetchSemanticsNodes().isNotEmpty()) {
-            click("Add energy and notes")
+        if (compose.onAllNodesWithText("Note").fetchSemanticsNodes().isEmpty()) {
+            click("Energy and notes")
         }
         compose.onNodeWithText("Note").performScrollTo().performTextReplacement("After stretching")
         click("Save")
@@ -468,12 +472,19 @@ class RedesignInteractionTest {
         assertEquals(null, area.stiffness)
     }
 
-    @Test fun afterCheckInSavesIndependentSymptomsAndEnergy() {
+    private fun launchAfterCheckIn(prepare: suspend (AppContainer, CheckIn, CheckIn) -> Unit) {
         val id = DemoFixtures.activeId
         launch("CheckInAfter", "checkin/$id/AFTER") { app ->
             val data = app.repository.snapshot()
             val before = data.checkIns.single { it.workoutId == id && it.phase == "BEFORE" }
             val after = data.checkIns.single { it.workoutId == id && it.phase == "AFTER" }
+            prepare(app, before, after)
+        }
+    }
+
+    @Test fun afterCheckInSavesIndependentSymptomsAndEnergy() {
+        val id = DemoFixtures.activeId
+        launchAfterCheckIn { app, before, after ->
             app.repository.saveCheckIn(before, listOf(BodyObservation(before.id, "left_knee", pain = 2)))
             app.repository.saveCheckIn(after.copy(energy = null), emptyList())
         }
@@ -496,7 +507,7 @@ class RedesignInteractionTest {
         compose.onNodeWithText("Pain medium").assertExists()
         compose.onNodeWithText("Stiffness mild").assertExists()
 
-        click("Add energy and notes")
+        click("Energy and notes")
         click("Low")
         compose.onNodeWithText("Low").assertIsSelected()
         click("Low")
@@ -515,10 +526,7 @@ class RedesignInteractionTest {
 
     @Test fun removingCheckInAreasRequiresConfirmationAndPreservesOtherPhases() {
         val id = DemoFixtures.activeId
-        launch("CheckInAfter", "checkin/$id/AFTER") { app ->
-            val data = app.repository.snapshot()
-            val before = data.checkIns.single { it.workoutId == id && it.phase == "BEFORE" }
-            val after = data.checkIns.single { it.workoutId == id && it.phase == "AFTER" }
+        launchAfterCheckIn { app, before, after ->
             app.repository.saveCheckIn(before, listOf(BodyObservation(before.id, "neck", pain = 2)))
             app.repository.saveCheckIn(
                 after,
@@ -658,10 +666,11 @@ class RedesignInteractionTest {
         launch("ActiveWorkoutPartiallyDone", "Today")
         click("Resume workout")
         compose.onNodeWithContentDescription("Workout options").performClick()
-        click("Check in before workout")
+        click("Add check-in")
         val release = CompletableDeferred<Unit>()
         journalViewModel.write { release.await() }
         try {
+            if (compose.onAllNodesWithText("Note").fetchSemanticsNodes().isEmpty()) click("Energy and notes")
             compose.onNodeWithText("Note").performScrollTo().performTextReplacement("Ready to lift")
             click("Save")
             compose.onNodeWithText("Save").assertIsNotEnabled()

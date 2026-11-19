@@ -10,10 +10,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import androidx.glance.Button
 import androidx.glance.ButtonDefaults
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.Image
+import androidx.glance.ImageProvider
+import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.Action
 import androidx.glance.action.clickable
@@ -28,12 +32,14 @@ import androidx.glance.background
 import androidx.glance.color.ColorProvider
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
+import androidx.glance.layout.ContentScale
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
+import androidx.glance.layout.width
 import androidx.glance.layout.wrapContentHeight
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
@@ -54,6 +60,8 @@ class InShapeWidget(private val previewOnly: Boolean = false) : GlanceAppWidget(
     override val sizeMode = SizeMode.Responsive(
         setOf(DpSize(Dimens.widgetNarrow, Dimens.widgetHeight), DpSize(Dimens.widgetWide, Dimens.widgetHeight))
     )
+
+    override val previewSizeMode = sizeMode
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         if (previewOnly) {
@@ -112,9 +120,15 @@ private fun WidgetContent(state: WidgetState, open: Action, timer: RemoteViews?,
         color = ColorProvider(LightColors.textSecondary, DarkColors.textSecondary),
         fontSize = AppTypography.labelSmall.fontSize
     )
+    val wideIdle = !state.resume && LocalSize.current.width >= Dimens.widgetWide
+    val showBand = wideIdle && LocalContext.current.resources.configuration.fontScale < 1.3f
+    val background = if (wideIdle) {
+        GlanceModifier.background(ImageProvider(R.drawable.inshape_widget_idle), ContentScale.FillBounds)
+    } else {
+        GlanceModifier.background(ColorProvider(LightColors.background, DarkColors.surface))
+    }
     Column(
-        GlanceModifier.fillMaxSize()
-            .background(ColorProvider(LightColors.background, DarkColors.surface))
+        GlanceModifier.fillMaxSize().then(background)
             .cornerRadius(Dimens.cardPadding).clickable(open).padding(Dimens.inner),
         verticalAlignment = Alignment.Vertical.CenterVertically
     ) {
@@ -131,15 +145,26 @@ private fun WidgetContent(state: WidgetState, open: Action, timer: RemoteViews?,
             WidgetHeader(false, state.goal?.let { "${state.count} of $it" } ?: workoutCount, labelStyle)
             Spacer(GlanceModifier.height(Dimens.innerSmall))
             Text("No workout running", style = titleStyle)
-            Button(
-                "Start",
-                open,
-                modifier = GlanceModifier.height(Dimens.touch),
-                colors = ButtonDefaults.buttonColors(
-                    backgroundColor = ColorProvider(LightColors.ink, DarkColors.ink),
-                    contentColor = ColorProvider(LightColors.onInk, DarkColors.onInk)
+            Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Vertical.CenterVertically) {
+                Button(
+                    "Start",
+                    open,
+                    modifier = GlanceModifier.height(Dimens.touch),
+                    colors = ButtonDefaults.buttonColors(
+                        backgroundColor = ColorProvider(LightColors.ink, DarkColors.ink),
+                        contentColor = ColorProvider(LightColors.onInk, DarkColors.onInk)
+                    )
                 )
-            )
+                if (showBand) {
+                    Spacer(GlanceModifier.defaultWeight())
+                    Image(
+                        ImageProvider(R.drawable.art_widget_resistance_band),
+                        contentDescription = null,
+                        modifier = GlanceModifier.width(68.dp).height(Dimens.touch),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+            }
         }
     }
 }

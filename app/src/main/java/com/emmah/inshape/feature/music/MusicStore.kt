@@ -58,8 +58,9 @@ class MusicStore(context: Context, name: String, private val scope: CoroutineSco
         val tracks = dao.tracks()
         val byId = tracks.associateBy { it.id }
         val memberships = playlists.memberships().groupBy { it.playlistId }
-        val accessLost = source != null && (source.tree == unreachableSource || !hasGrant(source.tree.toUri()))
-        fun MusicTrack.withAccess() = if (accessLost) copy(available = false) else this
+        val accessLost = source != null && !hasGrant(source.tree.toUri())
+        val folderUnavailable = source != null && (accessLost || source.tree == unreachableSource)
+        fun MusicTrack.withAccess() = if (folderUnavailable) copy(available = false) else this
         MusicCatalog(
             source,
             tracks.filter { it.tree == source?.tree }.map { it.withAccess() },

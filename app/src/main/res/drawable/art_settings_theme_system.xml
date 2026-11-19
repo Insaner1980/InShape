@@ -1,0 +1,35 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="160dp" android:height="124dp" android:viewportWidth="160" android:viewportHeight="124">
+  <group>
+    <clip-path android:pathData="M12.0,0.0 H148.0 a12.0,12.0 0 0,1 12.0,12.0 V112.0 a12.0,12.0 0 0,1 -12.0,12.0 H12.0 a12.0,12.0 0 0,1 -12.0,-12.0 V12.0 a12.0,12.0 0 0,1 12.0,-12.0 Z" />
+    <path android:pathData="M0.0,0.0 h160.0 v124.0 h-160.0 Z" android:fillColor="#f8f8f3" />
+    <group>
+      <path android:pathData="M25 20l-5 5 5 5m-5-5h12" android:fillColor="#00000000" android:strokeColor="#3b4b42" android:strokeWidth="2.4" android:strokeLineCap="round" android:strokeLineJoin="round" />
+    </group>
+    <path android:pathData="M51.0,21.0 H100.0 a4.0,4.0 0 0,1 4.0,4.0 V25.0 a4.0,4.0 0 0,1 -4.0,4.0 H51.0 a4.0,4.0 0 0,1 -4.0,-4.0 V25.0 a4.0,4.0 0 0,1 4.0,-4.0 Z" android:fillColor="#8da58b" />
+    <path android:pathData="M16 42h128" android:fillColor="#000000" android:strokeColor="#c7d0c3" android:strokeWidth="1" android:strokeLineCap="butt" android:strokeLineJoin="miter" />
+    <group>
+      <path android:pathData="M21.5,56.0 H70.5 a2.5,2.5 0 0,1 2.5,2.5 V58.5 a2.5,2.5 0 0,1 -2.5,2.5 H21.5 a2.5,2.5 0 0,1 -2.5,-2.5 V58.5 a2.5,2.5 0 0,1 2.5,-2.5 Z" android:fillColor="#c7d0c3" />
+      <path android:pathData="M21.5,78.0 H58.5 a2.5,2.5 0 0,1 2.5,2.5 V80.5 a2.5,2.5 0 0,1 -2.5,2.5 H21.5 a2.5,2.5 0 0,1 -2.5,-2.5 V80.5 a2.5,2.5 0 0,1 2.5,-2.5 Z" android:fillColor="#c7d0c3" />
+      <path android:pathData="M124.5,53.0 H135.5 a5.5,5.5 0 0,1 5.5,5.5 V58.5 a5.5,5.5 0 0,1 -5.5,5.5 H124.5 a5.5,5.5 0 0,1 -5.5,-5.5 V58.5 a5.5,5.5 0 0,1 5.5,-5.5 Z" android:fillColor="#c7d0c3" />
+    </group>
+    <path android:pathData="M131.2,58.5 a3.8,3.8 0 1,0 7.6,0 a3.8,3.8 0 1,0 -7.6,0 Z" android:fillColor="#f8f8f3" />
+    <path android:pathData="M24.0,96.0 H136.0 a6.0,6.0 0 0,1 6.0,6.0 V104.0 a6.0,6.0 0 0,1 -6.0,6.0 H24.0 a6.0,6.0 0 0,1 -6.0,-6.0 V102.0 a6.0,6.0 0 0,1 6.0,-6.0 Z" android:fillColor="#8da58b" />
+    <group>
+      <clip-path android:pathData="M102 0h58v124H62z" />
+      <path android:pathData="M0.0,0.0 h160.0 v124.0 h-160.0 Z" android:fillColor="#202826" />
+      <group>
+        <path android:pathData="M25 20l-5 5 5 5m-5-5h12" android:fillColor="#00000000" android:strokeColor="#d6e5df" android:strokeWidth="2.4" android:strokeLineCap="round" android:strokeLineJoin="round" />
+      </group>
+      <path android:pathData="M51.0,21.0 H100.0 a4.0,4.0 0 0,1 4.0,4.0 V25.0 a4.0,4.0 0 0,1 -4.0,4.0 H51.0 a4.0,4.0 0 0,1 -4.0,-4.0 V25.0 a4.0,4.0 0 0,1 4.0,-4.0 Z" android:fillColor="#679396" />
+      <path android:pathData="M16 42h128" android:fillColor="#000000" android:strokeColor="#53635b" android:strokeWidth="1" android:strokeLineCap="butt" android:strokeLineJoin="miter" />
+      <group>
+        <path android:pathData="M21.5,56.0 H70.5 a2.5,2.5 0 0,1 2.5,2.5 V58.5 a2.5,2.5 0 0,1 -2.5,2.5 H21.5 a2.5,2.5 0 0,1 -2.5,-2.5 V58.5 a2.5,2.5 0 0,1 2.5,-2.5 Z" android:fillColor="#53635b" />
+        <path android:pathData="M21.5,78.0 H58.5 a2.5,2.5 0 0,1 2.5,2.5 V80.5 a2.5,2.5 0 0,1 -2.5,2.5 H21.5 a2.5,2.5 0 0,1 -2.5,-2.5 V80.5 a2.5,2.5 0 0,1 2.5,-2.5 Z" android:fillColor="#53635b" />
+        <path android:pathData="M124.5,53.0 H135.5 a5.5,5.5 0 0,1 5.5,5.5 V58.5 a5.5,5.5 0 0,1 -5.5,5.5 H124.5 a5.5,5.5 0 0,1 -5.5,-5.5 V58.5 a5.5,5.5 0 0,1 5.5,-5.5 Z" android:fillColor="#53635b" />
+      </group>
+      <path android:pathData="M131.2,58.5 a3.8,3.8 0 1,0 7.6,0 a3.8,3.8 0 1,0 -7.6,0 Z" android:fillColor="#202826" />
+      <path android:pathData="M24.0,96.0 H136.0 a6.0,6.0 0 0,1 6.0,6.0 V104.0 a6.0,6.0 0 0,1 -6.0,6.0 H24.0 a6.0,6.0 0 0,1 -6.0,-6.0 V102.0 a6.0,6.0 0 0,1 6.0,-6.0 Z" android:fillColor="#679396" />
+    </group>
+  </group>
+  <path android:pathData="M12.25,0.75 H147.75 a11.5,11.5 0 0,1 11.5,11.5 V111.75 a11.5,11.5 0 0,1 -11.5,11.5 H12.25 a11.5,11.5 0 0,1 -11.5,-11.5 V12.25 a11.5,11.5 0 0,1 11.5,-11.5 Z" android:fillColor="#00000000" android:strokeColor="#c3cabe" android:strokeWidth="1.5" android:strokeLineCap="butt" android:strokeLineJoin="miter" />
+</vector>

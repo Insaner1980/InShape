@@ -2,6 +2,7 @@ package com.emmah.inshape.feature.workout
 
 import android.text.format.DateFormat
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -31,14 +34,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.health.connect.client.HealthConnectClient
 import androidx.room.withTransaction
 import com.emmah.inshape.JournalViewModel
+import com.emmah.inshape.R
 import com.emmah.inshape.data.EditorDraft
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.Workout
 import com.emmah.inshape.data.WorkoutTiming
 import com.emmah.inshape.data.resolveRecordedTime
+import com.emmah.inshape.ui.components.ArtworkHeader
 import com.emmah.inshape.ui.components.ButtonSize
 import com.emmah.inshape.ui.components.ConfirmDialog
 import com.emmah.inshape.ui.components.ListCard
@@ -51,6 +64,7 @@ import com.emmah.inshape.ui.components.RecordedTimePicker
 import com.emmah.inshape.ui.components.ResponsiveRow
 import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.components.TextField
+import com.emmah.inshape.ui.theme.ArtworkWash
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
@@ -177,7 +191,7 @@ fun FinishScreen(
                     }
                 }
             }, Modifier.fillMaxWidth(), enabled = empty || !noteConflict, size = ButtonSize.Large)
-            if (empty) TextAction("Discard workout", { discard = true }, color = colors.error)
+            if (empty) TextAction("Discard workout", { discard = true }, color = colors.error, icon = Icons.Outlined.Delete)
         }
     }, topBar = { PushedHeader(onBack = ::back) }) {
         if (!empty) {
@@ -186,27 +200,50 @@ fun FinishScreen(
             }
         }
         Text(if (empty) "Nothing recorded yet" else "Workout done", style = MaterialTheme.typography.headlineMedium)
-        Text(
-            "${workout.row.title}, ${workout.row.journalDate.journalDateLabel("EEEE d MMMM")}",
-            style = MaterialTheme.typography.bodyMedium,
-            color = colors.textSecondary
-        )
+        val dateLabel = workout.row.journalDate.journalDateLabel("EEEE d MMMM")
         if (empty) {
+            Text("${workout.row.title}, $dateLabel", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
             Text(
                 "Complete at least one set, mark an exercise done or add a note.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.textSecondary
             )
         } else {
-            Column(Modifier.padding(vertical = Dimens.itemGap), verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)) {
-                DurationSummary(finishDuration(form, workout.row.start))
-                if (!form.unknownTimes) {
-                    (form.fixedStart ?: workout.row.start)?.let {
-                        Text(
-                            workoutTimeRange(Instant.parse(it), Instant.parse(form.end), zone, uses24Hours),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.textSecondary
+            val background = colors.background
+            ArtworkHeader(
+                R.drawable.art_training_workout_finished,
+                160.dp,
+                76.dp,
+                Modifier.clip(InShapeShapes.card).background(ArtworkWash.Completed.brush())
+                    .drawWithContent {
+                        drawContent()
+                        val top = size.height - 12.dp.toPx()
+                        drawRect(
+                            Brush.verticalGradient(listOf(background.copy(alpha = 0f), background), top, size.height),
+                            topLeft = Offset(0f, top),
+                            size = Size(size.width, size.height - top)
                         )
+                    }.padding(Dimens.inner),
+                cropEnd = true
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)) {
+                    Text(workout.row.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        dateLabel,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    DurationSummary(finishDuration(form, workout.row.start))
+                    if (!form.unknownTimes) {
+                        (form.fixedStart ?: workout.row.start)?.let {
+                            Text(
+                                workoutTimeRange(Instant.parse(it), Instant.parse(form.end), zone, uses24Hours),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = colors.textSecondary
+                            )
+                        }
                     }
                 }
             }
@@ -216,12 +253,14 @@ fun FinishScreen(
             item { ListRow("Fix time", onClick = { fixTime = true }) }
             item { ListRow(if (form.note.isBlank()) "Add note" else "Note", onClick = { showNote = !showNote }) }
             item {
+                val available = vm.container.healthGateway.availability() == HealthConnectClient.SDK_AVAILABLE
                 val status = when {
+                    !available -> "Not available on this device"
                     !data.preferences.shareWorkouts -> "Off"
                     form.unknownTimes -> "Times needed"
                     else -> "On"
                 }
-                ListRow("Share to Health Connect", subtitle = status, onClick = onSettings)
+                ListRow("Share to Health Connect", subtitle = status, onClick = onSettings, enabled = available, showChevron = available)
             }
         }
         if (noteConflict) {
@@ -239,7 +278,7 @@ fun FinishScreen(
         }, { fixTime = false })
     }
     if (discard) {
-        ConfirmDialog("Discard this workout?", "The session and all work recorded in it will be deleted.", "Discard", {
+        ConfirmDialog("Discard this workout?", "The session and all work recorded in it will be deleted.", "Discard", destructive = true, {
             vm.write {
                 deleteWorkout(id)
                 onDelete()
@@ -329,9 +368,9 @@ private fun FixTimeSheet(initial: FinishDraft, recordedStart: String?, zone: Zon
                 draft =
                     draft.copy(unknownTimes = !draft.unknownTimes)
                 error = null
-            })
+            }, icon = Icons.Outlined.Schedule)
             if (draft.unknownTimes) {
-                NumberField(draft.minutes, { draft = draft.copy(minutes = it) }, "Duration in minutes (optional)")
+                NumberField(draft.minutes, { draft = draft.copy(minutes = it) }, "Duration in minutes (optional)", Modifier.fillMaxWidth())
                 Text(
                     "Workouts without times aren't shared to Health Connect.",
                     style = MaterialTheme.typography.bodyMedium,

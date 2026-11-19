@@ -18,7 +18,9 @@ data class InShapeColors(
     val onInk: Color,
     val error: Color,
     val scrim: Color
-)
+) {
+    val inactiveMark: Color get() = if (isDark) surfaceStrong else Color(0xFFE0E0E0)
+}
 
 val LightColors = InShapeColors(
     false, Color(0xFFFFFFFF), Color(0xFFF4F4F4), Color(0xFFEBEBEB),

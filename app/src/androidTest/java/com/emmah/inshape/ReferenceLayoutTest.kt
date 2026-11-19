@@ -5,13 +5,20 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.test.core.app.ActivityScenario
@@ -19,11 +26,15 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.emmah.inshape.demo.DemoActivity
 import com.emmah.inshape.demo.DemoFixtures
+import com.emmah.inshape.health.HealthPrivacyActivity
+import com.emmah.inshape.ui.theme.DarkColors
+import com.emmah.inshape.ui.theme.LightColors
 import com.emmah.inshape.ui.theme.ThemeMode
 import com.emmah.inshape.ui.theme.ThemeSettings
 import java.io.File
 import kotlin.math.roundToInt
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -39,6 +50,60 @@ class ReferenceLayoutTest {
         themeSettings.set(originalTheme)
     }
 
+    @Test fun themePreviewsSwitchTheAppThemeAndExposeSelection() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        ActivityScenario.launch<DemoActivity>(Intent(context, DemoActivity::class.java).putExtra("state", "SettingsConfigured")).use {
+            compose.waitUntil(30_000) {
+                compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange))
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
+            for (mode in listOf(ThemeMode.Dark, ThemeMode.Light, ThemeMode.System)) {
+                val choice = compose.onNodeWithText(mode.name)
+                choice.performScrollTo().performClick().assertIsSelected()
+                assertEquals(mode, ThemeSettings(context).mode.value)
+                if (mode != ThemeMode.System) {
+                    val pixels = compose.onRoot().captureToImage().toPixelMap()
+                    val y = choice.fetchSemanticsNode().boundsInRoot.center.y.toInt().coerceIn(0, pixels.height - 1)
+                    val expected = if (mode == ThemeMode.Dark) DarkColors.background else LightColors.background
+                    assertEquals(expected.toArgb(), pixels[pixels.width / 100, y].toArgb())
+                }
+            }
+        }
+    }
+
+    @Test fun privacyParagraphsUseTheThemeTextAndBackgroundColors() {
+        val context = ApplicationProvider.getApplicationContext<InShapeApplication>()
+        val settings = context.container.themeSettings
+        val savedAppearance = settings.mode.value
+        val paragraphs = listOf(
+            R.string.health_privacy_local_body,
+            R.string.health_privacy_sharing_body,
+            R.string.health_privacy_context_body,
+            R.string.health_privacy_removal_body
+        )
+        try {
+            for ((mode, colors) in listOf(ThemeMode.Dark to DarkColors, ThemeMode.Light to LightColors)) {
+                settings.set(mode)
+                ActivityScenario.launch(HealthPrivacyActivity::class.java).use {
+                    val contrast = (maxOf(colors.text.luminance(), colors.background.luminance()) + .05f) /
+                        (minOf(colors.text.luminance(), colors.background.luminance()) + .05f)
+                    assertTrue("Privacy contrast ($mode): $contrast", contrast >= 4.5f)
+                    paragraphs.forEach { resource ->
+                        val paragraph = compose.onNodeWithText(context.getString(resource)).performScrollTo()
+                        val pixels = paragraph.captureToImage().toPixelMap()
+                        fun contains(argb: Int): Boolean = (0 until pixels.height).any { y ->
+                            (0 until pixels.width).any { x -> pixels[x, y].toArgb() == argb }
+                        }
+                        assertTrue("Privacy paragraph foreground ($mode, $resource)", contains(colors.text.toArgb()))
+                        assertTrue("Privacy paragraph background ($mode, $resource)", contains(colors.background.toArgb()))
+                    }
+                }
+            }
+        } finally {
+            settings.set(savedAppearance)
+        }
+    }
+
     @Test fun allReferenceScreensScrollWithoutTextClipping() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val label = InstrumentationRegistry.getArguments().getString("captureLabel") ?: "390-100"
@@ -50,7 +115,10 @@ class ReferenceLayoutTest {
         val issues = linkedSetOf<String>()
         val geometry = mutableListOf<String>()
         val matcher = SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange)
-        DemoFixtures.names.take(9).forEach { state ->
+        val states = InstrumentationRegistry.getArguments().getString("referenceStates")?.split(",")
+            ?: DemoFixtures.names.take(9)
+        require(states.all { it in DemoFixtures.names })
+        states.forEach { state ->
             ActivityScenario.launch<DemoActivity>(
                 Intent(context, DemoActivity::class.java).putExtra("state", state)
             ).use { scenario ->
@@ -182,7 +250,7 @@ class ReferenceLayoutTest {
         File(output, "layout-results.txt").writeText(
             geometry.joinToString("\n") + "\n" +
                 if (issues.isEmpty()) {
-                    "All nine screens traversed. No text extends beyond raster bounds by more than one pixel."
+                    "All ${states.size} screens traversed. No text extends beyond raster bounds by more than one pixel."
                 } else {
                     issues
                         .joinToString(

@@ -7,6 +7,13 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class CheckInLevelsTest {
+    @Test fun energyLabelsUseSentenceCaseAndKeepStoredKeys() {
+        assertEquals(listOf("LOW", "OK", "GOOD"), EnergyLevel.entries.map { it.key })
+        assertEquals(listOf("Low", "OK", "Good"), EnergyLevel.entries.map { it.label })
+        EnergyLevel.entries.forEach { assertEquals(it, EnergyLevel.fromKey(it.key)) }
+        assertNull(EnergyLevel.fromKey("unknown"))
+    }
+
     @Test fun allStoredValuesMapWithoutConflatingMissingAndZero() {
         assertNull(effortLevelOf(null))
         assertNull(bodyLevelOf(null))

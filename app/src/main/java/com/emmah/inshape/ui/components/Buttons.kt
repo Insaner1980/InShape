@@ -90,8 +90,11 @@ fun OutlineButton(
         modifier.heightIn(min = if (size == ButtonSize.Large) Dimens.button else Dimens.touch),
         enabled,
         shape = InShapeShapes.button,
-        border = BorderStroke(Dimens.line, InShapeTheme.colors.outline),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = InShapeTheme.colors.text)
+        border = BorderStroke(Dimens.line, if (enabled) InShapeTheme.colors.outline else InShapeTheme.colors.divider),
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = InShapeTheme.colors.text,
+            disabledContentColor = InShapeTheme.colors.textTertiary
+        )
     ) {
         ProvideTextStyle(MaterialTheme.typography.labelLarge) { ButtonLabel(text, icon) }
     }
@@ -113,7 +116,7 @@ fun TextAction(
         colors = ButtonDefaults.textButtonColors(contentColor = color),
         contentPadding = PaddingValues(horizontal = Dimens.zero, vertical = Dimens.innerSmall)
     ) {
-        ProvideTextStyle(MaterialTheme.typography.labelLarge) { ButtonLabel(text, icon) }
+        ProvideTextStyle(MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium)) { ButtonLabel(text, icon) }
     }
 }
 

@@ -84,6 +84,14 @@ public fun com.emmah.inshape.feature.history.WorkoutDetailScreen(id: kotlin.Stri
     - modifier: STABLE (marked @Stable or @Immutable)
 
 @Composable
+private fun com.emmah.inshape.feature.library.EquipmentThumbnail(resource: kotlin.Int, size: androidx.compose.ui.unit.Dp): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - resource: STABLE (primitive type)
+    - size: STABLE (marked @Stable or @Immutable)
+
+@Composable
 public fun com.emmah.inshape.feature.library.ExerciseEditor(id: kotlin.String, data: com.emmah.inshape.data.JournalSnapshot, vm: com.emmah.inshape.JournalViewModel, onSave: kotlin.Function1<kotlin.String, kotlin.Unit>, modifier: androidx.compose.ui.Modifier): kotlin.Unit
   skippable: true
   restartable: true
@@ -95,14 +103,27 @@ public fun com.emmah.inshape.feature.library.ExerciseEditor(id: kotlin.String, d
     - modifier: STABLE (marked @Stable or @Immutable)
 
 @Composable
-public fun com.emmah.inshape.feature.library.ExercisePicker(data: com.emmah.inshape.data.JournalSnapshot, onChoose: kotlin.Function1<kotlin.String, kotlin.Unit>, onCreate: kotlin.Function0<kotlin.Unit>, modifier: androidx.compose.ui.Modifier): kotlin.Unit
+public fun com.emmah.inshape.feature.library.ExercisePicker(data: com.emmah.inshape.data.JournalSnapshot, photos: com.emmah.inshape.media.PhotoStore, onChoose: kotlin.Function1<kotlin.String, kotlin.Unit>, onCreate: kotlin.Function0<kotlin.Unit>, modifier: androidx.compose.ui.Modifier): kotlin.Unit
   skippable: true
   restartable: true
   params:
     - data: RUNTIME (requires runtime check)
+    - photos: UNSTABLE (has mutable properties or unstable members)
     - onChoose: STABLE (function type)
     - onCreate: STABLE (function type)
     - modifier: STABLE (marked @Stable or @Immutable)
+
+@Composable
+public fun com.emmah.inshape.feature.library.ExercisePickerList(data: com.emmah.inshape.data.JournalSnapshot, photos: com.emmah.inshape.media.PhotoStore, onChoose: kotlin.Function1<kotlin.String, kotlin.Unit>, modifier: androidx.compose.ui.Modifier, excluded: kotlin.collections.Set<kotlin.String>, onCreate: kotlin.Function0<kotlin.Unit>?): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - data: RUNTIME (requires runtime check)
+    - photos: UNSTABLE (has mutable properties or unstable members)
+    - onChoose: STABLE (function type)
+    - modifier: STABLE (marked @Stable or @Immutable)
+    - excluded: RUNTIME (requires runtime check)
+    - onCreate: STABLE (function type)
 
 @Composable
 public fun com.emmah.inshape.feature.library.ExerciseScreen(id: kotlin.String, sessionItemId: kotlin.String?, data: com.emmah.inshape.data.JournalSnapshot, vm: com.emmah.inshape.JournalViewModel, onEdit: kotlin.Function0<kotlin.Unit>, onExercise: kotlin.Function1<kotlin.String, kotlin.Unit>, onWorkout: kotlin.Function1<kotlin.String, kotlin.Unit>, onChart: kotlin.Function0<kotlin.Unit>, onBack: kotlin.Function0<kotlin.Unit>, modifier: androidx.compose.ui.Modifier): kotlin.Unit
@@ -153,6 +174,326 @@ public fun com.emmah.inshape.feature.library.RoutineEditor(id: kotlin.String, da
     - onStart: STABLE (function type)
     - onCreateExercise: STABLE (function type)
     - modifier: STABLE (marked @Stable or @Immutable)
+
+@Composable
+internal fun com.emmah.inshape.feature.library.exerciseThumbnail(exercise: com.emmah.inshape.data.Exercise, photo: com.emmah.inshape.data.PhotoAsset?, store: com.emmah.inshape.media.PhotoStore, size: androidx.compose.ui.unit.Dp, showIllustration: kotlin.Boolean): @[Composable] androidx.compose.runtime.internal.ComposableFunction0<kotlin.Unit>?
+  skippable: false
+  restartable: false
+  params:
+    - exercise: RUNTIME (requires runtime check)
+    - photo: STABLE (class with no mutable properties)
+    - store: UNSTABLE (has mutable properties or unstable members)
+    - size: STABLE (marked @Stable or @Immutable)
+    - showIllustration: STABLE (primitive type)
+
+@Composable
+internal fun com.emmah.inshape.feature.music.AddSongDialog(store: com.emmah.inshape.feature.music.MusicStore, playlists: kotlin.collections.List<com.emmah.inshape.feature.music.SavedPlaylist>, trackId: kotlin.String, onClose: kotlin.Function0<kotlin.Unit>, onCreate: kotlin.Function0<kotlin.Unit>): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - store: UNSTABLE (has mutable properties or unstable members)
+    - playlists: RUNTIME (requires runtime check)
+    - trackId: STABLE (String is immutable)
+    - onClose: STABLE (function type)
+    - onCreate: STABLE (function type)
+
+@Composable
+internal fun com.emmah.inshape.feature.music.MiniPlayer(playback: com.emmah.inshape.feature.music.MusicPlayback, openLabel: kotlin.String, onOpen: kotlin.Function0<kotlin.Unit>, modifier: androidx.compose.ui.Modifier): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - playback: UNKNOWN (interface or non-final class; concrete implementation unknown)
+    - openLabel: STABLE (String is immutable)
+    - onOpen: STABLE (function type)
+    - modifier: STABLE (marked @Stable or @Immutable)
+
+@Composable
+internal fun com.emmah.inshape.feature.music.MusicArtwork(uri: kotlin.String?, size: androidx.compose.ui.unit.Dp, modifier: androidx.compose.ui.Modifier, whenMissing: @[Composable] androidx.compose.runtime.internal.ComposableFunction0<kotlin.Unit>?): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - uri: STABLE (class with no mutable properties)
+    - size: STABLE (marked @Stable or @Immutable)
+    - modifier: STABLE (marked @Stable or @Immutable)
+    - whenMissing: STABLE (composable function type)
+
+@Composable
+internal fun com.emmah.inshape.feature.music.MusicArtwork(cover: com.emmah.inshape.feature.music.MusicCover, size: androidx.compose.ui.unit.Dp, modifier: androidx.compose.ui.Modifier): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - cover: UNKNOWN (interface or non-final class; concrete implementation unknown)
+    - size: STABLE (marked @Stable or @Immutable)
+    - modifier: STABLE (marked @Stable or @Immutable)
+
+@Composable
+internal fun com.emmah.inshape.feature.music.MusicChooser(store: com.emmah.inshape.feature.music.MusicStore, playback: com.emmah.inshape.feature.music.MusicPlayback, onClose: kotlin.Function0<kotlin.Unit>, fixture: com.emmah.inshape.feature.music.MusicCatalog?): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - store: UNSTABLE (has mutable properties or unstable members)
+    - playback: UNKNOWN (interface or non-final class; concrete implementation unknown)
+    - onClose: STABLE (function type)
+    - fixture: RUNTIME (requires runtime check)
+
+@Composable
+internal fun com.emmah.inshape.feature.music.MusicColumn(modifier: androidx.compose.ui.Modifier, content: @[Composable] @[ExtensionFunctionType] androidx.compose.runtime.internal.ComposableFunction1<androidx.compose.foundation.layout.ColumnScope, kotlin.Unit>): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - modifier: STABLE (marked @Stable or @Immutable)
+    - content: STABLE (composable function type)
+
+@Composable
+internal fun com.emmah.inshape.feature.music.MusicDivider(): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+
+@Composable
+private fun com.emmah.inshape.feature.music.MusicEditor(title: kotlin.String, onClose: kotlin.Function0<kotlin.Unit>, saveEnabled: kotlin.Boolean, onSave: kotlin.coroutines.SuspendFunction0<kotlin.Unit>, content: @[Composable] @[ExtensionFunctionType] androidx.compose.runtime.internal.ComposableFunction1<androidx.compose.foundation.layout.ColumnScope, kotlin.Unit>): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - title: STABLE (String is immutable)
+    - onClose: STABLE (function type)
+    - saveEnabled: STABLE (primitive type)
+    - onSave: UNKNOWN (interface or non-final class; concrete implementation unknown)
+    - content: STABLE (composable function type)
+
+@Composable
+internal fun com.emmah.inshape.feature.music.MusicHome(store: com.emmah.inshape.feature.music.MusicStore, playback: com.emmah.inshape.feature.music.MusicPlayback, onPlaylist: kotlin.Function1<kotlin.String, kotlin.Unit>, fixture: com.emmah.inshape.feature.music.MusicCatalog?, onPlay: kotlin.Function0<kotlin.Unit>, onClose: kotlin.Function0<kotlin.Unit>?): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - store: UNSTABLE (has mutable properties or unstable members)
+    - playback: UNKNOWN (interface or non-final class; concrete implementation unknown)
+    - onPlaylist: STABLE (function type)
+    - fixture: RUNTIME (requires runtime check)
+    - onPlay: STABLE (function type)
+    - onClose: STABLE (function type)
+
+@Composable
+private fun com.emmah.inshape.feature.music.MusicStatus(message: kotlin.String?): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - message: STABLE (class with no mutable properties)
+
+@Composable
+private fun com.emmah.inshape.feature.music.MusicTitle(): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+
+@Composable
+internal fun com.emmah.inshape.feature.music.NowPlaying(playback: com.emmah.inshape.feature.music.MusicPlayback, onBack: kotlin.Function0<kotlin.Unit>): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - playback: UNKNOWN (interface or non-final class; concrete implementation unknown)
+    - onBack: STABLE (function type)
+
+@Composable
+private fun com.emmah.inshape.feature.music.PlayPause(playback: com.emmah.inshape.feature.music.MusicPlayback, state: com.emmah.inshape.feature.music.PlaybackState): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - playback: UNKNOWN (interface or non-final class; concrete implementation unknown)
+    - state: RUNTIME (requires runtime check)
+
+@Composable
+internal fun com.emmah.inshape.feature.music.PlaybackBars(playing: kotlin.Boolean, modifier: androidx.compose.ui.Modifier): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - playing: STABLE (primitive type)
+    - modifier: STABLE (marked @Stable or @Immutable)
+
+@Composable
+private fun com.emmah.inshape.feature.music.PlaybackCanvas(playing: kotlin.Boolean, periodMillis: kotlin.Int, modifier: androidx.compose.ui.Modifier, draw: @[ExtensionFunctionType] kotlin.Function4<androidx.compose.ui.graphics.drawscope.DrawScope, @[ParameterName(name = \): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - playing: STABLE (primitive type)
+    - periodMillis: STABLE (primitive type)
+    - modifier: STABLE (marked @Stable or @Immutable)
+    - draw: STABLE (function type)
+
+@Composable
+internal fun com.emmah.inshape.feature.music.PlaybackRibbon(playing: kotlin.Boolean, modifier: androidx.compose.ui.Modifier): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - playing: STABLE (primitive type)
+    - modifier: STABLE (marked @Stable or @Immutable)
+
+@Composable
+private fun com.emmah.inshape.feature.music.PlaybackTime(state: com.emmah.inshape.feature.music.PlaybackState, seek: kotlin.Function1<kotlin.Long, kotlin.Unit>, modifier: androidx.compose.ui.Modifier): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - state: RUNTIME (requires runtime check)
+    - seek: STABLE (function type)
+    - modifier: STABLE (marked @Stable or @Immutable)
+
+@Composable
+internal fun com.emmah.inshape.feature.music.PlaylistDetail(id: kotlin.String, store: com.emmah.inshape.feature.music.MusicStore, playback: com.emmah.inshape.feature.music.MusicPlayback, onBack: kotlin.Function0<kotlin.Unit>, fixture: com.emmah.inshape.feature.music.MusicCatalog?, onPlay: kotlin.Function0<kotlin.Unit>): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - id: STABLE (String is immutable)
+    - store: UNSTABLE (has mutable properties or unstable members)
+    - playback: UNKNOWN (interface or non-final class; concrete implementation unknown)
+    - onBack: STABLE (function type)
+    - fixture: RUNTIME (requires runtime check)
+    - onPlay: STABLE (function type)
+
+@Composable
+internal fun com.emmah.inshape.feature.music.PlaylistDetailEditor(store: com.emmah.inshape.feature.music.MusicStore, catalog: com.emmah.inshape.feature.music.MusicCatalog, playlist: com.emmah.inshape.feature.music.SavedPlaylist, action: kotlin.String?, onClose: kotlin.Function0<kotlin.Unit>, onDelete: kotlin.Function0<kotlin.Unit>): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - store: UNSTABLE (has mutable properties or unstable members)
+    - catalog: RUNTIME (requires runtime check)
+    - playlist: RUNTIME (requires runtime check)
+    - action: STABLE (class with no mutable properties)
+    - onClose: STABLE (function type)
+    - onDelete: STABLE (function type)
+
+@Composable
+internal fun com.emmah.inshape.feature.music.PlaylistEditor(store: com.emmah.inshape.feature.music.MusicStore, songs: kotlin.collections.List<com.emmah.inshape.feature.music.MusicTrack>, onClose: kotlin.Function0<kotlin.Unit>, playlist: com.emmah.inshape.feature.music.SavedPlaylist?, firstSong: kotlin.String?): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - store: UNSTABLE (has mutable properties or unstable members)
+    - songs: RUNTIME (requires runtime check)
+    - onClose: STABLE (function type)
+    - playlist: RUNTIME (requires runtime check)
+    - firstSong: STABLE (class with no mutable properties)
+
+@Composable
+private fun com.emmah.inshape.feature.music.PlaylistHeader(playlist: com.emmah.inshape.feature.music.SavedPlaylist): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - playlist: RUNTIME (requires runtime check)
+
+@Composable
+private fun com.emmah.inshape.feature.music.PlaylistMenu(onAction: kotlin.Function1<kotlin.String, kotlin.Unit>): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - onAction: STABLE (function type)
+
+@Composable
+private fun com.emmah.inshape.feature.music.PlaylistPrompt(title: kotlin.String, confirm: kotlin.String, onClose: kotlin.Function0<kotlin.Unit>, initialName: kotlin.String?, message: kotlin.String?, destructive: kotlin.Boolean, action: kotlin.coroutines.SuspendFunction1<kotlin.String, kotlin.Unit>): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - title: STABLE (String is immutable)
+    - confirm: STABLE (String is immutable)
+    - onClose: STABLE (function type)
+    - initialName: STABLE (class with no mutable properties)
+    - message: STABLE (class with no mutable properties)
+    - destructive: STABLE (primitive type)
+    - action: UNKNOWN (interface or non-final class; concrete implementation unknown)
+
+@Composable
+private fun com.emmah.inshape.feature.music.PlaylistRow(playlist: com.emmah.inshape.feature.music.SavedPlaylist, open: kotlin.Function0<kotlin.Unit>, play: kotlin.Function0<kotlin.Unit>): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - playlist: RUNTIME (requires runtime check)
+    - open: STABLE (function type)
+    - play: STABLE (function type)
+
+@Composable
+private fun com.emmah.inshape.feature.music.PlaylistTitle(playlist: com.emmah.inshape.feature.music.SavedPlaylist, titleColor: androidx.compose.ui.graphics.Color, countColor: androidx.compose.ui.graphics.Color): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - playlist: RUNTIME (requires runtime check)
+    - titleColor: STABLE (marked @Stable or @Immutable)
+    - countColor: STABLE (marked @Stable or @Immutable)
+
+@Composable
+private fun com.emmah.inshape.feature.music.ReorderPlaylist(store: com.emmah.inshape.feature.music.MusicStore, playlist: com.emmah.inshape.feature.music.SavedPlaylist, onClose: kotlin.Function0<kotlin.Unit>): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - store: UNSTABLE (has mutable properties or unstable members)
+    - playlist: RUNTIME (requires runtime check)
+    - onClose: STABLE (function type)
+
+@Composable
+private fun com.emmah.inshape.feature.music.SongCount(count: kotlin.Int, color: androidx.compose.ui.graphics.Color): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - count: STABLE (primitive type)
+    - color: STABLE (marked @Stable or @Immutable)
+
+@Composable
+private fun com.emmah.inshape.feature.music.SongMenu(song: com.emmah.inshape.feature.music.MusicTrack, next: kotlin.Function0<kotlin.Unit>, add: kotlin.Function0<kotlin.Unit>): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - song: STABLE (class with no mutable properties)
+    - next: STABLE (function type)
+    - add: STABLE (function type)
+
+@Composable
+internal fun com.emmah.inshape.feature.music.SongRow(track: com.emmah.inshape.feature.music.MusicTrack, play: kotlin.Function0<kotlin.Unit>, actions: @[Composable] androidx.compose.runtime.internal.ComposableFunction0<kotlin.Unit>?): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - track: STABLE (class with no mutable properties)
+    - play: STABLE (function type)
+    - actions: STABLE (composable function type)
+
+@Composable
+private fun com.emmah.inshape.feature.music.TrackCheckbox(track: com.emmah.inshape.feature.music.MusicTrack, checked: kotlin.Boolean, onToggle: kotlin.Function1<kotlin.Boolean, kotlin.Unit>, modifier: androidx.compose.ui.Modifier): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - track: STABLE (class with no mutable properties)
+    - checked: STABLE (primitive type)
+    - onToggle: STABLE (function type)
+    - modifier: STABLE (marked @Stable or @Immutable)
+
+@Composable
+internal fun com.emmah.inshape.feature.music.TrackLabels(track: com.emmah.inshape.feature.music.MusicTrack, modifier: androidx.compose.ui.Modifier, arrangement: androidx.compose.foundation.layout.Arrangement.Vertical): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - track: STABLE (class with no mutable properties)
+    - modifier: STABLE (marked @Stable or @Immutable)
+    - arrangement: STABLE (marked @Stable or @Immutable)
+
+@Composable
+internal fun com.emmah.inshape.feature.music.playlistCover(playlist: com.emmah.inshape.feature.music.SavedPlaylist): com.emmah.inshape.feature.music.MusicCover
+  skippable: false
+  restartable: false
+  params:
+    - playlist: RUNTIME (requires runtime check)
+
+@Composable
+internal fun com.emmah.inshape.feature.music.rememberMusicPlayback(container: com.emmah.inshape.AppContainer, initial: kotlin.collections.List<com.emmah.inshape.feature.music.MusicTrack>, observe: kotlin.Boolean): com.emmah.inshape.feature.music.MusicPlayback
+  skippable: false
+  restartable: false
+  params:
+    - container: UNSTABLE (has mutable properties or unstable members)
+    - initial: RUNTIME (requires runtime check)
+    - observe: STABLE (primitive type)
+
+@Composable
+private fun com.emmah.inshape.feature.music.resolvedCover(uris: kotlin.collections.List<kotlin.String>, fallback: com.emmah.inshape.feature.music.MusicCover.Bundled): com.emmah.inshape.feature.music.MusicCover
+  skippable: false
+  restartable: false
+  params:
+    - uris: RUNTIME (requires runtime check)
+    - fallback: STABLE (class with no mutable properties)
 
 @Composable
 public fun com.emmah.inshape.feature.progress.AttendanceChart(weeks: kotlin.collections.List<com.emmah.inshape.feature.progress.WeekCount>, goal: kotlin.Int?, today: java.time.LocalDate, modifier: androidx.compose.ui.Modifier): kotlin.Unit
@@ -220,6 +561,14 @@ public fun com.emmah.inshape.feature.settings.SettingsScreen(data: com.emmah.ins
     - onExport: STABLE (function type)
 
 @Composable
+private fun com.emmah.inshape.feature.settings.ThemePreviews(selected: com.emmah.inshape.ui.theme.ThemeMode, onSelect: kotlin.Function1<com.emmah.inshape.ui.theme.ThemeMode, kotlin.Unit>): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - selected: STABLE (class with no mutable properties)
+    - onSelect: STABLE (function type)
+
+@Composable
 public fun com.emmah.inshape.feature.today.TodayScreen(data: com.emmah.inshape.data.JournalSnapshot, today: java.time.LocalDate, onSettings: kotlin.Function0<kotlin.Unit>, onStart: kotlin.Function1<com.emmah.inshape.data.StartSource, kotlin.Unit>, onWorkout: kotlin.Function1<kotlin.String, kotlin.Unit>, clock: java.time.Clock, onOpenRoutine: kotlin.Function1<kotlin.String?, kotlin.Unit>, modifier: androidx.compose.ui.Modifier, healthContext: @[Composable] androidx.compose.runtime.internal.ComposableFunction0<kotlin.Unit>): kotlin.Unit
   skippable: true
   restartable: true
@@ -267,7 +616,7 @@ private fun com.emmah.inshape.feature.workout.FixTimeSheet(initial: com.emmah.in
     - onDismiss: STABLE (function type)
 
 @Composable
-public fun com.emmah.inshape.feature.workout.SetRow(set: com.emmah.inshape.data.SessionSet, number: kotlin.Int, basis: kotlin.String, vm: com.emmah.inshape.JournalViewModel, modifier: androidx.compose.ui.Modifier, highlighted: kotlin.Boolean): kotlin.Unit
+public fun com.emmah.inshape.feature.workout.SetRow(set: com.emmah.inshape.data.SessionSet, number: kotlin.Int, basis: kotlin.String, vm: com.emmah.inshape.JournalViewModel, modifier: androidx.compose.ui.Modifier, highlighted: kotlin.Boolean, onRemove: kotlin.Function0<kotlin.Unit>): kotlin.Unit
   skippable: true
   restartable: true
   params:
@@ -277,6 +626,7 @@ public fun com.emmah.inshape.feature.workout.SetRow(set: com.emmah.inshape.data.
     - vm: UNSTABLE (has mutable properties or unstable members)
     - modifier: STABLE (marked @Stable or @Immutable)
     - highlighted: STABLE (primitive type)
+    - onRemove: STABLE (function type)
 
 @Composable
 public fun com.emmah.inshape.feature.workout.SetRow.Done(): kotlin.Unit
@@ -320,7 +670,7 @@ public fun com.emmah.inshape.feature.workout.WorkoutMetrics(workout: com.emmah.i
     - modifier: STABLE (marked @Stable or @Immutable)
 
 @Composable
-public fun com.emmah.inshape.feature.workout.WorkoutScreen(id: kotlin.String, data: com.emmah.inshape.data.JournalSnapshot, vm: com.emmah.inshape.JournalViewModel, onExercise: kotlin.Function2<kotlin.String, kotlin.String, kotlin.Unit>, onCheckIn: kotlin.Function0<kotlin.Unit>, onFinish: kotlin.Function0<kotlin.Unit>, onDelete: kotlin.Function0<kotlin.Unit>, onBack: kotlin.Function0<kotlin.Unit>, modifier: androidx.compose.ui.Modifier): kotlin.Unit
+public fun com.emmah.inshape.feature.workout.WorkoutScreen(id: kotlin.String, data: com.emmah.inshape.data.JournalSnapshot, vm: com.emmah.inshape.JournalViewModel, onExercise: kotlin.Function2<kotlin.String, kotlin.String, kotlin.Unit>, onCheckIn: kotlin.Function0<kotlin.Unit>, onFinish: kotlin.Function0<kotlin.Unit>, onDelete: kotlin.Function0<kotlin.Unit>, onBack: kotlin.Function0<kotlin.Unit>, modifier: androidx.compose.ui.Modifier, musicPlayback: com.emmah.inshape.feature.music.MusicPlayback?, musicFixture: com.emmah.inshape.feature.music.MusicCatalog?): kotlin.Unit
   skippable: true
   restartable: true
   params:
@@ -333,6 +683,8 @@ public fun com.emmah.inshape.feature.workout.WorkoutScreen(id: kotlin.String, da
     - onDelete: STABLE (function type)
     - onBack: STABLE (function type)
     - modifier: STABLE (marked @Stable or @Immutable)
+    - musicPlayback: UNKNOWN (interface or non-final class; concrete implementation unknown)
+    - musicFixture: RUNTIME (requires runtime check)
 
 @Composable
 public fun com.emmah.inshape.feature.workout.WorkoutTimingEditor(id: kotlin.String, data: com.emmah.inshape.data.JournalSnapshot, vm: com.emmah.inshape.JournalViewModel, correcting: kotlin.Boolean, onSave: kotlin.Function0<kotlin.Unit>, modifier: androidx.compose.ui.Modifier): kotlin.Unit
@@ -345,6 +697,13 @@ public fun com.emmah.inshape.feature.workout.WorkoutTimingEditor(id: kotlin.Stri
     - correcting: STABLE (primitive type)
     - onSave: STABLE (function type)
     - modifier: STABLE (marked @Stable or @Immutable)
+
+@Composable
+public fun com.emmah.inshape.feature.workout.itemSummary(item: com.emmah.inshape.data.WorkoutItem): kotlin.String
+  skippable: false
+  restartable: false
+  params:
+    - item: RUNTIME (requires runtime check)
 
 @Composable
 public fun com.emmah.inshape.health.HealthSettings(data: com.emmah.inshape.data.JournalSnapshot, vm: com.emmah.inshape.JournalViewModel): kotlin.Unit
@@ -373,7 +732,7 @@ public fun com.emmah.inshape.health.WorkoutHealthControls(workout: com.emmah.ins
     - modifier: STABLE (marked @Stable or @Immutable)
 
 @Composable
-public fun com.emmah.inshape.navigation.AppNavigation(container: com.emmah.inshape.AppContainer, modifier: androidx.compose.ui.Modifier, entryAction: kotlin.Pair<kotlin.String, kotlin.Long>?, consumeEntry: kotlin.Function0<kotlin.Unit>, initialRoute: kotlin.String, vm: com.emmah.inshape.JournalViewModel): kotlin.Unit
+public fun com.emmah.inshape.navigation.AppNavigation(container: com.emmah.inshape.AppContainer, modifier: androidx.compose.ui.Modifier, entryAction: kotlin.Pair<kotlin.String, kotlin.Long>?, consumeEntry: kotlin.Function0<kotlin.Unit>, initialRoute: kotlin.String, musicFixture: com.emmah.inshape.feature.music.MusicCatalog?, initialMusic: kotlin.collections.List<com.emmah.inshape.feature.music.MusicTrack>, vm: com.emmah.inshape.JournalViewModel): kotlin.Unit
   skippable: true
   restartable: true
   params:
@@ -382,6 +741,8 @@ public fun com.emmah.inshape.navigation.AppNavigation(container: com.emmah.insha
     - entryAction: STABLE (known stable type)
     - consumeEntry: STABLE (function type)
     - initialRoute: STABLE (String is immutable)
+    - musicFixture: RUNTIME (requires runtime check)
+    - initialMusic: RUNTIME (requires runtime check)
     - vm: UNSTABLE (has mutable properties or unstable members)
 
 @Composable
@@ -421,7 +782,20 @@ public fun com.emmah.inshape.ui.components.AppMenu(expanded: kotlin.Boolean, onD
     - content: STABLE (composable function type)
 
 @Composable
-private fun com.emmah.inshape.ui.components.BottomActionBar(scrolledContent: kotlin.Boolean, content: @[Composable] androidx.compose.runtime.internal.ComposableFunction0<kotlin.Unit>): kotlin.Unit
+internal fun com.emmah.inshape.ui.components.ArtworkHeader(artwork: kotlin.Int?, artWidth: androidx.compose.ui.unit.Dp, artHeight: androidx.compose.ui.unit.Dp, modifier: androidx.compose.ui.Modifier, cropEnd: kotlin.Boolean, mirror: kotlin.Boolean, content: @[Composable] androidx.compose.runtime.internal.ComposableFunction0<kotlin.Unit>): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - artwork: STABLE (class with no mutable properties)
+    - artWidth: STABLE (marked @Stable or @Immutable)
+    - artHeight: STABLE (marked @Stable or @Immutable)
+    - modifier: STABLE (marked @Stable or @Immutable)
+    - cropEnd: STABLE (primitive type)
+    - mirror: STABLE (primitive type)
+    - content: STABLE (composable function type)
+
+@Composable
+internal fun com.emmah.inshape.ui.components.BottomActionBar(scrolledContent: kotlin.Boolean, content: @[Composable] androidx.compose.runtime.internal.ComposableFunction0<kotlin.Unit>): kotlin.Unit
   skippable: true
   restartable: true
   params:
@@ -437,13 +811,14 @@ private fun com.emmah.inshape.ui.components.ButtonLabel(text: kotlin.String, ico
     - icon: STABLE (marked @Stable or @Immutable)
 
 @Composable
-public fun com.emmah.inshape.ui.components.ConfirmDialog(title: kotlin.String, message: kotlin.String, confirm: kotlin.String, onConfirm: kotlin.Function0<kotlin.Unit>, onDismiss: kotlin.Function0<kotlin.Unit>): kotlin.Unit
+public fun com.emmah.inshape.ui.components.ConfirmDialog(title: kotlin.String, message: kotlin.String, confirm: kotlin.String, destructive: kotlin.Boolean, onConfirm: kotlin.Function0<kotlin.Unit>, onDismiss: kotlin.Function0<kotlin.Unit>): kotlin.Unit
   skippable: true
   restartable: true
   params:
     - title: STABLE (String is immutable)
     - message: STABLE (String is immutable)
     - confirm: STABLE (String is immutable)
+    - destructive: STABLE (primitive type)
     - onConfirm: STABLE (function type)
     - onDismiss: STABLE (function type)
 
@@ -454,6 +829,27 @@ private fun com.emmah.inshape.ui.components.DateHeading(title: kotlin.String, da
   params:
     - title: STABLE (String is immutable)
     - days: RUNTIME (requires runtime check)
+
+@Composable
+public fun com.emmah.inshape.ui.components.DialogAction(text: kotlin.String, onClick: kotlin.Function0<kotlin.Unit>, modifier: androidx.compose.ui.Modifier, destructive: kotlin.Boolean, enabled: kotlin.Boolean): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - text: STABLE (String is immutable)
+    - onClick: STABLE (function type)
+    - modifier: STABLE (marked @Stable or @Immutable)
+    - destructive: STABLE (primitive type)
+    - enabled: STABLE (primitive type)
+
+@Composable
+public fun com.emmah.inshape.ui.components.DisclosureRow(label: kotlin.String, expanded: kotlin.Boolean, onToggle: kotlin.Function0<kotlin.Unit>, modifier: androidx.compose.ui.Modifier): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - label: STABLE (String is immutable)
+    - expanded: STABLE (primitive type)
+    - onToggle: STABLE (function type)
+    - modifier: STABLE (marked @Stable or @Immutable)
 
 @Composable
 public fun com.emmah.inshape.ui.components.EmptyState(title: kotlin.String, message: kotlin.String, modifier: androidx.compose.ui.Modifier, action: kotlin.String?, onAction: kotlin.Function0<kotlin.Unit>, icon: androidx.compose.ui.graphics.vector.ImageVector?): kotlin.Unit
@@ -498,7 +894,7 @@ public fun com.emmah.inshape.ui.components.IconCircleButton(icon: androidx.compo
     - accent: STABLE (primitive type)
 
 @Composable
-public fun com.emmah.inshape.ui.components.InShapeCard(modifier: androidx.compose.ui.Modifier, color: androidx.compose.ui.graphics.Color, inset: kotlin.Boolean, borderColor: androidx.compose.ui.graphics.Color, contentPadding: androidx.compose.foundation.layout.PaddingValues, onClick: kotlin.Function0<kotlin.Unit>?, gap: androidx.compose.ui.unit.Dp, content: @[Composable] @[ExtensionFunctionType] androidx.compose.runtime.internal.ComposableFunction1<androidx.compose.foundation.layout.ColumnScope, kotlin.Unit>): kotlin.Unit
+public fun com.emmah.inshape.ui.components.InShapeCard(modifier: androidx.compose.ui.Modifier, color: androidx.compose.ui.graphics.Color, inset: kotlin.Boolean, borderColor: androidx.compose.ui.graphics.Color, contentPadding: androidx.compose.foundation.layout.PaddingValues, onClick: kotlin.Function0<kotlin.Unit>?, gap: androidx.compose.ui.unit.Dp, wash: androidx.compose.ui.graphics.Brush?, content: @[Composable] @[ExtensionFunctionType] androidx.compose.runtime.internal.ComposableFunction1<androidx.compose.foundation.layout.ColumnScope, kotlin.Unit>): kotlin.Unit
   skippable: true
   restartable: true
   params:
@@ -509,6 +905,7 @@ public fun com.emmah.inshape.ui.components.InShapeCard(modifier: androidx.compos
     - contentPadding: STABLE (marked @Stable or @Immutable)
     - onClick: STABLE (function type)
     - gap: STABLE (marked @Stable or @Immutable)
+    - wash: STABLE (marked @Stable or @Immutable)
     - content: STABLE (composable function type)
 
 @Composable
@@ -550,7 +947,7 @@ public fun com.emmah.inshape.ui.components.ListCard(modifier: androidx.compose.u
     - content: STABLE (function type)
 
 @Composable
-public fun com.emmah.inshape.ui.components.ListRow(title: kotlin.String, modifier: androidx.compose.ui.Modifier, subtitle: kotlin.String?, leading: @[Composable] androidx.compose.runtime.internal.ComposableFunction0<kotlin.Unit>?, trailing: @[Composable] androidx.compose.runtime.internal.ComposableFunction0<kotlin.Unit>?, onClick: kotlin.Function0<kotlin.Unit>?, enabled: kotlin.Boolean, titleStyle: androidx.compose.ui.text.TextStyle, showChevron: kotlin.Boolean): kotlin.Unit
+public fun com.emmah.inshape.ui.components.ListRow(title: kotlin.String, modifier: androidx.compose.ui.Modifier, subtitle: kotlin.String?, leading: @[Composable] androidx.compose.runtime.internal.ComposableFunction0<kotlin.Unit>?, trailing: @[Composable] androidx.compose.runtime.internal.ComposableFunction0<kotlin.Unit>?, onClick: kotlin.Function0<kotlin.Unit>?, enabled: kotlin.Boolean, titleStyle: androidx.compose.ui.text.TextStyle, showChevron: kotlin.Boolean, details: @[Composable] androidx.compose.runtime.internal.ComposableFunction0<kotlin.Unit>?): kotlin.Unit
   skippable: true
   restartable: true
   params:
@@ -563,6 +960,7 @@ public fun com.emmah.inshape.ui.components.ListRow(title: kotlin.String, modifie
     - enabled: STABLE (primitive type)
     - titleStyle: STABLE (marked @Stable or @Immutable)
     - showChevron: STABLE (primitive type)
+    - details: STABLE (composable function type)
 
 @Composable
 public fun com.emmah.inshape.ui.components.MenuAction(text: kotlin.String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: kotlin.Function0<kotlin.Unit>, modifier: androidx.compose.ui.Modifier, enabled: kotlin.Boolean, destructive: kotlin.Boolean): kotlin.Unit
@@ -604,11 +1002,12 @@ public fun com.emmah.inshape.ui.components.OutlineButton(text: kotlin.String, on
     - size: STABLE (class with no mutable properties)
 
 @Composable
-public fun com.emmah.inshape.ui.components.Page(modifier: androidx.compose.ui.Modifier, bottomBar: @[Composable] androidx.compose.runtime.internal.ComposableFunction0<kotlin.Unit>?, topBar: @[Composable] androidx.compose.runtime.internal.ComposableFunction0<kotlin.Unit>?, scrollState: androidx.compose.foundation.ScrollState, content: @[Composable] @[ExtensionFunctionType] androidx.compose.runtime.internal.ComposableFunction1<androidx.compose.foundation.layout.ColumnScope, kotlin.Unit>): kotlin.Unit
+public fun com.emmah.inshape.ui.components.Page(modifier: androidx.compose.ui.Modifier, scrollViewportModifier: androidx.compose.ui.Modifier, bottomBar: @[Composable] androidx.compose.runtime.internal.ComposableFunction0<kotlin.Unit>?, topBar: @[Composable] androidx.compose.runtime.internal.ComposableFunction0<kotlin.Unit>?, scrollState: androidx.compose.foundation.ScrollState, content: @[Composable] @[ExtensionFunctionType] androidx.compose.runtime.internal.ComposableFunction1<androidx.compose.foundation.layout.ColumnScope, kotlin.Unit>): kotlin.Unit
   skippable: true
   restartable: true
   params:
     - modifier: STABLE (marked @Stable or @Immutable)
+    - scrollViewportModifier: STABLE (marked @Stable or @Immutable)
     - bottomBar: STABLE (composable function type)
     - topBar: STABLE (composable function type)
     - scrollState: STABLE (marked @Stable or @Immutable)
@@ -626,14 +1025,14 @@ private fun com.emmah.inshape.ui.components.PickerDialog(onDismiss: kotlin.Funct
     - content: STABLE (composable function type)
 
 @Composable
-public fun com.emmah.inshape.ui.components.Pill(text: kotlin.String, modifier: androidx.compose.ui.Modifier, tone: com.emmah.inshape.ui.components.PillTone, outlined: kotlin.Boolean): kotlin.Unit
+public fun com.emmah.inshape.ui.components.Pill(text: kotlin.String, modifier: androidx.compose.ui.Modifier, tone: com.emmah.inshape.ui.components.PillTone, style: androidx.compose.ui.text.TextStyle): kotlin.Unit
   skippable: true
   restartable: true
   params:
     - text: STABLE (String is immutable)
     - modifier: STABLE (marked @Stable or @Immutable)
     - tone: STABLE (class with no mutable properties)
-    - outlined: STABLE (primitive type)
+    - style: STABLE (marked @Stable or @Immutable)
 
 @Composable
 public fun com.emmah.inshape.ui.components.PrimaryButton(text: kotlin.String, onClick: kotlin.Function0<kotlin.Unit>, modifier: androidx.compose.ui.Modifier, icon: androidx.compose.ui.graphics.vector.ImageVector?, enabled: kotlin.Boolean, trailingIcon: androidx.compose.ui.graphics.vector.ImageVector?, inverted: kotlin.Boolean, size: com.emmah.inshape.ui.components.ButtonSize): kotlin.Unit
@@ -650,23 +1049,24 @@ public fun com.emmah.inshape.ui.components.PrimaryButton(text: kotlin.String, on
     - size: STABLE (class with no mutable properties)
 
 @Composable
-public fun com.emmah.inshape.ui.components.ProgressSegments(states: kotlin.collections.List<com.emmah.inshape.ui.components.ProgressState>, contentDescription: kotlin.String, modifier: androidx.compose.ui.Modifier, onAccent: kotlin.Boolean): kotlin.Unit
+public fun com.emmah.inshape.ui.components.ProgressSegments(states: kotlin.collections.List<com.emmah.inshape.ui.components.ProgressState>, contentDescription: kotlin.String, modifier: androidx.compose.ui.Modifier, onDarkSurface: kotlin.Boolean): kotlin.Unit
   skippable: true
   restartable: true
   params:
     - states: RUNTIME (requires runtime check)
     - contentDescription: STABLE (String is immutable)
     - modifier: STABLE (marked @Stable or @Immutable)
-    - onAccent: STABLE (primitive type)
+    - onDarkSurface: STABLE (primitive type)
 
 @Composable
-public fun com.emmah.inshape.ui.components.PushedHeader(onBack: kotlin.Function0<kotlin.Unit>, modifier: androidx.compose.ui.Modifier, title: kotlin.String, actions: @[Composable] @[ExtensionFunctionType] androidx.compose.runtime.internal.ComposableFunction1<androidx.compose.foundation.layout.RowScope, kotlin.Unit>): kotlin.Unit
+public fun com.emmah.inshape.ui.components.PushedHeader(onBack: kotlin.Function0<kotlin.Unit>, modifier: androidx.compose.ui.Modifier, title: kotlin.String, endInset: kotlin.Boolean, actions: @[Composable] @[ExtensionFunctionType] androidx.compose.runtime.internal.ComposableFunction1<androidx.compose.foundation.layout.RowScope, kotlin.Unit>): kotlin.Unit
   skippable: true
   restartable: true
   params:
     - onBack: STABLE (function type)
     - modifier: STABLE (marked @Stable or @Immutable)
     - title: STABLE (String is immutable)
+    - endInset: STABLE (primitive type)
     - actions: STABLE (composable function type)
 
 @Composable
@@ -708,6 +1108,14 @@ public fun com.emmah.inshape.ui.components.RecordedTimePicker(title: kotlin.Stri
     - originalOffset: UNSTABLE (Java class; stability cannot be inferred)
 
 @Composable
+internal fun com.emmah.inshape.ui.components.ReorderHandle(label: kotlin.String, onMove: kotlin.Function1<kotlin.Int, kotlin.Unit>): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - label: STABLE (String is immutable)
+    - onMove: STABLE (function type)
+
+@Composable
 public fun com.emmah.inshape.ui.components.ResponsiveRow(modifier: androidx.compose.ui.Modifier, content: @[Composable] @[ExtensionFunctionType] androidx.compose.runtime.internal.ComposableFunction1<androidx.compose.foundation.layout.FlowRowScope, kotlin.Unit>): kotlin.Unit
   skippable: true
   restartable: true
@@ -725,6 +1133,16 @@ public fun com.emmah.inshape.ui.components.ScreenHeader(title: kotlin.String, mo
     - trailing: STABLE (composable function type)
 
 @Composable
+public fun com.emmah.inshape.ui.components.ScreenTabs(options: kotlin.collections.List<kotlin.String>, selected: kotlin.Int, onSelect: kotlin.Function1<kotlin.Int, kotlin.Unit>, modifier: androidx.compose.ui.Modifier): kotlin.Unit
+  skippable: true
+  restartable: true
+  params:
+    - options: RUNTIME (requires runtime check)
+    - selected: STABLE (primitive type)
+    - onSelect: STABLE (function type)
+    - modifier: STABLE (marked @Stable or @Immutable)
+
+@Composable
 public fun com.emmah.inshape.ui.components.SearchField(value: kotlin.String, onChange: kotlin.Function1<kotlin.String, kotlin.Unit>, placeholder: kotlin.String, modifier: androidx.compose.ui.Modifier): kotlin.Unit
   skippable: true
   restartable: true
@@ -735,7 +1153,7 @@ public fun com.emmah.inshape.ui.components.SearchField(value: kotlin.String, onC
     - modifier: STABLE (marked @Stable or @Immutable)
 
 @Composable
-public fun com.emmah.inshape.ui.components.SectionHeader(text: kotlin.String, modifier: androidx.compose.ui.Modifier, action: kotlin.String?, onAction: kotlin.Function0<kotlin.Unit>?, quiet: kotlin.Boolean): kotlin.Unit
+public fun com.emmah.inshape.ui.components.SectionHeader(text: kotlin.String, modifier: androidx.compose.ui.Modifier, action: kotlin.String?, onAction: kotlin.Function0<kotlin.Unit>?, quiet: kotlin.Boolean, trailing: @[Composable] androidx.compose.runtime.internal.ComposableFunction0<kotlin.Unit>?): kotlin.Unit
   skippable: true
   restartable: true
   params:
@@ -744,6 +1162,7 @@ public fun com.emmah.inshape.ui.components.SectionHeader(text: kotlin.String, mo
     - action: STABLE (class with no mutable properties)
     - onAction: STABLE (function type)
     - quiet: STABLE (primitive type)
+    - trailing: STABLE (composable function type)
 
 @Composable
 public fun com.emmah.inshape.ui.components.SegmentedControl(options: kotlin.collections.List<kotlin.String>, selected: kotlin.Int, onSelect: kotlin.Function1<kotlin.Int, kotlin.Unit>, modifier: androidx.compose.ui.Modifier, compact: kotlin.Boolean): kotlin.Unit
@@ -795,7 +1214,7 @@ public fun com.emmah.inshape.ui.components.TextAction(text: kotlin.String, onCli
     - enabled: STABLE (primitive type)
 
 @Composable
-public fun com.emmah.inshape.ui.components.TextField(value: kotlin.String, label: kotlin.String, onChange: kotlin.Function1<kotlin.String, kotlin.Unit>, modifier: androidx.compose.ui.Modifier, singleLine: kotlin.Boolean, error: kotlin.String?): kotlin.Unit
+public fun com.emmah.inshape.ui.components.TextField(value: kotlin.String, label: kotlin.String, onChange: kotlin.Function1<kotlin.String, kotlin.Unit>, modifier: androidx.compose.ui.Modifier, singleLine: kotlin.Boolean, error: kotlin.String?, placeholder: kotlin.String?): kotlin.Unit
   skippable: true
   restartable: true
   params:
@@ -805,6 +1224,7 @@ public fun com.emmah.inshape.ui.components.TextField(value: kotlin.String, label
     - modifier: STABLE (marked @Stable or @Immutable)
     - singleLine: STABLE (primitive type)
     - error: STABLE (class with no mutable properties)
+    - placeholder: STABLE (class with no mutable properties)
 
 @Composable
 private fun com.emmah.inshape.ui.components.calendarDateFormatter(): androidx.compose.material3.DatePickerFormatter
@@ -827,6 +1247,13 @@ public fun com.emmah.inshape.ui.theme.ActivityTheme(settings: com.emmah.inshape.
     - content: STABLE (composable function type)
 
 @Composable
+public fun com.emmah.inshape.ui.theme.ArtworkWash.brush(useDark: kotlin.Boolean): androidx.compose.ui.graphics.Brush
+  skippable: false
+  restartable: false
+  params:
+    - useDark: STABLE (primitive type)
+
+@Composable
 public fun com.emmah.inshape.ui.theme.InShapeTheme(mode: com.emmah.inshape.ui.theme.ThemeMode, content: @[Composable] androidx.compose.runtime.internal.ComposableFunction0<kotlin.Unit>): kotlin.Unit
   skippable: true
   restartable: true
@@ -836,6 +1263,12 @@ public fun com.emmah.inshape.ui.theme.InShapeTheme(mode: com.emmah.inshape.ui.th
 
 @Composable
 public fun com.emmah.inshape.ui.theme.InShapeTheme.colors(): com.emmah.inshape.ui.theme.InShapeColors
+  skippable: false
+  restartable: false
+  params:
+
+@Composable
+internal fun com.emmah.inshape.ui.theme.hasArtworkColumns(): kotlin.Boolean
   skippable: false
   restartable: false
   params:

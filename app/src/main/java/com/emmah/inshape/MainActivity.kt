@@ -55,7 +55,9 @@ open class MainActivity : ComponentActivity() {
         acceptIntent(intent)
     }
     private fun acceptIntent(intent: Intent) {
-        if (intent.action in listOf(OPEN_TODAY, OPEN_WORKOUT, OPEN_FINISH) || (allowWorkoutStart && intent.action == START_OR_RESUME)) {
+        if (intent.action in listOf(OPEN_TODAY, OPEN_WORKOUT, OPEN_FINISH, OPEN_MUSIC) ||
+            (allowWorkoutStart && intent.action == START_OR_RESUME)
+        ) {
             entryAction = intent.action!! to ++entrySequence
         }
     }
@@ -64,5 +66,6 @@ open class MainActivity : ComponentActivity() {
         const val OPEN_WORKOUT = "com.emmah.inshape.OPEN_WORKOUT"
         const val OPEN_FINISH = "com.emmah.inshape.OPEN_FINISH"
         const val OPEN_TODAY = "com.emmah.inshape.OPEN_TODAY"
+        const val OPEN_MUSIC = "com.emmah.inshape.OPEN_MUSIC"
     }
 }

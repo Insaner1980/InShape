@@ -7,6 +7,8 @@ import android.text.format.DateFormat
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -25,6 +27,7 @@ import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.Workout
 import com.emmah.inshape.data.WorkoutTiming
 import com.emmah.inshape.data.resolveRecordedTime
+import com.emmah.inshape.ui.components.DialogAction
 import com.emmah.inshape.ui.components.InShapeCard
 import com.emmah.inshape.ui.components.KeyValueRow
 import com.emmah.inshape.ui.components.NumberField
@@ -213,9 +216,6 @@ fun WorkoutTimingEditor(
         ) {
             SectionHeader("Recorded timing")
             if (zone != vm.container.clock.zone) Text("Recorded in ${zone.id}", color = InShapeTheme.colors.textSecondary)
-            TextAction(if (form.unknownTimes) "Use recorded times" else "I don't know the times", {
-                edit(form.copy(unknownTimes = !form.unknownTimes))
-            })
             if (!form.unknownTimes) {
                 KeyValueRow("Started", "${dateLabel(form.startDate)}, ${timeLabel(form.startTime)}", numeric = true) {
                     endpoint = "Started"
@@ -228,8 +228,15 @@ fun WorkoutTimingEditor(
                     computedDuration < 0 -> "Finish is before start"
                     else -> formatDuration(computedDuration)
                 }
-                KeyValueRow("Elapsed time", elapsed, numeric = true)
+                if (computedDuration != null && (computedDuration < 0 || computedDuration / 60 != form.duration.toLongOrNull())) {
+                    KeyValueRow("Elapsed time", elapsed, numeric = true)
+                }
             }
+            TextAction(
+                if (form.unknownTimes) "Use recorded times" else "I don't know the times",
+                { edit(form.copy(unknownTimes = !form.unknownTimes)) },
+                icon = Icons.Outlined.Schedule
+            )
             NumberField(
                 form.duration,
                 { edit(form.copy(duration = it)) },
@@ -257,7 +264,7 @@ fun WorkoutTimingEditor(
                     }
                 }
             },
-            confirmButton = { TextAction("Close", { endpoint = null }) }
+            confirmButton = { DialogAction("Close", { endpoint = null }) }
         )
     }
     picker?.let { field ->

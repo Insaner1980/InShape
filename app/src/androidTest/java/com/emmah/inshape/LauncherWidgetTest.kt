@@ -85,7 +85,7 @@ class LauncherWidgetTest {
             return (0 until node.childCount).firstNotNullOfOrNull { node.getChild(it)?.let(::find) }
         }
         val roots = sequenceOf(automation.rootInActiveWindow) + automation.windows.asSequence().map { it.root }
-        var action = roots.filterNotNull().filter { it.packageName?.toString() != "com.emmah.inshape" }
+        var action = roots.filterNotNull().filter { it.packageName?.toString() != BuildConfig.APPLICATION_ID }
             .firstNotNullOfOrNull(::find)
         while (action != null && !action.isClickable) action = action.parent
         return action?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true

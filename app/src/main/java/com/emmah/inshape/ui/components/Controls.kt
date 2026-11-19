@@ -2,6 +2,7 @@ package com.emmah.inshape.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,12 +12,14 @@ import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -39,6 +42,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -65,11 +69,12 @@ fun InShapeCard(
     },
     onClick: (() -> Unit)? = null,
     gap: Dp = Dimens.inner,
+    wash: Brush? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val body: @Composable () -> Unit = {
         Column(
-            Modifier.padding(contentPadding),
+            Modifier.then(if (wash == null) Modifier else Modifier.background(wash)).padding(contentPadding),
             verticalArrangement = Arrangement.spacedBy(gap),
             content = content
         )
@@ -93,6 +98,7 @@ val LocalPageSnackbar = staticCompositionLocalOf<SnackbarHostState?> { null }
 @Composable
 fun Page(
     modifier: Modifier = Modifier,
+    scrollViewportModifier: Modifier = Modifier,
     bottomBar: (@Composable () -> Unit)? = null,
     topBar: (@Composable () -> Unit)? = null,
     scrollState: ScrollState = rememberScrollState(),
@@ -101,7 +107,7 @@ fun Page(
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Column(Modifier.widthIn(max = Dimens.maxPageWidth).fillMaxWidth().imePadding()) {
             topBar?.invoke()
-            Box(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
+            Box(Modifier.weight(1f).fillMaxWidth().clipToBounds().then(scrollViewportModifier)) {
                 Column(
                     Modifier.fillMaxSize().verticalScroll(scrollState).padding(
                         start = Dimens.screenPadding,
@@ -125,7 +131,7 @@ fun Page(
 }
 
 @Composable
-private fun BottomActionBar(scrolledContent: Boolean, content: @Composable () -> Unit) {
+internal fun BottomActionBar(scrolledContent: Boolean, content: @Composable () -> Unit) {
     val colors = InShapeTheme.colors
     Surface(color = colors.background) {
         Column {
@@ -146,7 +152,13 @@ private fun BottomActionBar(scrolledContent: Boolean, content: @Composable () ->
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PushedHeader(onBack: () -> Unit, modifier: Modifier = Modifier, title: String = "", actions: @Composable RowScope.() -> Unit = {}) {
+fun PushedHeader(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    title: String = "",
+    endInset: Boolean = false,
+    actions: @Composable RowScope.() -> Unit = {}
+) {
     val colors = InShapeTheme.colors
     TopAppBar(
         title = { if (title.isNotEmpty()) Text(title, style = MaterialTheme.typography.titleLarge) },
@@ -156,7 +168,10 @@ fun PushedHeader(onBack: () -> Unit, modifier: Modifier = Modifier, title: Strin
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back))
             }
         },
-        actions = actions,
+        actions = {
+            actions()
+            if (endInset) Spacer(Modifier.width(Dimens.headerActionEnd))
+        },
         expandedHeight = if (LocalDensity.current.fontScale >= 1.3f && title.isNotEmpty()) Dimens.topBarLarge else Dimens.rowMinTwoLine,
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = colors.background,
@@ -227,7 +242,8 @@ fun SectionHeader(
     modifier: Modifier = Modifier,
     action: String? = null,
     onAction: (() -> Unit)? = null,
-    quiet: Boolean = false
+    quiet: Boolean = false,
+    trailing: (@Composable () -> Unit)? = null
 ) {
     ResponsiveRow(modifier.padding(top = Dimens.sectionGap - Dimens.itemGap)) {
         Text(
@@ -237,6 +253,7 @@ fun SectionHeader(
             color = if (quiet) InShapeTheme.colors.textSecondary else InShapeTheme.colors.text
         )
         if (action != null && onAction != null) TextAction(action, onAction)
+        trailing?.invoke()
     }
 }
 

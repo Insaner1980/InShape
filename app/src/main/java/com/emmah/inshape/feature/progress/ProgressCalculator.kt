@@ -10,7 +10,13 @@ import java.time.temporal.ChronoUnit
 
 private const val MAX_ATTENDANCE_WEEKS = 260L
 
-enum class ExerciseMetric { WEIGHT, REPS, REPS_AT_LOAD, LOAD_AT_REPS, SET_COUNT }
+enum class ExerciseMetric(val label: String) {
+    WEIGHT("Heaviest weight"),
+    REPS("Most reps"),
+    REPS_AT_LOAD("Reps at a set weight"),
+    LOAD_AT_REPS("Weight for a rep target"),
+    SET_COUNT("Number of sets")
+}
 data class ExerciseMetricQuery(
     val exerciseId: String,
     val equipmentId: String,

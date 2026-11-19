@@ -56,6 +56,23 @@ class JournalRepositoryTest {
         assertEquals("8", saved.last().rawReps)
     }
 
+    @Test fun noteAndDiscomfortUpdatesPreserveEachOther() = runBlocking {
+        val exercise = Exercise(name = "Row")
+        repo.saveExercise(exercise)
+        val workout = repo.startWorkout(StartSource.Empty)
+        val item = repo.addExercise(workout, exercise.id)
+        repo.saveItemNote(item, discomfort = true)
+        repo.saveItemNote(item, note = "Keep shoulders down")
+        val noted = repo.snapshot().items.single { it.id == item }
+        assertTrue(noted.discomfort)
+        assertEquals("Keep shoulders down", noted.note)
+
+        repo.saveItemNote(item, discomfort = false)
+        val updated = repo.snapshot().items.single { it.id == item }
+        assertFalse(updated.discomfort)
+        assertEquals("Keep shoulders down", updated.note)
+    }
+
     @Test fun staleCheckInNoteCannotOverwriteAnotherPhaseAndRollsBack() = runBlocking {
         val id = repo.startWorkout(StartSource.Empty)
         repo.saveWorkoutNote(id, "Newer note")

@@ -145,6 +145,8 @@ dependencies {
     implementation(libs.navigation)
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.session)
     ksp(libs.room.compiler)
     implementation(libs.serialization)
     implementation(libs.coroutines)
@@ -158,6 +160,8 @@ dependencies {
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.test.runner)
+    // Compose Test still requests Espresso 3.5, which calls an InputManager API removed in Android 17.
+    androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.compose.test.junit)
     debugImplementation(libs.compose.test.manifest)
 }

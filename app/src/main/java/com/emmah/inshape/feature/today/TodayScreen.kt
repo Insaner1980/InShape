@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Settings
@@ -19,6 +20,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -27,6 +29,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import com.emmah.inshape.R
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.Routine
@@ -34,10 +37,13 @@ import com.emmah.inshape.data.StartSource
 import com.emmah.inshape.data.Workout
 import com.emmah.inshape.data.parseWorkoutInstant
 import com.emmah.inshape.data.weekStart
+import com.emmah.inshape.feature.library.routineArtwork
+import com.emmah.inshape.ui.components.ArtworkHeader
 import com.emmah.inshape.ui.components.IconCircleButton
 import com.emmah.inshape.ui.components.InShapeCard
 import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListRow
+import com.emmah.inshape.ui.components.OutlineButton
 import com.emmah.inshape.ui.components.Page
 import com.emmah.inshape.ui.components.PrimaryButton
 import com.emmah.inshape.ui.components.ProgressSegments
@@ -45,7 +51,7 @@ import com.emmah.inshape.ui.components.ProgressState
 import com.emmah.inshape.ui.components.ResponsiveRow
 import com.emmah.inshape.ui.components.ScreenHeader
 import com.emmah.inshape.ui.components.SectionHeader
-import com.emmah.inshape.ui.components.TextAction
+import com.emmah.inshape.ui.theme.ArtworkWash
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
@@ -115,19 +121,15 @@ fun TodayScreen(
             } else {
                 colors.background
             },
-            gap = Dimens.itemGap
+            gap = Dimens.itemGap,
+            wash = if (active != null) ArtworkWash.Active.brush(useDark = true) else ArtworkWash.Routine.brush()
         ) {
             val text = if (accent) colors.onInk else colors.text
             val secondary = if (accent) colors.onInk.copy(alpha = .72f) else colors.textSecondary
-            if (active != null || routine != null) {
+            if (active != null) {
                 ResponsiveRow {
-                    Text(
-                        if (active != null) "In progress" else "Next up",
-                        Modifier.weight(1f),
-                        color = secondary,
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                    if (active != null && recordedStart != null) {
+                    Text("In progress", Modifier.weight(1f), color = secondary, style = MaterialTheme.typography.labelSmall)
+                    if (recordedStart != null) {
                         Text(
                             "Started ${recordedStart.workoutTime(ZoneId.of(active.row.zoneId), uses24Hours)}",
                             color = secondary,
@@ -135,17 +137,24 @@ fun TodayScreen(
                         )
                     }
                 }
-            }
-            Text(active?.row?.title ?: routine?.title ?: "Start a workout", color = text, style = MaterialTheme.typography.titleLarge)
-            if (active != null) {
-                if (elapsed != null) {
-                    Text(formatElapsed(elapsed!!), color = text, style = MaterialTheme.typography.displaySmall)
-                } else {
-                    Text(
-                        "Started ${LocalDate.parse(active.row.journalDate).displayDate("EEE d MMM")}",
-                        color = secondary,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                ArtworkHeader(
+                    R.drawable.art_training_motion_dark.takeIf { recordedStart != null },
+                    150.dp,
+                    64.dp,
+                    mirror = true
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)) {
+                        Text(active.row.title, color = text, style = MaterialTheme.typography.titleLarge)
+                        if (elapsed != null) {
+                            Text(formatElapsed(elapsed!!), color = text, style = MaterialTheme.typography.displaySmall)
+                        } else {
+                            Text(
+                                "Started ${LocalDate.parse(active.row.journalDate).displayDate("EEE d MMM")}",
+                                color = secondary,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
                 }
                 ProgressSegments(
                     active.items.map {
@@ -156,7 +165,7 @@ fun TodayScreen(
                         }
                     },
                     "${active.doneCount} of ${active.items.size} exercises done",
-                    onAccent = accent
+                    onDarkSurface = true
                 )
                 Text(
                     "${active.doneCount} of ${active.items.size} exercises done",
@@ -164,15 +173,31 @@ fun TodayScreen(
                     style = MaterialTheme.typography.bodyMedium
                 )
             } else {
-                Text(
-                    routine?.let {
-                        val count = data.routineItems.count { item -> item.routineId == it.id }
-                        pluralStringResource(R.plurals.exercise_count, count, count) +
-                            (it.durationMinutes?.let { minutes -> ", about $minutes min" } ?: "")
-                    } ?: "Pick a routine below or add exercises as you go.",
-                    color = secondary,
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                val items = remember(routine, data.routineItems) { data.routineItems.filter { it.routineId == routine?.id } }
+                val artwork = remember(items, routine?.durationMinutes, data.exercises) {
+                    val exercises = data.exercises.associateBy { it.id }
+                    routineArtwork(items.map { exercises[it.exerciseId] }, routine?.durationMinutes)
+                }
+                ArtworkHeader(
+                    artwork,
+                    136.dp,
+                    if (artwork == R.drawable.art_training_strength_barbell) 96.dp else 88.dp,
+                    cropEnd = artwork != R.drawable.art_training_mobility_mat
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)) {
+                        if (routine != null) Text("Next up", color = secondary, style = MaterialTheme.typography.labelSmall)
+                        Text(routine?.title ?: "Start a workout", color = text, style = MaterialTheme.typography.titleLarge)
+                        val detail = if (routine == null) {
+                            "Pick a routine below or add exercises as you go."
+                        } else {
+                            pluralStringResource(R.plurals.exercise_count, items.size, items.size)
+                        }
+                        Text(detail, color = secondary, style = MaterialTheme.typography.bodyMedium)
+                        routine?.durationMinutes?.let {
+                            Text("About $it min", color = secondary, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
             }
             PrimaryButton(if (active == null) (if (routine == null) "Start" else "Start workout") else "Resume workout", {
                 if (active != null) {
@@ -183,20 +208,17 @@ fun TodayScreen(
             }, Modifier.fillMaxWidth(), icon = if (active == null) Icons.Outlined.PlayArrow else null, inverted = accent)
         }
         if (active == null && routine != null) {
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                TextAction("Start empty workout", { onStart(StartSource.Empty) })
-            }
+            OutlineButton("Start empty workout", { onStart(StartSource.Empty) }, Modifier.fillMaxWidth(), icon = Icons.Outlined.Add)
         }
-        Column(Modifier.padding(top = Dimens.inner), verticalArrangement = Arrangement.spacedBy(Dimens.rowPadding)) {
-            ResponsiveRow {
-                Text("This week", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+        Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
+            SectionHeader("This week", trailing = {
                 Text(
                     data.preferences.weeklyGoal?.let { "${thisWeek.size} of $it" }
                         ?: pluralStringResource(R.plurals.workout_count, thisWeek.size, thisWeek.size),
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.textSecondary
                 )
-            }
+            })
             Row(Modifier.fillMaxWidth()) {
                 for (day in 0..6) {
                     val date = week.plusDays(day.toLong())
@@ -220,7 +242,7 @@ fun TodayScreen(
                             } else if (isToday) {
                                 Color.Transparent
                             } else {
-                                colors.surface
+                                if (colors.isDark) colors.surface else colors.inactiveMark
                             },
                             border = if (isToday &&
                                 !done
@@ -253,12 +275,15 @@ fun TodayScreen(
                 }
             }
         }
-        SectionHeader("Routines", action = "See all", onAction = { onOpenRoutine(null) })
+        val otherRoutines = data.routines.filter { active != null || it.id != routine?.id }.take(3)
+        if (data.routines.isEmpty() || otherRoutines.isNotEmpty()) {
+            SectionHeader("Routines", action = "See all", onAction = { onOpenRoutine(null) })
+        }
         if (data.routines.isEmpty()) {
             ListRow("Create a routine", onClick = { onOpenRoutine(null) })
-        } else {
+        } else if (otherRoutines.isNotEmpty()) {
             ListCard {
-                data.routines.filter { active != null || it.id != routine?.id }.take(3).forEach { saved ->
+                otherRoutines.forEach { saved ->
                     item {
                         val count = data.routineItems.count { it.routineId == saved.id }
                         ListRow(saved.title, trailing = {

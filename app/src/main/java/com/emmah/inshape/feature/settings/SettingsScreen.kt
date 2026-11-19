@@ -8,16 +8,26 @@ import android.text.format.DateFormat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,28 +40,31 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.emmah.inshape.JournalViewModel
+import com.emmah.inshape.R
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.newId
 import com.emmah.inshape.health.HealthPrivacyActivity
 import com.emmah.inshape.health.HealthSettings
 import com.emmah.inshape.reminders.ReminderScheduler
 import com.emmah.inshape.transfer.BackupControls
-import com.emmah.inshape.ui.components.GroupLabel
+import com.emmah.inshape.ui.components.DialogAction
 import com.emmah.inshape.ui.components.InShapeSwitch
 import com.emmah.inshape.ui.components.KeyValueRow
 import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListRow
 import com.emmah.inshape.ui.components.OutlineButton
 import com.emmah.inshape.ui.components.Page
-import com.emmah.inshape.ui.components.SegmentedControl
+import com.emmah.inshape.ui.components.SectionHeader
 import com.emmah.inshape.ui.components.Stepper
 import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.components.TextField
@@ -60,6 +73,7 @@ import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.InShapeType
 import com.emmah.inshape.ui.theme.ThemeMode
+import com.emmah.inshape.ui.theme.hasArtworkColumns
 import com.emmah.inshape.ui.theme.workoutTime
 import com.emmah.inshape.widget.WidgetUpdater
 import java.time.DayOfWeek
@@ -99,8 +113,6 @@ fun SettingsScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifi
     val reminderStatus = when {
         !preferences.remindersEnabled -> null
 
-        preferences.remindersHeld -> "Paused after restore"
-
         !notificationsAllowed -> "Notifications blocked in Android"
 
         days.isEmpty() -> "Choose at least one day"
@@ -117,7 +129,7 @@ fun SettingsScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifi
             " at ${LocalTime.parse(preferences.reminderTime).workoutTime(DateFormat.is24HourFormat(context))}"
     }
     Page(modifier) {
-        GroupLabel("Profile")
+        SectionHeader("Profile")
         ListCard {
             item {
                 KeyValueRow("Name", preferences.name.ifBlank { "Add name" }, onClick = {
@@ -153,34 +165,40 @@ fun SettingsScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifi
                 })
             }
         }
-        GroupLabel("Reminders")
+        SectionHeader("Reminders")
         ListCard {
             item {
-                val subtitle = if (preferences.remindersHeld) "Paused after restore" else reminderStatus
-                ListRow("Workout reminders", titleStyle = MaterialTheme.typography.bodyLarge, subtitle = subtitle, trailing = {
-                    InShapeSwitch(preferences.remindersEnabled, { enabled ->
-                        vm.write {
-                            updatePreferences(
-                                snapshot().preferences.copy(
-                                    remindersEnabled = enabled,
-                                    remindersHeld = false
-                                )
+                val held = preferences.remindersHeld
+                val subtitle = if (held) "Paused after restoring a backup" else reminderStatus
+                fun setReminders(enabled: Boolean) {
+                    vm.write {
+                        updatePreferences(
+                            snapshot().preferences.copy(
+                                remindersEnabled = enabled,
+                                remindersHeld = false
                             )
-                        }
-                        if (enabled && Build.VERSION.SDK_INT >= 33 &&
-                            !notificationsAllowed
-                        ) {
-                            permission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        }
-                    }, "Enable workout reminders")
-                })
-            }
-            if (preferences.remindersHeld) {
-                item {
-                    TextAction("Resume", {
-                        vm.write { updatePreferences(snapshot().preferences.copy(remindersHeld = false)) }
-                    })
+                        )
+                    }
+                    if (enabled && Build.VERSION.SDK_INT >= 33 &&
+                        !notificationsAllowed
+                    ) {
+                        permission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
                 }
+                ListRow(
+                    "Workout reminders",
+                    subtitle = subtitle,
+                    trailing = { InShapeSwitch(preferences.remindersEnabled && !held, ::setReminders, "Enable workout reminders") },
+                    details = if (held) {
+                        (
+                            {
+                                TextAction("Turn on again", { setReminders(true) }, icon = Icons.Outlined.NotificationsActive)
+                            }
+                            )
+                    } else {
+                        null
+                    }
+                )
             }
             if (preferences.remindersEnabled) {
                 item {
@@ -245,20 +263,11 @@ fun SettingsScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifi
             }
         }
         HealthSettings(data, vm)
-        GroupLabel("Appearance")
+        SectionHeader("Appearance")
         Column(verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)) {
-            Text("Theme", style = MaterialTheme.typography.bodyLarge)
-            SegmentedControl(
-                ThemeMode.entries.map {
-                    it.name
-                },
-                mode.ordinal,
-                {
-                    vm.container.themeSettings.set(ThemeMode.entries[it])
-                }
-            )
+            ThemePreviews(mode, vm.container.themeSettings::set)
         }
-        GroupLabel("Your data")
+        SectionHeader("Your data")
         BackupControls(vm, preferences.lastBackupAt) {
             item {
                 ListRow(
@@ -291,7 +300,7 @@ fun SettingsScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifi
                 color = colors.textSecondary
             )
         }
-        GroupLabel("Privacy")
+        SectionHeader("Privacy")
         ListCard {
             item {
                 ListRow("Privacy and permissions", onClick = {
@@ -307,7 +316,7 @@ fun SettingsScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifi
             title = { Text("Name") },
             text = { TextField(name, "Name", { name = it }, singleLine = true) },
             confirmButton = {
-                TextAction("Save", {
+                DialogAction("Save", {
                     val value = name
                     vm.write {
                         updatePreferences(snapshot().preferences.copy(name = value))
@@ -315,7 +324,7 @@ fun SettingsScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifi
                     }
                 })
             },
-            dismissButton = { TextAction("Cancel", { nameEditSession = null }) }
+            dismissButton = { DialogAction("Cancel", { nameEditSession = null }) }
         )
     }
     if (editReminderTime) {
@@ -323,5 +332,51 @@ fun SettingsScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifi
             vm.write { updatePreferences(snapshot().preferences.copy(reminderTime = time, remindersHeld = false)) }
             editReminderTime = false
         }, { editReminderTime = false })
+    }
+}
+
+@Composable
+private fun ThemePreviews(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
+    val colors = InShapeTheme.colors
+    val choices = listOf(
+        ThemeMode.System to R.drawable.art_settings_theme_system,
+        ThemeMode.Light to R.drawable.art_settings_theme_light,
+        ThemeMode.Dark to R.drawable.art_settings_theme_dark
+    )
+    fun Modifier.themeOption(mode: ThemeMode): Modifier {
+        val isSelected = selected == mode
+        return then(if (isSelected) Modifier.border(2.dp, colors.ink, InShapeShapes.field) else Modifier)
+            .selectable(isSelected, role = Role.RadioButton, onClick = { onSelect(mode) })
+    }
+    BoxWithConstraints(Modifier.fillMaxWidth().selectableGroup()) {
+        if (hasArtworkColumns()) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                choices.forEach { (mode, artwork) ->
+                    Column(
+                        Modifier.weight(1f).themeOption(mode).padding(4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Image(painterResource(artwork), null, Modifier.widthIn(max = 112.dp).fillMaxWidth().aspectRatio(160f / 124f))
+                        Text(mode.name)
+                    }
+                }
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                choices.forEach { (mode, artwork) ->
+                    val isSelected = selected == mode
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = Dimens.touch).themeOption(mode).padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Image(painterResource(artwork), null, Modifier.size(48.dp))
+                        Text(mode.name, Modifier.weight(1f))
+                        RadioButton(isSelected, onClick = null)
+                    }
+                }
+            }
+        }
     }
 }

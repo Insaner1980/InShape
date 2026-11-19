@@ -42,15 +42,25 @@ object DemoFixtures {
             "SettingsConfigured",
             "Empty",
             "SparseHistory",
-            "FailedSave"
+            "FailedSave",
+            "MusicHome",
+            "MusicPlaylist",
+            "WorkoutWithMusic",
+            "TodayStrength",
+            "TodayMobility",
+            "TodayShort",
+            "ProgressWithoutAttendance"
         )
+    private val artworkRoutines = mapOf("TodayStrength" to routineId, "TodayMobility" to id("mobility"), "TodayShort" to id("short"))
     fun route(state: String): String = when (state) {
         "FinishSummary" -> "finish/$activeId"
-        "ActiveWorkoutPartiallyDone" -> "workout/$activeId"
+        "ActiveWorkoutPartiallyDone", "WorkoutWithMusic" -> "workout/$activeId"
+        "MusicHome" -> "Music"
+        "MusicPlaylist" -> "music-playlist/${DemoMusic.NIGHT_DRIVE_ID}"
         "ExerciseWithSetup" -> "exercise/$pulldownId"
         "CheckInAfter" -> "checkin/$activeId/AFTER"
         "ProgressWithHistory" -> "History?view=progress&exercise=$pulldownId"
-        "SparseHistory" -> "History?view=progress"
+        "SparseHistory", "ProgressWithoutAttendance" -> "History?view=progress"
         "HistoryNovember" -> "History"
         "LibraryRoutineExpanded" -> "routine/$routineId"
         "SettingsConfigured" -> "Settings"
@@ -312,7 +322,9 @@ object DemoFixtures {
                 )
             }
         }
-        if (state !in setOf("ProgressWithHistory", "HistoryNovember", "SparseHistory", "Empty")) {
+        if (state !in artworkRoutines &&
+            state !in setOf("ProgressWithHistory", "HistoryNovember", "SparseHistory", "Empty", "ProgressWithoutAttendance")
+        ) {
             workouts +=
                 WorkoutEntity(
                     activeId,
@@ -425,9 +437,14 @@ object DemoFixtures {
             )
             if (state != "Empty") {
                 exercises.forEach { dao.put(it) }
-                routines.forEach { dao.put(it) }
-                routineItems.forEach { dao.put(it) }
-                val selectedWorkouts = if (state == "SparseHistory") workouts.take(1) else workouts
+                val selectedRoutine = artworkRoutines[state]
+                routines.filter { selectedRoutine == null || it.id == selectedRoutine }.forEach { dao.put(it) }
+                routineItems.filter { selectedRoutine == null || it.routineId == selectedRoutine }.forEach { dao.put(it) }
+                val selectedWorkouts = when {
+                    state == "SparseHistory" -> workouts.take(1)
+                    state == "ProgressWithoutAttendance" || selectedRoutine != null -> emptyList()
+                    else -> workouts
+                }
                 val selectedIds = selectedWorkouts.map { it.id }.toSet()
                 val selectedItems = items.filter {
                     it.workoutId in

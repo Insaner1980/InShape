@@ -1,7 +1,9 @@
 package com.emmah.inshape.feature.progress
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -13,17 +15,22 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import com.emmah.inshape.R
 import com.emmah.inshape.data.DateRange
 import com.emmah.inshape.data.Exercise
 import com.emmah.inshape.data.JournalSnapshot
+import com.emmah.inshape.data.MeasurementBasis
 import com.emmah.inshape.data.NumericInputResult
 import com.emmah.inshape.data.parseDecimalInput
 import com.emmah.inshape.data.weekStart
 import com.emmah.inshape.feature.checkin.BodyLevelPills
 import com.emmah.inshape.feature.checkin.bodyRegions
-import com.emmah.inshape.ui.components.ActionRow
+import com.emmah.inshape.ui.components.ArtworkHeader
+import com.emmah.inshape.ui.components.DisclosureRow
 import com.emmah.inshape.ui.components.EmptyState
-import com.emmah.inshape.ui.components.FilterPill
 import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListRow
 import com.emmah.inshape.ui.components.NumberField
@@ -34,8 +41,9 @@ import com.emmah.inshape.ui.components.ResponsiveRow
 import com.emmah.inshape.ui.components.SectionHeader
 import com.emmah.inshape.ui.components.SegmentedControl
 import com.emmah.inshape.ui.components.SelectField
-import com.emmah.inshape.ui.components.TextAction
+import com.emmah.inshape.ui.theme.ArtworkWash
 import com.emmah.inshape.ui.theme.Dimens
+import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.displayDate
 import java.time.LocalDate
@@ -88,14 +96,7 @@ fun ProgressScreen(
         },
         today
     )
-    val options =
-        listOf(
-            "Weight / resistance",
-            "Repetitions",
-            "Reps at a fixed load",
-            "Load at minimum reps",
-            "Set count"
-        )
+    val measures = ExerciseMetric.entries.map { it.label }
     val parsedLoad = (parseDecimalInput(load) as? NumericInputResult.Valid)?.value
     var region by rememberSaveable {
         mutableStateOf(data.observations.firstOrNull()?.region ?: "lower_back")
@@ -106,25 +107,35 @@ fun ProgressScreen(
     var showValues by rememberSaveable { mutableStateOf(false) }
     Page(modifier) {
         header()
-        ActionRow {
-            listOf("4 weeks", "12 weeks", "All").forEach { value -> FilterPill(value, period == value, { period = value }) }
-        }
+        val periods = listOf("4 weeks", "12 weeks", "All")
+        SegmentedControl(periods, periods.indexOf(period), { period = periods[it] }, compact = true)
         Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
             val weeks = weeklyAttendance(history, range)
             SectionHeader("Workouts per week")
             if (history.none { it.qualifiesForAttendance && it.row.journalDate in range }) {
-                Text(
-                    "No workouts recorded in this period.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.textSecondary
-                )
+                ArtworkHeader(
+                    R.drawable.art_history_empty_training_log,
+                    104.dp,
+                    76.dp,
+                    Modifier.clip(InShapeShapes.card).background(ArtworkWash.Paper.brush()).padding(Dimens.inner)
+                ) {
+                    Text("No workouts recorded in this period.", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+                }
             } else {
-                Column {
-                    Text(
-                        String.format(Locale.ENGLISH, "%.1f", averageWeeklyAttendance(history, range, today)),
-                        style = MaterialTheme.typography.displaySmall
-                    )
-                    Text("on average", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+                ArtworkHeader(
+                    R.drawable.art_history_stacked_plates,
+                    152.dp,
+                    64.dp,
+                    Modifier.clip(InShapeShapes.card).background(ArtworkWash.Equipment.brush()).padding(Dimens.inner),
+                    cropEnd = true
+                ) {
+                    Column {
+                        Text(
+                            String.format(Locale.ENGLISH, "%.1f", averageWeeklyAttendance(history, range, today)),
+                            style = MaterialTheme.typography.displaySmall
+                        )
+                        Text("on average", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+                    }
                 }
                 if (weeks.first().week > range.start) {
                     Text(
@@ -137,7 +148,7 @@ fun ProgressScreen(
             }
         }
         if (!showExercise) {
-            SectionHeader("Exercises", quiet = true)
+            SectionHeader("Exercises")
             ListCard {
                 available.distinctBy { it.row.exerciseId }.forEach { exercise ->
                     val series =
@@ -158,18 +169,18 @@ fun ProgressScreen(
                         ListRow(
                             exercise.row.name,
                             subtitle = latest?.let { value ->
-                                "${value.stripTrailingZeros().toPlainString()} ${exercise.row.basis}" +
+                                MeasurementBasis.fromKey(exercise.row.basis).formatValue(value.stripTrailingZeros().toPlainString()) +
                                     (
                                         change?.takeIf {
                                             it.signum() != 0
                                         }?.let {
                                             val direction = if (it.signum() > 0) "up" else "down"
                                             val amount = it.abs().stripTrailingZeros().toPlainString()
-                                            ", $direction $amount ${exercise.row.basis}"
+                                            ", $direction ${MeasurementBasis.fromKey(exercise.row.basis).formatValue(amount)}"
                                         }
                                             ?: ""
                                         )
-                            } ?: "Completion recorded",
+                            } ?: stringResource(R.string.done_without_weight),
                             trailing = { ExerciseSparkline(series) },
                             onClick = {
                                 selected = exercise.row.exerciseId
@@ -205,16 +216,8 @@ fun ProgressScreen(
                 val points = calculateExerciseSeries(history, query)
                 val unit = when (query.metric) {
                     ExerciseMetric.REPS, ExerciseMetric.REPS_AT_LOAD -> "reps"
-
                     ExerciseMetric.SET_COUNT -> "sets"
-
-                    else -> if (query.basis ==
-                        "assistance_kg"
-                    ) {
-                        "kg assistance"
-                    } else {
-                        query.basis
-                    }
+                    else -> MeasurementBasis.fromKey(query.basis).unitLabel
                 }
                 val recorded = points.filter { it.value != null }
                 Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
@@ -267,23 +270,9 @@ fun ProgressScreen(
                             }
                         }
                     }
-                    SegmentedControl(
-                        listOf("Weight", "Reps", "Sets"),
-                        when (metric) {
-                            0, 3 -> 0
-                            1, 2 -> 1
-                            else -> 2
-                        },
-                        {
-                            metric =
-                                listOf(0, 1, 4)[it]
-                        }
-                    )
-                    SelectField("Comparison", options[metric], options, {
-                        metric = options.indexOf(it)
-                    })
+                    SelectField("Measure", measures[metric], measures, { metric = measures.indexOf(it) })
                     val basisLabels = bases.map {
-                        "${it.row.equipmentName.ifBlank { "Recorded equipment" }}, ${it.row.basis}"
+                        "${it.row.equipmentName.ifBlank { "Recorded equipment" }}, ${MeasurementBasis.fromKey(it.row.basis).optionLabel}"
                     }
                     if (bases.size >
                         1
@@ -305,16 +294,12 @@ fun ProgressScreen(
                     ) {
                         NumberField(load, {
                             load = it
-                        }, "Compare at ${item.row.basis}", decimal = true)
+                        }, "Compare at (${MeasurementBasis.fromKey(item.row.basis).unitLabel})", decimal = true)
                     }
                     if (metric ==
                         3
                     ) {
                         NumberField(minimumReps, { minimumReps = it }, "Minimum repetitions")
-                        Text(
-                            "${query.minimumReps}+ reps",
-                            style = MaterialTheme.typography.bodySmall
-                        )
                     }
                     if (metric == 2 &&
                         parsedLoad == null
@@ -347,19 +332,21 @@ fun ProgressScreen(
                 }
                 calculatePersonalBest(history, query)?.let { best ->
                     Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
-                        SectionHeader(
+                        Text(
                             when {
                                 best.previous == null -> "First recorded result"
                                 best.isNewRecord -> "New record in this period"
                                 else -> "Best in this period"
-                            }
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.textSecondary
                         )
                         Text(
                             "${best.point.value!!.stripTrailingZeros().toPlainString()} $unit",
                             style = MaterialTheme.typography.headlineSmall
                         )
                         Text(
-                            best.point.date.displayDate() + ", " + options[metric] +
+                            best.point.date.displayDate() + ", " + query.metric.label +
                                 if (metric ==
                                     3
                                 ) {
@@ -367,7 +354,7 @@ fun ProgressScreen(
                                 } else if (metric ==
                                     2
                                 ) {
-                                    ", at ${query.fixedLoad} ${query.basis}"
+                                    ", at ${MeasurementBasis.fromKey(query.basis).formatValue(query.fixedLoad.toString())}"
                                 } else {
                                     ""
                                 },
@@ -402,11 +389,6 @@ fun ProgressScreen(
                     region =
                         bodyRegions.first { it.label == label }.id
                 }, inline = true)
-                Text(
-                    "Scale 0 to 10",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.textSecondary
-                )
                 val phases = listOf("BEFORE", "AFTER", "NEXT_DAY")
                 SegmentedControl(listOf("Before", "After", "Next day"), phases.indexOf(phase), {
                     phase =
@@ -431,10 +413,7 @@ fun ProgressScreen(
                         )
                     }
                     ObservationChart(points)
-                    TextAction(if (showValues) "Hide values" else "View values", {
-                        showValues =
-                            !showValues
-                    })
+                    DisclosureRow("Values", showValues, { showValues = !showValues })
                     if (showValues) {
                         points.forEach {
                             Text(it.date.displayDate(), style = MaterialTheme.typography.bodyLarge)

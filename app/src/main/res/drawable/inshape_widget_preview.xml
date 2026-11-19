@@ -1,0 +1,5 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/inshape_widget_idle" android:width="250dp" android:height="130dp" />
+    <item android:drawable="@drawable/art_widget_resistance_band" android:gravity="bottom|end"
+        android:width="68dp" android:height="45dp" android:end="16dp" android:bottom="16dp" />
+</layer-list>

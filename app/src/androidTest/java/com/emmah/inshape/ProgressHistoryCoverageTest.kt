@@ -1,6 +1,11 @@
 package com.emmah.inshape
 
 import android.content.Context
+import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -35,6 +40,7 @@ class ProgressHistoryCoverageTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val databaseName = "progress-history-${newId()}.db"
     private lateinit var container: AppContainer
+    private lateinit var focusManager: FocusManager
 
     @After fun cleanup() {
         if (::container.isInitialized) {
@@ -45,41 +51,45 @@ class ProgressHistoryCoverageTest {
     }
 
     @Test fun weeklyCountsFollowPeriodAndAverageExcludesCurrentWeek() {
-        launch("ProgressWithHistory", "View weekly counts")
+        launch("ProgressWithHistory", "Weekly counts")
         compose.onNodeWithText("1.2").assertExists()
-        compose.clickText("View weekly counts")
-        compose.onNodeWithText("Week of 21 Sep: 1 workout").assertExists()
-        compose.onNodeWithText("Week of 9 Nov: 2 workouts").assertExists()
+        val disclosure = compose.onNodeWithText("Weekly counts")
+        disclosure.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Collapsed"))
+        compose.clickText("Weekly counts")
+        disclosure.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Expanded"))
+        compose.onNode(hasText("Week of 21 Sep") and hasText("1 workout")).assertExists()
+        compose.onNode(hasText("Week of 9 Nov") and hasText("2 workouts")).assertExists()
 
         compose.clickText("4 weeks")
         compose.onNodeWithText("2.3").assertExists()
-        compose.onNodeWithText("Week of 19 Oct: 3 workouts").assertExists()
-        compose.onNodeWithText("Week of 21 Sep: 1 workout").assertDoesNotExist()
-        compose.onNodeWithText("Week of 9 Nov: 2 workouts").assertExists()
+        compose.onNode(hasText("Week of 19 Oct") and hasText("3 workouts")).assertExists()
+        compose.onNode(hasText("Week of 21 Sep") and hasText("1 workout")).assertDoesNotExist()
+        compose.onNode(hasText("Week of 9 Nov") and hasText("2 workouts")).assertExists()
 
         compose.clickText("All")
         compose.onNodeWithText("2.0").assertExists()
-        compose.onNodeWithText("Week of 21 Sep: 1 workout").assertExists()
-        compose.clickText("Hide weekly counts")
-        compose.onNodeWithText("Week of 9 Nov: 2 workouts").assertDoesNotExist()
+        compose.onNode(hasText("Week of 21 Sep") and hasText("1 workout")).assertExists()
+        compose.clickText("Weekly counts")
+        compose.onNode(hasText("Week of 9 Nov") and hasText("2 workouts")).assertDoesNotExist()
     }
 
     @Test fun exerciseComparisonShowsMissingFixedLoadAndMinimumRepsResults() {
-        launch("ProgressWithHistory", "Comparison")
-        select("Comparison, Weight / resistance", "Reps at a fixed load")
+        launch("ProgressWithHistory", "Measure")
+        select("Measure, Heaviest weight", "Reps at a set weight")
         compose.onNodeWithText("Enter a load to compare repetitions.").performScrollTo().assertIsDisplayed()
 
-        compose.onNodeWithText("Compare at kg").performScrollTo().performTextReplacement("22.5")
+        compose.onNodeWithText("Compare at (kg)").performScrollTo().performTextReplacement("22.5")
         compose.onNodeWithText("23 Oct: 10 reps").assertExists()
-        compose.clickText("View data values")
+        compose.clickText("Data values")
         compose.onNode(hasClickAction() and hasText("13 Nov") and hasText("Not recorded"))
             .performScrollTo().performClick()
         compose.onNodeWithText("13 Nov: Not recorded").assertExists()
 
-        select("Comparison, Reps at a fixed load", "Load at minimum reps")
+        select("Measure, Reps at a set weight", "Weight for a rep target")
         compose.onNodeWithText("13 Nov: 27.5 kg").assertExists()
         compose.onNodeWithText("Minimum repetitions").performScrollTo().performTextReplacement("11")
-        compose.onNodeWithText("11+ reps").assertExists()
+        compose.runOnIdle { focusManager.clearFocus() }
+        compose.onNodeWithText("11+ reps").assertDoesNotExist()
         compose.onNodeWithText("No recorded values for this comparison.").performScrollTo().assertIsDisplayed()
     }
 
@@ -88,7 +98,7 @@ class ProgressHistoryCoverageTest {
         compose.clickText("Pain and stiffness")
         compose.onNodeWithText("Pain, mild").assertExists()
         compose.onNodeWithText("Stiffness, medium").assertExists()
-        compose.clickText("View values")
+        compose.clickText("Values")
         compose.onAllNodesWithText("Pain mild").onFirst().assertExists()
 
         compose.clickText("Before")
@@ -146,7 +156,7 @@ class ProgressHistoryCoverageTest {
         launch("HistoryNovember", "Full body A", route = "Export")
         compose.onNodeWithText("Save").assertIsNotEnabled()
         compose.clickText("Select period")
-        val confirm = compose.onNode(hasText("Select period") and hasClickAction() and hasAnyAncestor(isDialog()))
+        val confirm = compose.onNode(hasText("Apply") and hasClickAction() and hasAnyAncestor(isDialog()))
         confirm.assertIsNotEnabled()
 
         compose.onNode(hasClickAction() and hasText("Wednesday, 4 November 2026")).performClick()
@@ -175,6 +185,7 @@ class ProgressHistoryCoverageTest {
             prepare(container)
         }
         compose.setContent {
+            focusManager = LocalFocusManager.current
             InShapeTheme { AppNavigation(container, initialRoute = route) }
         }
         compose.waitUntil(30_000) {

@@ -11,7 +11,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AddAPhoto
 import androidx.compose.material.icons.outlined.Close
@@ -48,13 +51,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
 import com.emmah.inshape.JournalViewModel
+import com.emmah.inshape.R
 import com.emmah.inshape.data.DateRange
 import com.emmah.inshape.data.Exercise
 import com.emmah.inshape.data.JournalSnapshot
+import com.emmah.inshape.data.MeasurementBasis
 import com.emmah.inshape.data.PhotoAsset
 import com.emmah.inshape.feature.progress.ExerciseMetric
 import com.emmah.inshape.feature.progress.ExerciseMetricQuery
@@ -76,11 +83,13 @@ import com.emmah.inshape.ui.components.Pill
 import com.emmah.inshape.ui.components.PushedHeader
 import com.emmah.inshape.ui.components.SectionHeader
 import com.emmah.inshape.ui.components.TextAction
+import com.emmah.inshape.ui.theme.ArtworkWash
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.LightColors
 import com.emmah.inshape.ui.theme.displayDate
+import com.emmah.inshape.ui.theme.hasArtworkColumns
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -135,7 +144,7 @@ fun ExerciseScreen(
     var photoMenu by remember { mutableStateOf(false) }
     val pickPhoto = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
     Page(modifier, topBar = {
-        PushedHeader(onBack) {
+        PushedHeader(onBack, endInset = true) {
             if (exercise !=
                 null
             ) {
@@ -156,7 +165,7 @@ fun ExerciseScreen(
             listOfNotNull(
                 exercise?.muscles?.takeIf { it.isNotBlank() },
                 historical?.category ?: exercise?.category
-            ).forEach { Pill(it, outlined = true) }
+            ).forEach { Pill(it) }
         }
         if (selected !=
             null
@@ -188,24 +197,41 @@ fun ExerciseScreen(
                 }
             }
         } else {
-            Surface(
-                Modifier.fillMaxWidth().heightIn(min = Dimens.photoPlaceholder),
-                color = InShapeTheme.colors.surface,
-                shape = InShapeShapes.card
+            val artwork = if (historical != null) {
+                equipmentArtwork(historical.equipmentName, historical.name)
+            } else {
+                exercise?.let { equipmentArtwork(it.equipmentName, it.name) }
+            }?.drawable ?: R.drawable.art_exercises_exercise_equipment
+            BoxWithConstraints(
+                Modifier.fillMaxWidth().heightIn(min = Dimens.photoPlaceholder)
+                    .clip(InShapeShapes.card).background(ArtworkWash.Equipment.brush()).padding(Dimens.inner),
+                contentAlignment = Alignment.Center
             ) {
-                Column(
-                    Modifier.padding(Dimens.inner),
-                    horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(Dimens.itemGap, Alignment.CenterVertically)
-                ) {
+                val prompt: @Composable () -> Unit = {
                     Icon(Icons.Outlined.AddAPhoto, null, Modifier.size(Dimens.iconLarge))
                     Text("Your photo of the machine", color = InShapeTheme.colors.text)
-                    OutlineButton(
-                        "Add photo",
-                        pickPhoto,
-                        enabled =
-                            exercise != null
-                    )
+                    OutlineButton("Add photo", pickPhoto, enabled = exercise != null)
+                }
+                if (hasArtworkColumns()) {
+                    val artSize = minOf(160.dp, maxWidth * .4f, maxWidth - 184.dp)
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
+                            prompt()
+                        }
+                        Image(painterResource(artwork), null, Modifier.size(artSize))
+                    }
+                } else {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)
+                    ) {
+                        Image(painterResource(artwork), null, Modifier.size(112.dp))
+                        prompt()
+                    }
                 }
             }
         }
@@ -260,24 +286,39 @@ fun ExerciseScreen(
                 exercise?.instructions?.ifBlank { "No instructions recorded" }
                     ?: "No instructions recorded"
             )
-            exercise?.links?.forEach { link ->
-                TextAction(link.label.ifBlank { link.url }, {
-                    try {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, link.url.toUri()))
-                    } catch (
-                        _: android.content.ActivityNotFoundException
-                    ) {
-                        linkError =
-                            "No app is available to open this link. Your saved link is kept."
-                    } catch (
-                        _: SecurityException
-                    ) {
-                        linkError =
-                            "This link could not be opened. Your saved link is kept."
-                    }
-                })
-            }
             if (exercise?.notes?.isNotBlank() == true) Text(exercise.notes)
+        }
+        exercise?.links?.takeIf { it.isNotEmpty() }?.let { links ->
+            SectionHeader("Links")
+            ListCard {
+                links.forEach { link ->
+                    item {
+                        val uri = link.url.toUri()
+                        val host = uri.host.orEmpty().ifBlank { link.url }
+                        ListRow(
+                            link.label.ifBlank { host },
+                            subtitle = host,
+                            trailing = {
+                                Icon(
+                                    Icons.AutoMirrored.Outlined.OpenInNew,
+                                    null,
+                                    Modifier.size(Dimens.iconSmall),
+                                    tint = InShapeTheme.colors.textSecondary
+                                )
+                            },
+                            onClick = {
+                                try {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                                } catch (_: android.content.ActivityNotFoundException) {
+                                    linkError = "No app is available to open this link. Your saved link is kept."
+                                } catch (_: SecurityException) {
+                                    linkError = "This link could not be opened. Your saved link is kept."
+                                }
+                            }
+                        )
+                    }
+                }
+            }
             linkError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
         SectionHeader("Alternatives")
@@ -315,10 +356,18 @@ fun ExerciseScreen(
                     )
                 )?.let { best ->
                     InShapeCard(inset = true) {
-                        Text("Best load for 10+ reps", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "${best.point.value?.stripTrailingZeros()?.toPlainString()} ${row.basis}, ${best.point.date.displayDate()}"
+                            "Best load for 10+ reps",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = InShapeTheme.colors.textSecondary
                         )
+                        best.point.value?.let { value ->
+                            Text(
+                                MeasurementBasis.fromKey(row.basis).formatValue(value.stripTrailingZeros().toPlainString()),
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                        }
+                        Text(best.point.date.displayDate(), color = InShapeTheme.colors.textSecondary)
                     }
                 }
             }
@@ -357,7 +406,7 @@ fun ExerciseScreen(
         }
     }
     removal?.let { photo ->
-        ConfirmDialog("Remove photo?", "This photo will be removed from your exercise library.", "Remove", {
+        ConfirmDialog("Remove photo?", "This photo will be removed from your exercise library.", "Remove", destructive = true, {
             vm.write { vm.container.photos.removePhoto(photo.id) }
             removal =
                 null

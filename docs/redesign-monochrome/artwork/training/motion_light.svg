@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="340" viewBox="0 0 900 340">
+<defs><linearGradient id="ink" x1="0" y1=".8" x2="1" y2=".25" gradientUnits="objectBoundingBox"><stop stop-color="#829c79" stop-opacity="0"/><stop offset=".5" stop-color="#829c79" stop-opacity=".55"/><stop offset=".78" stop-color="#9fb298" stop-opacity=".9"/><stop offset="1" stop-color="#829c79" stop-opacity=".25"/></linearGradient></defs>
+<g fill="none" stroke="url(#ink)" stroke-linecap="round">
+<path stroke-width="1.6" d="M76 297 C430 310, 711 290, 920 -70"/>
+<path stroke-width="1.7" d="M81 299 C430 313, 711 297, 920 -57"/>
+<path stroke-width="1.8" d="M86 301 C430 316, 711 304, 920 -44"/>
+<path stroke-width="1.9" d="M91 303 C430 319, 711 311, 920 -31"/>
+<path stroke-width="2.0" d="M96 305 C430 322, 711 318, 920 -18"/>
+<path stroke-width="2.1" d="M101 307 C430 325, 711 325, 920 -5"/>
+<path stroke-width="2.2" d="M106 309 C430 328, 711 332, 920 8"/>
+<path stroke-width="2.3" d="M111 311 C430 331, 711 339, 920 21"/>
+<path stroke-width="2.4" d="M116 313 C430 334, 711 346, 920 34"/>
+</g>
+</svg>

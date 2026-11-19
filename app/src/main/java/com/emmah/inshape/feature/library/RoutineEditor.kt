@@ -1,23 +1,24 @@
 package com.emmah.inshape.feature.library
 
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.ArrowDownward
+import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.DragIndicator
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,32 +29,32 @@ import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import com.emmah.inshape.JournalViewModel
 import com.emmah.inshape.R
 import com.emmah.inshape.data.Exercise
 import com.emmah.inshape.data.JournalSnapshot
+import com.emmah.inshape.data.MeasurementBasis
 import com.emmah.inshape.data.Routine
 import com.emmah.inshape.data.RoutineItem
 import com.emmah.inshape.data.SetTarget
 import com.emmah.inshape.data.newId
 import com.emmah.inshape.data.validatedSetValues
 import com.emmah.inshape.ui.components.AppMenu
+import com.emmah.inshape.ui.components.ArtworkHeader
 import com.emmah.inshape.ui.components.ButtonSize
 import com.emmah.inshape.ui.components.ConfirmDialog
+import com.emmah.inshape.ui.components.DialogAction
 import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListRow
 import com.emmah.inshape.ui.components.MenuAction
@@ -62,10 +63,14 @@ import com.emmah.inshape.ui.components.OutlineButton
 import com.emmah.inshape.ui.components.Page
 import com.emmah.inshape.ui.components.PrimaryButton
 import com.emmah.inshape.ui.components.PushedHeader
+import com.emmah.inshape.ui.components.ReorderHandle
 import com.emmah.inshape.ui.components.SelectField
 import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.components.TextField
+import com.emmah.inshape.ui.components.reorderActions
+import com.emmah.inshape.ui.theme.ArtworkWash
 import com.emmah.inshape.ui.theme.Dimens
+import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -126,11 +131,36 @@ fun RoutineEditor(
     onCreateExercise: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val saved = remember(id, data.routines, data.routineItems) {
+        data.routines.find { it.id == id }?.let { routine ->
+            RoutineDraft(
+                routine.id,
+                routine.title,
+                routine.description,
+                routine.durationMinutes?.toString() ?: "",
+                data.routineItems.filter {
+                    it.routineId == id
+                }.map { item ->
+                    RoutineItemDraft(
+                        item.id,
+                        item.exerciseId,
+                        item.mode,
+                        item.durationSeconds?.div(60)?.toString() ?: "",
+                        item.note,
+                        item.sets.map {
+                            RoutineSetDraft(it.load ?: "", it.reps?.toString() ?: "")
+                        },
+                        originalDurationSeconds = item.durationSeconds,
+                        durationReviewed = true
+                    )
+                }
+            )
+        }
+    }
     var draft by remember(id) {
         mutableStateOf(
-            data.drafts.find {
-                it.id == "routine:$id"
-            }?.let { runCatching { Json.decodeFromString<RoutineDraft>(it.payload) }.getOrNull() }
+            data.drafts.find { it.id == "routine:$id" }
+                ?.let { runCatching { Json.decodeFromString<RoutineDraft>(it.payload) }.getOrNull() }
                 ?.let { restored ->
                     restored.copy(
                         items = restored.items.map { item ->
@@ -138,35 +168,13 @@ fun RoutineEditor(
                         }
                     )
                 }
-                ?: data.routines.find { it.id == id }?.let { routine ->
-                    RoutineDraft(
-                        routine.id,
-                        routine.title,
-                        routine.description,
-                        routine.durationMinutes?.toString() ?: "",
-                        data.routineItems.filter {
-                            it.routineId == id
-                        }.map { item ->
-                            RoutineItemDraft(
-                                item.id,
-                                item.exerciseId,
-                                item.mode,
-                                item.durationSeconds?.div(60)?.toString() ?: "",
-                                item.note,
-                                item.sets.map {
-                                    RoutineSetDraft(it.load ?: "", it.reps?.toString() ?: "")
-                                },
-                                originalDurationSeconds = item.durationSeconds,
-                                durationReviewed = true
-                            )
-                        }
-                    )
-                } ?: RoutineDraft()
+                ?: saved
+                ?: RoutineDraft()
         )
     }
     var picker by remember { mutableStateOf(false) }
     var removing by remember { mutableStateOf(false) }
-    var details by remember { mutableStateOf(id == "new") }
+    var details by rememberSaveable(id) { mutableStateOf(id == "new") }
     var editingItem by remember { mutableStateOf<String?>(null) }
     var menu by remember { mutableStateOf<String?>(null) }
     var movement by remember { mutableStateOf("") }
@@ -244,7 +252,6 @@ fun RoutineEditor(
             if (start) onStart(routine.id) else onSave()
         }
     }
-    val dragStep = with(LocalDensity.current) { Dimens.rowMinTwoLine.toPx() }
     Page(
         modifier,
         topBar = {
@@ -280,11 +287,38 @@ fun RoutineEditor(
         }
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
-            Text(
-                pluralStringResource(R.plurals.exercise_count, draft.items.size, draft.items.size) +
-                    draft.duration.takeIf(String::isNotBlank)?.let { ", about $it min" }.orEmpty()
-            )
-            if (draft.description.isNotBlank()) Text(draft.description)
+            val artwork = remember(draft.items, draft.duration, data.exercises) {
+                val exercises = data.exercises.associateBy { it.id }
+                routineArtwork(draft.items.map { exercises[it.exerciseId] }, draft.duration.toIntOrNull())
+            }
+            if (draft.items.isNotEmpty()) {
+                ArtworkHeader(
+                    artwork,
+                    Dimens.routineArtworkWidth,
+                    Dimens.routineArtworkHeight,
+                    Modifier.clip(InShapeShapes.card).background(ArtworkWash.Routine.brush()).padding(Dimens.inner),
+                    cropEnd = artwork != R.drawable.art_training_mobility_mat
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)) {
+                        Text(
+                            pluralStringResource(R.plurals.exercise_count, draft.items.size, draft.items.size),
+                            style = MaterialTheme.typography.titleLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        draft.duration.takeIf(String::isNotBlank)?.let {
+                            Text(
+                                "About $it min",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = InShapeTheme.colors.textSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (draft.description.isNotBlank()) Text(draft.description)
+                    }
+                }
+            }
             if (movement.isNotEmpty()) {
                 Text(
                     movement,
@@ -302,67 +336,22 @@ fun RoutineEditor(
                 draft.items.forEachIndexed { index, entry ->
                     item {
                         key(entry.id) {
-                            var distance by remember { mutableFloatStateOf(0f) }
                             val exercise = data.exercises.find { it.id == entry.exerciseId }
                             ListRow(
                                 exercise?.name ?: "Archived exercise",
-                                modifier = Modifier.semantics {
-                                    customActions = buildList {
-                                        if (index > 0) {
-                                            add(
-                                                CustomAccessibilityAction("Move up") {
-                                                    move(entry.id, -1)
-                                                    true
-                                                }
-                                            )
-                                        }
-                                        if (index < draft.items.lastIndex) {
-                                            add(
-                                                CustomAccessibilityAction("Move down") {
-                                                    move(entry.id, 1)
-                                                    true
-                                                }
-                                            )
-                                        }
-                                    }
-                                },
-                                subtitle = if (entry.mode ==
-                                    "DURATION"
-                                ) {
-                                    "${entry.duration.ifBlank { "No" }} min planned"
-                                } else if (entry.mode ==
-                                    "QUICK"
-                                ) {
-                                    "Completion only"
-                                } else {
-                                    exercise?.category ?: "Exercise"
+                                modifier = Modifier.reorderActions(index > 0, index < draft.items.lastIndex) { move(entry.id, it) },
+                                subtitle = when (entry.mode) {
+                                    "DURATION" -> entry.duration.takeIf(String::isNotBlank)?.let { "$it min planned" } ?: "No targets yet"
+
+                                    "QUICK" -> "Completion only"
+
+                                    else -> routineTargetSummary(
+                                        entry.sets.map { SetTarget(it.load.takeIf(String::isNotBlank), it.reps.toIntOrNull()) },
+                                        MeasurementBasis.fromKey(exercise?.basis.orEmpty())
+                                    )
                                 },
                                 leading = {
-                                    Box(
-                                        Modifier.size(
-                                            Dimens.touch
-                                        ).pointerInput(entry.id, draft.items.size) {
-                                            detectDragGesturesAfterLongPress(onDragStart = {
-                                                distance = 0f
-                                            }, onDrag = { change, amount ->
-                                                change.consume()
-                                                distance +=
-                                                    amount.y
-                                            }, onDragEnd = {
-                                                move(entry.id, (distance / dragStep).toInt())
-                                                distance =
-                                                    0f
-                                            })
-                                        },
-                                        contentAlignment = androidx.compose.ui.Alignment.Center
-                                    ) {
-                                        Icon(
-                                            Icons.Outlined.DragIndicator,
-                                            "Drag to reorder ${exercise?.name ?: "exercise"}",
-                                            Modifier.size(Dimens.screenPadding),
-                                            tint = InShapeTheme.colors.textSecondary
-                                        )
-                                    }
+                                    ReorderHandle(exercise?.name ?: "exercise") { move(entry.id, it) }
                                 },
                                 trailing = {
                                     Box {
@@ -376,23 +365,23 @@ fun RoutineEditor(
                                         }
                                         AppMenu(menu == entry.id, { menu = null }) {
                                             if (index > 0) {
-                                                DropdownMenuItem({ Text("Move up") }, {
+                                                MenuAction("Move up", Icons.Outlined.ArrowUpward, {
                                                     menu = null
                                                     move(entry.id, -1)
                                                 })
                                             }
                                             if (index < draft.items.lastIndex) {
-                                                DropdownMenuItem({ Text("Move down") }, {
+                                                MenuAction("Move down", Icons.Outlined.ArrowDownward, {
                                                     menu = null
                                                     move(entry.id, 1)
                                                 })
                                             }
-                                            DropdownMenuItem({ Text("Edit targets and note") }, {
+                                            MenuAction("Edit targets and note", Icons.Outlined.Edit, {
                                                 menu =
                                                     null
                                                 editingItem = entry.id
                                             })
-                                            DropdownMenuItem({ Text("Remove exercise") }, {
+                                            MenuAction("Remove exercise", Icons.Outlined.Delete, {
                                                 menu = null
                                                 edit(
                                                     draft.copy(
@@ -402,7 +391,7 @@ fun RoutineEditor(
                                                         }
                                                     )
                                                 )
-                                            })
+                                            }, destructive = true)
                                         }
                                     }
                                 }
@@ -413,36 +402,52 @@ fun RoutineEditor(
             }
             TextAction("Add exercise", { picker = true }, icon = Icons.Outlined.Add)
             // The editor keeps a draft until Save routine or Start routine is pressed.
-            OutlineButton("Save routine", { save(false) }, Modifier.fillMaxWidth())
+            if (draft != saved) {
+                OutlineButton("Save routine", { save(false) }, Modifier.fillMaxWidth())
+            } else {
+                Text("All changes saved", style = MaterialTheme.typography.bodyMedium, color = InShapeTheme.colors.textSecondary)
+            }
         }
     }
     if (details) {
-        AlertDialog(onDismissRequest = {
+        var title by rememberSaveable { mutableStateOf(draft.title) }
+        var description by rememberSaveable { mutableStateOf(draft.description) }
+        var duration by rememberSaveable { mutableStateOf(draft.duration) }
+        val closeDetails = {
             details = false
-        }, title = { Text("Routine details") }, text = {
-            Column(
-                Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)
-            ) {
-                TextField(
-                    draft.title,
-                    "Routine name",
-                    { edit(draft.copy(title = it)) },
-                    singleLine = true,
-                    error = "Enter a routine name".takeIf { showNameError && draft.title.isBlank() }
-                )
-                TextField(draft.description, "Description (optional)", {
-                    edit(draft.copy(description = it))
+            showNameError = false
+        }
+        AlertDialog(
+            onDismissRequest = closeDetails,
+            title = { Text("Routine details") },
+            text = {
+                Column(
+                    Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)
+                ) {
+                    TextField(
+                        title,
+                        "Routine name",
+                        { title = it },
+                        singleLine = true,
+                        error = "Enter a routine name".takeIf { showNameError && title.isBlank() }
+                    )
+                    TextField(description, "Description (optional)", { description = it })
+                    NumberField(duration, { duration = it }, "Estimated minutes (optional)")
+                }
+            },
+            confirmButton = {
+                DialogAction("Done", {
+                    if (title.isBlank()) {
+                        showNameError = true
+                    } else {
+                        edit(draft.copy(title = title, description = description, duration = duration))
+                        closeDetails()
+                    }
                 })
-                NumberField(draft.duration, {
-                    edit(draft.copy(duration = it))
-                }, "Estimated minutes (optional)")
-            }
-        }, confirmButton = {
-            TextAction("Done", {
-                if (draft.title.isBlank()) showNameError = true else details = false
-            })
-        })
+            },
+            dismissButton = { DialogAction("Cancel", closeDetails) }
+        )
     }
     editingItem?.let { editing ->
         val index = draft.items.indexOfFirst { it.id == editing }
@@ -533,7 +538,7 @@ fun RoutineEditor(
                                         }
                                     )
                                 )
-                            })
+                            }, color = InShapeTheme.colors.error, icon = Icons.Outlined.Delete)
                         }
                         OutlineButton("Add planned set", {
                             updateItem(
@@ -547,12 +552,12 @@ fun RoutineEditor(
                     }
                     TextField(item.note, "Plan note", { updateItem(index, item.copy(note = it)) })
                 }
-            }, confirmButton = { TextAction("Done", { editingItem = null }) })
+            }, confirmButton = { DialogAction("Done", { editingItem = null }) })
         }
     }
     if (picker) {
         ModalBottomSheet(onDismissRequest = { picker = false }) {
-            ExercisePicker(data, { exerciseId ->
+            ExercisePicker(data, vm.container.photos, { exerciseId ->
                 edit(
                     draft.copy(
                         items =
@@ -568,7 +573,7 @@ fun RoutineEditor(
         }
     }
     if (removing) {
-        ConfirmDialog("Remove routine?", "Saved workouts and any active session are kept.", "Remove", {
+        ConfirmDialog("Remove routine?", "Saved workouts and any active session are kept.", "Remove", destructive = true, {
             vm.write {
                 removeRoutine(id)
                 deleteEditorDraft("routine:$id")
@@ -577,5 +582,25 @@ fun RoutineEditor(
             removing =
                 false
         }, { removing = false })
+    }
+}
+
+internal fun routineTargetSummary(sets: List<SetTarget>, basis: MeasurementBasis): String {
+    if (sets.none { it.reps != null || it.load != null }) return "No targets yet"
+    val count = "${sets.size} ${if (sets.size == 1) "set" else "sets"}"
+    val equal = sets.distinct().singleOrNull()
+    if (equal != null) {
+        val reps = equal.reps?.let { " of $it" }.orEmpty()
+        val load = equal.load?.let { ", ${basis.formatValue(it)}" }.orEmpty()
+        return if (load.isEmpty() && reps.isNotEmpty()) "$count$reps reps" else "$count$reps$load"
+    }
+    val reps = sets.mapNotNull { it.reps }
+    val min = reps.minOrNull()
+    val max = reps.maxOrNull()
+    return when {
+        min == null -> count
+        min != max -> "$count, $min to $max reps"
+        reps.size == sets.size -> "$count of $min reps"
+        else -> count
     }
 }

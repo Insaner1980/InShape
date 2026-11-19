@@ -3,7 +3,12 @@
     <string name="today">Today</string>
     <string name="history">History</string>
     <string name="library">Library</string>
+    <string name="music">Music</string>
     <string name="back">Back</string>
+    <plurals name="song_count">
+        <item quantity="one">%d song</item>
+        <item quantity="other">%d songs</item>
+    </plurals>
     <plurals name="workout_count">
         <item quantity="one">%d workout</item>
         <item quantity="other">%d workouts</item>
@@ -19,5 +24,34 @@
     <plurals name="link_count">
         <item quantity="one">%d link</item>
         <item quantity="other">%d links</item>
+    </plurals>
+    <string name="health_privacy_title">Privacy</string>
+    <string name="health_privacy_local_title">What stays on this phone</string>
+    <string name="health_privacy_local_body">Your journal works offline. Sets, equipment settings, check-ins, notes and photos are stored on this phone. A full backup also includes routines and drafts. Keep backups somewhere private.</string>
+    <string name="health_privacy_sharing_title">What is shared with Health Connect</string>
+    <string name="health_privacy_sharing_body">Completed workout summaries can be shared with their start, end and activity type. Google Health and other connected apps can read those summaries.</string>
+    <string name="health_privacy_context_body">Steps, sleep and recent heart rate are optional context. They are shown in the app and kept out of your journal. InShape reads its own workout summaries only when you ask it to reconcile a restored workout.</string>
+    <string name="health_privacy_removal_title">Removing data</string>
+    <string name="health_privacy_removal_body">Manage or revoke permissions in Android Health Connect settings. Turning sharing off stops future sharing. Use the workout\'s Health Connect controls to remove a shared summary. A pending removal is retained if access is unavailable.</string>
+    <string name="exercise_measurement_help">Use a separate exercise for each machine or way of measuring.</string>
+    <string name="pre_workout_check_in">Pre-workout check-in</string>
+    <string name="add_check_in">Add check-in</string>
+    <string name="done_without_weight">Done, no weight recorded</string>
+    <string name="delete_workout_message">This workout is removed from your journal. If it was shared to Health Connect, it is removed there the next time the app has access.</string>
+    <string name="workout_item_done">Done</string>
+    <string name="done_with_duration">Done, %1$s</string>
+    <string name="music_repeat_off">Repeat, off</string>
+    <string name="music_repeat_one">Repeat, one</string>
+    <string name="music_repeat_all">Repeat, all</string>
+    <string name="export_csv_description">Several CSV files, packed in one ZIP file.</string>
+    <string name="backup_unfinished_workout">" and an unfinished workout"</string>
+    <string name="backup_replace_message">This backup contains %1$s, %2$s, %3$s and %4$s%5$s. It will replace your current journal and drafts. Reminders and Health Connect sharing will stay off until you turn them on again.</string>
+    <plurals name="routine_count">
+        <item quantity="one">%d routine</item>
+        <item quantity="other">%d routines</item>
+    </plurals>
+    <plurals name="photo_count">
+        <item quantity="one">%d photo</item>
+        <item quantity="other">%d photos</item>
     </plurals>
 </resources>

@@ -14,11 +14,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,6 +32,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
@@ -91,7 +94,7 @@ fun SelectField(
                     }
                 }
             }
-        }, confirmButton = { TextAction("Close", { open = false }) })
+        }, confirmButton = {}, dismissButton = { DialogAction("Cancel", { open = false }) })
     }
 }
 
@@ -106,21 +109,29 @@ fun ActionRow(modifier: Modifier = Modifier, content: @Composable FlowRowScope.(
 }
 
 @Composable
-fun ConfirmDialog(title: String, message: String, confirm: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    val destructive = listOf("delete", "discard", "remove", "replace", "archive").any {
-        confirm.startsWith(it, true)
+fun DialogAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, destructive: Boolean = false, enabled: Boolean = true) {
+    val colors = InShapeTheme.colors
+    TextButton(
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        colors = ButtonDefaults.textButtonColors(
+            contentColor = if (destructive) colors.error else colors.text,
+            disabledContentColor = colors.textTertiary
+        ),
+        contentPadding = ButtonDefaults.TextButtonContentPadding
+    ) {
+        Text(text, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold))
     }
+}
+
+@Composable
+fun ConfirmDialog(title: String, message: String, confirm: String, destructive: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Text(message) },
-        confirmButton = {
-            TextAction(
-                confirm,
-                onConfirm,
-                color = if (destructive) InShapeTheme.colors.error else InShapeTheme.colors.text
-            )
-        },
-        dismissButton = { TextAction("Cancel", onDismiss) }
+        confirmButton = { DialogAction(confirm, onConfirm, destructive = destructive) },
+        dismissButton = { DialogAction("Cancel", onDismiss) }
     )
 }

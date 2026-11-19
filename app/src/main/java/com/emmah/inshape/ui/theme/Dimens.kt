@@ -5,6 +5,7 @@ import androidx.compose.ui.unit.dp
 object Dimens {
     val zero = 0.dp
     val screenPadding = 20.dp
+    val headerActionEnd = 16.dp // The app bar already adds 4 dp.
     val screenTop = 16.dp
     val itemGap = 12.dp
     val sectionGap = 32.dp
@@ -16,6 +17,16 @@ object Dimens {
     val rowMin = 52.dp
     val rowMinTwoLine = 64.dp
     val touch = 48.dp
+    val transport = 64.dp
+    val transportIcon = 36.dp
+    val playButton = 80.dp
+    val playIcon = 40.dp
+    val nowPlayingCover = 240.dp
+    val inlinePlayerWindowHeight = 560.dp
+    val pickerThumbnail = 40.dp
+    val libraryThumbnailTextWidth = 332.dp
+    val pillPadding = 10.dp
+    val tabIndicator = 2.dp
     val maxPageWidth = 600.dp
     val button = 56.dp
     val iconSmall = 18.dp
@@ -39,6 +50,8 @@ object Dimens {
     const val PHOTO_ASPECT = 1.79f
     val photoPlaceholder = 200.dp
     val photoThumbnail = 72.dp
+    val routineArtworkWidth = 136.dp
+    val routineArtworkHeight = 84.dp
     val iconLarge = 32.dp
     val bodyHeight = 300.dp
     val chartLine = 3.dp

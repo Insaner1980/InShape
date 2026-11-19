@@ -18,10 +18,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.emmah.inshape.JournalViewModel
+import com.emmah.inshape.R
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.ui.components.ActionRow
 import com.emmah.inshape.ui.components.InShapeSwitch
@@ -144,7 +146,7 @@ fun ExportScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifier
         })
         SectionHeader("Format")
         SegmentedControl(formats, formatIndex, { formatIndex = it })
-        if (formatIndex == 1) Text("Linked CSV files in a ZIP.", style = MaterialTheme.typography.bodyMedium)
+        if (formatIndex == 1) Text(stringResource(R.string.export_csv_description), style = MaterialTheme.typography.bodyMedium)
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         if (state.isError || state.message.endsWith("export saved successfully.")) {
             Text(

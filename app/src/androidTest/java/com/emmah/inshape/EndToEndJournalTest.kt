@@ -1,6 +1,7 @@
 package com.emmah.inshape
 
 import android.content.Context
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -100,10 +101,10 @@ class EndToEndJournalTest {
         click("New exercise")
         input("Exercise name", "Lat pulldown")
         click("More details")
-        input("Recognizable machine name", "Machine A")
+        input("Machine name (as shown on the machine)", "Machine A")
         click("Add setting")
-        input("Label", "Seat")
-        input("Value", "4")
+        input("Setting 1 name", "Seat")
+        input("Setting 1 value", "4")
         click("Save exercise")
         compose.waitUntil(10_000) {
             runBlocking {
@@ -118,7 +119,6 @@ class EndToEndJournalTest {
         compose.waitUntil(30_000) {
             compose.onAllNodesWithContentDescription("Workout options").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithContentDescription("Workout options").performClick()
         click("Add exercise")
         click("Lat pulldown")
         compose.onNodeWithText("00:00").assertExists()
@@ -215,7 +215,9 @@ class EndToEndJournalTest {
 
     @Test fun emptyFinishAcceptsANoteAndManualDurationWithoutSharingUnknownTimes() {
         click("Start")
-        click("Finish workout")
+        compose.onNodeWithText("Add exercise").assertIsDisplayed()
+        compose.onNodeWithText("Finish workout").assertDoesNotExist()
+        click("Finish")
         compose.onNodeWithText("Nothing recorded yet").assertExists()
         compose.onNodeWithText("Save workout").assertDoesNotExist()
         click("Fix time")
@@ -237,7 +239,7 @@ class EndToEndJournalTest {
 
     @Test fun cancellingDiscardKeepsTheWorkoutAndConfirmingItRemovesTheDraft() {
         click("Start")
-        click("Finish workout")
+        click("Finish")
         val id = runBlocking { requireNotNull(container.repository.snapshot().active).row.id }
         compose.waitUntil(10_000) {
             runBlocking { container.repository.snapshot().drafts.any { it.id == "finish:$id" } }

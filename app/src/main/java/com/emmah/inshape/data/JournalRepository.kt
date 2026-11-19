@@ -415,9 +415,9 @@ class JournalRepository(val db: JournalDatabase, val clock: Clock) {
         selectNext(row.workoutId)
         changed(row.workoutId)
     }
-    suspend fun saveItemNote(id: String, note: String, discomfort: Boolean) = db.withTransaction {
+    suspend fun saveItemNote(id: String, note: String? = null, discomfort: Boolean? = null) = db.withTransaction {
         val row = item(id)
-        dao.put(row.copy(note = note, discomfort = discomfort))
+        dao.put(row.copy(note = note ?: row.note, discomfort = discomfort ?: row.discomfort))
         changed(row.workoutId)
     }
     suspend fun finishWorkout(id: String, timing: WorkoutTiming, note: String? = null, expectedNote: String? = null) = db.withTransaction {

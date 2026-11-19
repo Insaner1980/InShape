@@ -1,9 +1,11 @@
 package com.emmah.inshape
 
 import android.content.Context
+import androidx.core.content.edit
 import androidx.room.Room
 import com.emmah.inshape.data.JournalDatabase
 import com.emmah.inshape.data.JournalRepository
+import com.emmah.inshape.feature.music.MusicStore
 import com.emmah.inshape.feature.workout.ActiveWorkoutNotifier
 import com.emmah.inshape.feature.workout.activeNotice
 import java.io.File
@@ -25,6 +27,13 @@ class AppContainer(
     val integrationsEnabled: Boolean = databaseName ==
         "journal.db"
 ) {
+    private val uiPreferences = context.getSharedPreferences("ui_settings", Context.MODE_PRIVATE)
+    val hasRemovedSet: Boolean get() = uiPreferences.getBoolean("has_removed_set", false)
+
+    fun markSetRemoved() {
+        uiPreferences.edit { putBoolean("has_removed_set", true) }
+    }
+
     val themeSettings = com.emmah.inshape.ui.theme.ThemeSettings(context)
     val storageRoot = if (databaseName ==
         "journal.db"
@@ -41,9 +50,14 @@ class AppContainer(
     val backups = com.emmah.inshape.transfer.BackupService(this)
     val exports = com.emmah.inshape.transfer.ExportService(this)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val musicStorage = lazy {
+        MusicStore(context, "music-$databaseName", scope)
+    }
+    val music by musicStorage
     val storageReady = scope.async { backups.recoverOwnedStaging() }
     init {
         if (integrationsEnabled) {
+            scope.launch { com.emmah.inshape.widget.WidgetUpdater.publishPreview(context) }
             scope.launch {
                 repository.changes.map { it.activeNotice() }.distinctUntilChanged().collect {
                     ActiveWorkoutNotifier(context).reconcile(it)
@@ -98,6 +112,7 @@ class AppContainer(
     }
     fun close() {
         scope.cancel()
+        if (musicStorage.isInitialized()) music.close()
         database.close()
     }
 }

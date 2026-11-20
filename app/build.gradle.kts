@@ -135,8 +135,8 @@ dependencies {
         testImplementation("com.google.guava:guava:33.8.0-jre")
         add("ksp", "com.google.guava:guava:33.8.0-jre")
         androidTestImplementation("com.google.code.gson:gson:2.15.0")
-        add("ktlint", "ch.qos.logback:logback-classic:1.6.6")
-        add("ktlint", "ch.qos.logback:logback-core:1.6.6")
+        add("ktlint", "ch.qos.logback:logback-classic:1.6.8")
+        add("ktlint", "ch.qos.logback:logback-core:1.6.8")
         // Android Lint resolves a separate copy of the build-tool libraries.
         add("androidLintTool", "com.google.guava:guava:33.8.0-jre")
         add("androidLintTool", "org.apache.commons:commons-lang3:3.22.0")

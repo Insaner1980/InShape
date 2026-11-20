@@ -1,9 +1,14 @@
 package com.emmah.inshape.data
 
+import com.emmah.inshape.R
+import com.emmah.inshape.ui.UiException
+import com.emmah.inshape.ui
+import com.emmah.inshape.testContext
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -30,11 +35,43 @@ class JournalRepositoryTest {
         repo =
             JournalRepository(
                 db,
-                Clock.fixed(Instant.parse("2026-11-13T08:42:00Z"), ZoneId.of("Europe/Helsinki"))
+                Clock.fixed(Instant.parse("2026-11-13T08:42:00Z"), ZoneId.of("Europe/Helsinki")),
+                testContext()
             )
     }
 
     @After fun close() = db.close()
+
+    @Test fun startUsesOneInstantForTheWorkoutDateAndTimestamps() = runBlocking {
+        val beforeMidnight = Instant.parse("2026-11-13T21:59:59Z")
+        val afterMidnight = beforeMidnight.plusSeconds(1)
+        val reads = AtomicInteger()
+        val clock = object : Clock() {
+            override fun getZone(): ZoneId = repo.clock.zone
+            override fun withZone(zone: ZoneId): Clock = Clock.fixed(instant(), zone)
+            override fun instant(): Instant = if (reads.getAndIncrement() < 2) beforeMidnight else afterMidnight
+        }
+        JournalRepository(db, clock, testContext()).startWorkout(StartSource.Empty)
+        val workout = db.journal().workouts().single()
+        assertEquals("2026-11-13", workout.journalDate)
+        assertEquals(beforeMidnight.toString(), workout.start)
+        assertEquals(beforeMidnight.toString(), workout.createdAt)
+        assertEquals(beforeMidnight.toString(), workout.modifiedAt)
+    }
+
+    @Test fun deletingWorkoutRemovesOnlyItsFinishAndCheckInDrafts() = runBlocking {
+        val removed = repo.startWorkout(StartSource.Empty)
+        val retained = repo.createPastWorkout("2026-11-10", "Keep")
+        val retainedDraft = EditorDraft("checkin:$retained:AFTER", "checkin", "{}", repo.clock.instant().toString())
+        val removedDrafts = listOf("BEFORE", "AFTER", "NEXT_DAY").map {
+            EditorDraft("checkin:$removed:$it", "checkin", "{}", repo.clock.instant().toString())
+        } + EditorDraft("finish:$removed", "finish", "{}", repo.clock.instant().toString())
+        (removedDrafts + retainedDraft).forEach { repo.saveEditorDraft(it) }
+
+        repo.deleteWorkout(removed)
+
+        assertEquals(listOf(retainedDraft), repo.snapshot().drafts)
+    }
 
     @Test fun appendingAfterDeletionKeepsItemsAndSetsInOrder() = runBlocking {
         val exercise = Exercise(name = "Row")
@@ -92,7 +129,8 @@ class JournalRepositoryTest {
         val nextDay =
             JournalRepository(
                 db,
-                Clock.fixed(Instant.parse("2026-11-14T08:00:00Z"), ZoneId.of("Europe/Helsinki"))
+                Clock.fixed(Instant.parse("2026-11-14T08:00:00Z"), ZoneId.of("Europe/Helsinki")),
+                testContext()
             )
         assertEquals(id, nextDay.snapshot().active!!.row.id)
         assertTrue(nextDay.snapshot().active!!.row.timingNeedsReview)
@@ -168,6 +206,7 @@ class JournalRepositoryTest {
                 )
             )
         )
+        repo.archiveExercise(exercise.id)
         val first = repo.startWorkout(StartSource.Routine(routine.id))
         assertEquals(first, repo.startWorkout(StartSource.Empty))
         val workout = repo.snapshot().workout(first)!!
@@ -186,12 +225,20 @@ class JournalRepositoryTest {
         val set = repo.addSet(item)
         repo.saveSetDraft(set, "27,5", "10")
         repo.setSetCompleted(set, true)
-        val other = repo.useAlternative(item, alternative.id)
+        val other = repo.useAlternative(item, alternative.id, requireCurrent = true)
         val saved = repo.snapshot().workout(id)!!
         assertEquals("27.5", saved.items.first { it.row.id == item }.sets.single().load)
         assertEquals(original.id, saved.items.first { it.row.id == item }.row.exerciseId)
         assertFalse(saved.items.first { it.row.id == other }.hasPerformedWork)
         assertEquals(item, saved.items.first { it.row.id == other }.row.alternativeOf)
+        val staleSwap = runCatching { repo.useAlternative(item, alternative.id, requireCurrent = true) }
+        assertEquals(R.string.replacement_changed, (staleSwap.exceptionOrNull() as? UiException)?.text)
+        repo.markItemDone(other, null)
+        repo.finishWorkout(id, WorkoutTiming(clearTimes = true))
+        val repeated = repo.startWorkout(StartSource.Repeat(id))
+        val plan = repo.snapshot().workout(repeated)!!.items
+        assertEquals(listOf(alternative.id), plan.map { it.row.exerciseId })
+        assertFalse(plan.single().hasPerformedWork)
     }
 
     @Test fun finishingIsIdempotentAndRepeatingResetsPerformedState() = runBlocking {
@@ -318,7 +365,7 @@ class JournalRepositoryTest {
         val workout = repo.startWorkout(StartSource.Empty)
         repo.archiveExercise(exercise.id)
         val archived = runCatching { repo.addExercise(workout, exercise.id) }
-        assertEquals("This exercise is archived", archived.exceptionOrNull()?.message)
+        assertEquals(R.string.archived_exercise, (archived.exceptionOrNull() as? UiException)?.text)
         assertTrue(repo.snapshot().items.isEmpty())
     }
 
@@ -349,6 +396,21 @@ class JournalRepositoryTest {
         assertEquals(listOf(updated), saved.routineItems)
     }
 
+    @Test fun savingAnEditorDraftKeepsTheFavoriteToggledWhileItWasOpen() = runBlocking {
+        val exercise = Exercise(name = "Row")
+        repo.saveExercise(exercise)
+        val draft = EditorDraft("exercise:new", "exercise", "{}", repo.clock.instant().toString())
+        repo.saveEditorDraft(draft)
+
+        repo.setExerciseFavorite(exercise.id, true)
+        assertEquals(listOf(draft), repo.snapshot().drafts)
+
+        repo.saveExercise(exercise.copy(name = "Seated row"), draftId = draft.id, preserveFavorite = true)
+        val saved = repo.snapshot()
+        assertEquals(exercise.copy(name = "Seated row", favorite = true), saved.exercises.single())
+        assertTrue(saved.drafts.isEmpty())
+    }
+
     @Test fun repeatingWorkoutUsesCorrectedResultsAndKeepsUntouchedTargets() = runBlocking {
         val exercise = Exercise(name = "Row")
         repo.saveExercise(exercise)
@@ -368,10 +430,10 @@ class JournalRepositoryTest {
         assertEquals("25,5", performed.rawLoad)
         assertNull(performed.reps)
         assertEquals(
-            "Use Edit to correct a completed set",
-            runCatching {
+            R.string.edit_completed_set,
+            (runCatching {
                 repo.saveSetDraft(set, "10", "10")
-            }.exceptionOrNull()?.message
+            }.exceptionOrNull() as? UiException)?.text
         )
         repo.markItemDone(original.row.id, null)
         assertNull(requireNotNull(repo.snapshot().active).items.single().row.quickCompletedAt)
@@ -387,7 +449,7 @@ class JournalRepositoryTest {
         assertTrue(sets.all { it.suggestedReps == null && it.rawReps.isEmpty() && it.load == null })
     }
 
-    @Test fun movingDeferringAndSkippingExercisesPreservesTheActiveSequence() = runBlocking {
+    @Test fun skippingForNowMovesExercisesBackAndRecordsThemOnFinish() = runBlocking {
         val exercise = Exercise(name = "Row")
         repo.saveExercise(exercise)
         val id = repo.startWorkout(StartSource.Empty)
@@ -395,11 +457,11 @@ class JournalRepositoryTest {
         repo.moveItem(third, -1)
         assertEquals(listOf(first, third, second), requireNotNull(repo.snapshot().active).items.map { it.row.id })
 
-        repo.deferItem(first)
+        repo.skipItemForNow(first)
         val deferred = requireNotNull(repo.snapshot().active)
         assertEquals(listOf(third, second, first), deferred.items.map { it.row.id })
         assertEquals(third, deferred.row.currentItemId)
-        repo.skipItem(third)
+        repo.skipItemForNow(third)
         assertEquals(second, repo.snapshot().active?.row?.currentItemId)
 
         repo.markItemDone(second, 60)
@@ -408,7 +470,7 @@ class JournalRepositoryTest {
         assertEquals(60L, done.durationSeconds)
         assertEquals("Tight shoulder", done.note)
         assertTrue(done.discomfort)
-        assertEquals("Confirm deleting the recorded work", runCatching { repo.removeItem(second) }.exceptionOrNull()?.message)
+        assertEquals(R.string.confirm_delete_work, (runCatching { repo.removeItem(second) }.exceptionOrNull() as? UiException)?.text)
         repo.reopenItem(second)
         val reopened = requireNotNull(repo.snapshot().active)
         val row = reopened.items.first { it.row.id == second }.row
@@ -419,18 +481,22 @@ class JournalRepositoryTest {
         assertEquals(done.note, row.note)
 
         repo.markItemDone(first, null)
-        assertEquals("No other exercise can move ahead of this one", runCatching { repo.deferItem(second) }.exceptionOrNull()?.message)
+        repo.skipItemForNow(second)
+        assertEquals(third, repo.snapshot().active?.row?.currentItemId)
         repo.removeItem(first, confirmPerformed = true)
         assertEquals(listOf(third, second), requireNotNull(repo.snapshot().active).items.map { it.row.id })
+        repo.saveWorkoutNote(id, "Training notes")
+        repo.finishWorkout(id, WorkoutTiming(clearTimes = true))
+        assertTrue(requireNotNull(repo.snapshot().workout(id)).items.all { it.row.disposition == "SKIPPED" })
     }
 
     @Test fun recordsInferredLiveTimingAndFiltersCompletedJournalDates() = runBlocking {
         val id = repo.startWorkout(StartSource.Empty)
         assertEquals(
-            "Nothing recorded yet. Add work or a note, or discard this workout.",
-            runCatching {
+            R.string.empty_workout_save,
+            (runCatching {
                 repo.finishWorkout(id, WorkoutTiming())
-            }.exceptionOrNull()?.message
+            }.exceptionOrNull() as? UiException)?.text
         )
         repo.saveWorkoutNote(id, "Training notes")
         val before = repo.snapshot()
@@ -439,14 +505,23 @@ class JournalRepositoryTest {
         }
         assertEquals(before, repo.snapshot())
 
-        val later = JournalRepository(db, Clock.fixed(repo.clock.instant().plusSeconds(1_800), repo.clock.zone))
-        later.finishWorkout(id, WorkoutTiming(acknowledged = true, journalDate = "2026-11-12"))
+        val later = JournalRepository(db, Clock.fixed(repo.clock.instant().plusSeconds(1_800), repo.clock.zone), testContext())
+        later.finishWorkout(id, WorkoutTiming(journalDate = "2026-11-12"), confirmCurrentTiming = true)
         val saved = requireNotNull(later.snapshot().workout(id)).row
         assertEquals("2026-11-12", saved.journalDate)
         assertEquals(later.clock.instant().toString(), saved.end)
         assertEquals(1_800L, saved.durationSeconds)
         assertEquals("INTERVAL", saved.durationSource)
         assertTrue(saved.timingConfirmed)
+        later.correctWorkout(
+            id,
+            saved.revision,
+            saved.title,
+            saved.journalDate,
+            "Corrected note",
+            WorkoutTiming(saved.start, saved.end, saved.durationSeconds, acknowledged = true)
+        )
+        assertEquals("INTERVAL", later.snapshot().history.single().row.durationSource)
 
         val past = LocalDate.parse(saved.journalDate)
         val today = LocalDate.now(later.clock)
@@ -457,14 +532,14 @@ class JournalRepositoryTest {
     @Test fun resumingPreviousDayRequiresTimingReviewAndCanClearOldTimes() = runBlocking {
         val id = repo.startWorkout(StartSource.Empty)
         repo.saveWorkoutNote(id, "Recorded yesterday")
-        val nextDay = JournalRepository(db, Clock.fixed(repo.clock.instant().plusSeconds(86_400), repo.clock.zone))
+        val nextDay = JournalRepository(db, Clock.fixed(repo.clock.instant().plusSeconds(86_400), repo.clock.zone), testContext())
         assertEquals(id, nextDay.startWorkout(StartSource.Empty))
         assertTrue(db.journal().workouts().single().timingNeedsReview)
         assertEquals(
-            "Review timing for this resumed workout",
-            runCatching {
-                nextDay.finishWorkout(id, WorkoutTiming(clearTimes = true))
-            }.exceptionOrNull()?.message
+            R.string.review_resumed_timing,
+            (runCatching {
+                nextDay.finishWorkout(id, WorkoutTiming(end = nextDay.clock.instant().toString()), confirmCurrentTiming = true)
+            }.exceptionOrNull() as? UiException)?.text
         )
         nextDay.finishWorkout(id, WorkoutTiming(clearTimes = true, acknowledged = true))
         val saved = nextDay.snapshot().history.single().row
@@ -516,10 +591,10 @@ class JournalRepositoryTest {
         assertFalse(saved.timingConfirmed)
         assertNull(saved.endOffset)
         assertEquals(
-            "This workout changed. Reopen it and review your correction.",
-            runCatching {
+            R.string.timing_changed,
+            (runCatching {
                 repo.correctWorkout(id, before.revision, "Stale title", before.journalDate, "", WorkoutTiming())
-            }.exceptionOrNull()?.message
+            }.exceptionOrNull() as? UiException)?.text
         )
         assertEquals(saved, repo.snapshot().workout(id)?.row)
     }

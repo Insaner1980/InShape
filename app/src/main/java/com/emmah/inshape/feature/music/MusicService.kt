@@ -27,7 +27,9 @@ import com.emmah.inshape.MainActivity
 import com.emmah.inshape.R
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.SettableFuture
+import java.util.UUID
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -48,13 +50,19 @@ private data class QueueSnapshot(val ids: List<String>, val index: Int, val posi
 internal val chooseQueue = SessionCommand("com.emmah.inshape.CHOOSE_QUEUE", Bundle.EMPTY)
 internal val playNext = SessionCommand("com.emmah.inshape.PLAY_NEXT", Bundle.EMPTY)
 internal val endPlayback = SessionCommand("com.emmah.inshape.END_PLAYBACK", Bundle.EMPTY)
+internal val jumpToOccurrence = SessionCommand("com.emmah.inshape.JUMP_TO_OCCURRENCE", Bundle.EMPTY)
+internal val seekInOccurrence = SessionCommand("com.emmah.inshape.SEEK_IN_OCCURRENCE", Bundle.EMPTY)
+internal val assistantGainChange = SessionCommand("com.emmah.inshape.ASSISTANT_GAIN", Bundle.EMPTY)
 internal const val MUSIC_ERROR = "musicError"
 internal const val MUSIC_IDS = "trackIds"
 internal const val MUSIC_SHUFFLE = "shuffle"
 internal const val MUSIC_START = "start"
+internal const val MUSIC_OCCURRENCE = "occurrence"
+internal const val MUSIC_POSITION = "position"
+private const val TRACK_ID = "trackId"
 
 @UnstableApi
-class MusicService : MediaSessionService() {
+class MusicService(private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO) : MediaSessionService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val store get() = (application as InShapeApplication).container.music
     private val preferences by lazy { getSharedPreferences("music_playback", MODE_PRIVATE) }
@@ -64,11 +72,28 @@ class MusicService : MediaSessionService() {
     private var restoration: Job? = null
     private var selection = 0L
     private val queueMutations = Mutex()
-    private val failedIndices = mutableSetOf<Int>()
+    private val failedOccurrences = mutableSetOf<String>()
     private var lastSnapshot: QueueSnapshot? = null
+    private var assistantOwner: String? = null
+    private var assistantWatchdog: Job? = null
+    private var musicGain = 1f
+    private var duckGain: Float? = null
+    private var listeningWorkoutId: String? = null
+    private var listeningInterval: ListeningInterval? = null
     private val playerListener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
             if (!restoring) saveQueue()
+            reconcileListening()
+        }
+
+        override fun onVolumeChanged(volume: Float) {
+            val reduction = duckGain
+            if (reduction == null) {
+                musicGain = volume
+            } else if (volume != musicGain * reduction) {
+                musicGain = volume
+                this@MusicService.player.volume = volume * reduction
+            }
         }
 
         override fun onPlayerError(error: PlaybackException) {
@@ -104,13 +129,22 @@ class MusicService : MediaSessionService() {
                 .apply { setSmallIcon(R.drawable.ic_stat_music) }
         )
         player.addListener(playerListener)
+        scope.launch {
+            (application as InShapeApplication).container.repository.changes.collect { journal ->
+                val workoutId = journal.active?.row?.id
+                if (listeningWorkoutId != workoutId) {
+                    listeningWorkoutId = workoutId
+                    reconcileListening()
+                }
+            }
+        }
         restoration = scope.launch {
             try {
                 restoreQueue()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                if (restoring) showError("Could not restore the listening queue.")
+                if (restoring) showError(getString(R.string.restore_queue_failed))
             } finally {
                 restoring = false
             }
@@ -119,7 +153,8 @@ class MusicService : MediaSessionService() {
             while (isActive) {
                 delay(12_000)
                 if (player.isPlaying) {
-                    failedIndices.clear()
+                    checkpointListening()
+                    failedOccurrences.clear()
                     saveQueue()
                 }
             }
@@ -140,7 +175,9 @@ class MusicService : MediaSessionService() {
                 .remove(Player.COMMAND_SET_MEDIA_ITEM)
                 .build()
             val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
-            if (ownController) commands.add(chooseQueue).add(playNext).add(endPlayback)
+            if (ownController) {
+                commands.add(chooseQueue).add(playNext).add(endPlayback).add(jumpToOccurrence).add(seekInOccurrence).add(assistantGainChange)
+            }
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
                 .setAvailablePlayerCommands(defaults)
                 .setAvailableSessionCommands(commands.build())
@@ -158,36 +195,99 @@ class MusicService : MediaSessionService() {
                 result.set(SessionResult(SessionError.ERROR_PERMISSION_DENIED))
                 return result
             }
+            if (command == assistantGainChange) {
+                val owner = args.getString("owner")
+                if (owner != null && owner.length <= 64) {
+                    if (args.containsKey("gain")) setAssistantGain(owner, args.getFloat("gain").coerceIn(0f, 1f))
+                    else releaseAssistantGain(owner)
+                }
+                result.set(SessionResult(SessionResult.RESULT_SUCCESS))
+                return result
+            }
             if (command == chooseQueue || command == endPlayback) selection++
             val request = selection
             scope.launch {
                 try {
                     queueMutations.withLock {
-                        if (request != selection) return@withLock
-                        when (command) {
-                            chooseQueue -> prepareSelection(args, request)
-
-                            playNext -> insertNext(args, request)
-
-                            endPlayback -> {
-                                restoring = false
-                                player.stop()
-                                player.clearMediaItems()
-                                showError(null)
-                                saveQueue()
-                            }
-                        }
+                        handleQueueCommand(command, args, request)
                     }
                     result.set(SessionResult(SessionResult.RESULT_SUCCESS))
                 } catch (cancelled: CancellationException) {
                     result.cancel(false)
                     throw cancelled
                 } catch (_: Exception) {
-                    if (request == selection) showError("Could not open the selected music.")
+                    if (request == selection) showError(getString(R.string.open_music_failed))
                     result.set(SessionResult(SessionError.ERROR_IO))
                 }
             }
             return result
+        }
+    }
+
+    private fun setAssistantGain(owner: String, gain: Float) {
+        if (duckGain == null) musicGain = player.volume
+        assistantOwner = owner
+        duckGain = gain
+        player.volume = musicGain * gain
+        assistantWatchdog?.cancel()
+        assistantWatchdog = scope.launch {
+            delay(45_000)
+            releaseAssistantGain(owner)
+        }
+    }
+
+    private fun releaseAssistantGain(owner: String) {
+        if (assistantOwner != owner) return
+        assistantOwner = null
+        duckGain = null
+        assistantWatchdog?.cancel()
+        assistantWatchdog = null
+        player.volume = musicGain
+    }
+
+    private data class ListeningInterval(
+        val event: ListeningEvent,
+        val occurrenceId: String,
+        val startedElapsed: Long
+    )
+
+    private fun reconcileListening() {
+        val workout = listeningWorkoutId
+        val item = player.currentMediaItem?.takeIf { player.isPlaying && player.volume > 0f && workout != null }
+        val previous = listeningInterval
+        if (previous != null && (item?.mediaId != previous.occurrenceId || workout != previous.event.workoutId)) {
+            checkpointListening()
+            listeningInterval = null
+        }
+        if (listeningInterval == null && item != null && workout != null) {
+            listeningInterval = ListeningInterval(
+                ListeningEvent(UUID.randomUUID().toString(), item.trackId, workout, java.time.Instant.now().toString(), 0),
+                item.mediaId,
+                android.os.SystemClock.elapsedRealtime()
+            )
+        }
+    }
+
+    private fun checkpointListening() {
+        val interval = listeningInterval ?: return
+        store.recordListening(interval.event.copy(playedMs = android.os.SystemClock.elapsedRealtime() - interval.startedElapsed))
+    }
+
+    private suspend fun handleQueueCommand(command: SessionCommand, args: Bundle, request: Long) {
+        if (request != selection && command != endPlayback) return
+        when (command) {
+            chooseQueue -> prepareSelection(args, request)
+            playNext -> insertNext(args, request)
+            jumpToOccurrence -> jumpTo(args)
+            seekInOccurrence -> seekIn(args)
+            endPlayback -> {
+                restoring = false
+                player.stop()
+                player.clearMediaItems()
+                failedOccurrences.clear()
+                showError(null)
+                saveQueue()
+            }
         }
     }
 
@@ -196,7 +296,7 @@ class MusicService : MediaSessionService() {
         val tracks = store.resolve(ids)
         if (request != selection) return
         if (tracks.isEmpty()) {
-            showError("No available songs in this selection.")
+            showError(getString(R.string.no_available_songs))
             return
         }
         val shuffle = args.getBoolean(MUSIC_SHUFFLE)
@@ -207,7 +307,7 @@ class MusicService : MediaSessionService() {
         val order = tracks.indices.toList().let { if (shuffle) it.shuffled() else it }
         val start = if (shuffle) order.first() else tracks.indexOfFirst { it.id == firstId }.coerceAtLeast(0)
         restoring = false
-        failedIndices.clear()
+        failedOccurrences.clear()
         showError(null)
         player.setMediaItems(tracks.map(MusicTrack::toMediaItem), start, 0L)
         if (shuffle) player.setShuffleOrder(DefaultShuffleOrder(order.toIntArray(), System.nanoTime()))
@@ -221,7 +321,7 @@ class MusicService : MediaSessionService() {
         val id = args.getStringArrayList(MUSIC_IDS)?.singleOrNull() ?: return
         val track = store.resolve(listOf(id)).singleOrNull()
         if (request != selection || track == null) {
-            if (request == selection) showError("That song is unavailable.")
+            if (request == selection) showError(getString(R.string.song_unavailable))
             return
         }
         if (restoring) restoration?.join()
@@ -243,8 +343,25 @@ class MusicService : MediaSessionService() {
         saveQueue()
     }
 
+    private fun jumpTo(args: Bundle) {
+        val occurrence = args.getString(MUSIC_OCCURRENCE) ?: return
+        val index = (0 until player.mediaItemCount).firstOrNull {
+            player.getMediaItemAt(it).mediaId == occurrence
+        } ?: return
+        player.seekToDefaultPosition(index)
+        if (player.playbackState == Player.STATE_IDLE) player.prepare()
+        player.play()
+    }
+
+    private fun seekIn(args: Bundle) {
+        val occurrence = args.getString(MUSIC_OCCURRENCE) ?: return
+        if (player.currentMediaItem?.mediaId == occurrence && player.isCurrentMediaItemSeekable) {
+            player.seekTo(args.getLong(MUSIC_POSITION))
+        }
+    }
+
     private suspend fun restoreQueue() {
-        val saved = withContext(Dispatchers.IO) {
+        val saved = withContext(ioDispatcher) {
             preferences.getString("queue", null)?.let {
                 runCatching { Json.decodeFromString<QueueSnapshot>(it) }.getOrNull()
             }
@@ -270,7 +387,7 @@ class MusicService : MediaSessionService() {
 
     private fun saveQueue() {
         val snapshot = QueueSnapshot(
-            List(player.mediaItemCount) { player.getMediaItemAt(it).mediaId },
+            List(player.mediaItemCount) { player.getMediaItemAt(it).trackId },
             player.currentMediaItemIndex,
             player.currentPosition,
             player.queueIndices().takeIf { player.shuffleModeEnabled },
@@ -285,17 +402,17 @@ class MusicService : MediaSessionService() {
 
     private fun recoverPlayback() {
         val current = player.currentMediaItemIndex
-        val title = player.currentMediaItem?.mediaMetadata?.title ?: "Song"
-        failedIndices.add(current)
+        val title = player.currentMediaItem?.mediaMetadata?.title ?: getString(R.string.track)
+        player.currentMediaItem?.mediaId?.let(failedOccurrences::add)
         val order = player.queueIndices()
         val split = order.indexOf(current) + 1
         val candidates = order.drop(split) + if (player.repeatMode == Player.REPEAT_MODE_ALL) order.take(split) else emptyList()
-        val next = candidates.firstOrNull { it !in failedIndices }
+        val next = candidates.firstOrNull { player.getMediaItemAt(it).mediaId !in failedOccurrences }
         if (next == null) {
             player.pause()
-            showError("Could not play $title. Choose another song or refresh the folder.")
+            showError(getString(R.string.music_play_failed, title))
         } else {
-            showError("Could not play $title. Skipped to the next song.")
+            showError(getString(R.string.music_play_skipped, title))
             player.seekToDefaultPosition(next)
             player.prepare()
         }
@@ -307,6 +424,8 @@ class MusicService : MediaSessionService() {
 
     override fun onDestroy() {
         if (!restoring) saveQueue()
+        checkpointListening()
+        assistantOwner?.let(::releaseAssistantGain)
         scope.cancel()
         player.removeListener(playerListener)
         session.release()
@@ -316,14 +435,22 @@ class MusicService : MediaSessionService() {
 }
 
 private fun MusicTrack.toMediaItem() = MediaItem.Builder()
-    .setMediaId(id)
+    .setMediaId(UUID.randomUUID().toString())
     .setUri(uri)
     .setMediaMetadata(
         MediaMetadata.Builder().setTitle(title).setArtist(artist)
-            .setExtras(Bundle().apply { putString("localUri", uri) })
+            .setExtras(
+                Bundle().apply {
+                    putString("localUri", uri)
+                    putString(TRACK_ID, id)
+                }
+            )
             .build()
     )
     .build()
+
+internal val MediaItem.trackId: String
+    get() = mediaMetadata.extras?.getString(TRACK_ID) ?: mediaId
 
 internal fun Player.queueIndices(): List<Int> {
     if (mediaItemCount == 0) return emptyList()

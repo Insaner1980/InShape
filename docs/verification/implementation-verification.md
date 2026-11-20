@@ -81,11 +81,7 @@ Both owned emulators were shut down. Exact recorded launcher, QEMU, console and 
 
 Superseded captures, intermediate exports/logs/databases, test APK, project build caches and build intermediates were removed. Only the final APK and its small build metadata remain under `app/build`. The final evidence set is under `docs/verification`.
 
-Cleanup is blocked for two read-only emulator `pstore.bin` files, 65,536 bytes each, and their enclosing directories beneath `C:\Dev\InShape\.superpowers`. All other scratch contents were removed. This directory and its descendants were verified to remain within the owned workspace location with no junctions or symbolic links. Automatic approval review rejected both the bounded forced directory removal and the narrower forced single-file removal with `blocked by policy`. No attributes or alternate deletion tools were used to bypass the rejection. The following removes only those remaining owned emulator files and empty directories; it preserves the APK, source and verification evidence:
-
-```powershell
-Remove-Item -LiteralPath 'C:\Dev\InShape\.superpowers' -Recurse -Force
-```
+At the end of that run, two read-only emulator `pstore.bin` files (65,536 bytes each) and their enclosing directories remained beneath `C:\Dev\InShape\.superpowers`. All other scratch contents were removed. Automatic approval review rejected both directory removal and forced single-file removal.
 
 ## Visual redesign, 14 November 2026
 
@@ -127,6 +123,8 @@ The captures show actual Compose content, scroll through the entire page and ret
 ### Layout, appearance and native interaction checks
 
 All eight reference screens passed complete scroll and text-extent checks in **12 configurations, 96 screen traversals**: system Light and Dark at 390 dp/100%, 320 dp/100%, 390 dp/130%, 390 dp/200%, and 320 dp/200%, plus app Dark on a light system and app Light on a dark system at 390 dp/100%. [Measured geometry and results](redesign/layout-matrix.txt). The four theme combinations also passed rendered-background pixel checks: light `#F3F4F6`, dark `#0E1114`. Normal-size captures and the 320 dp/200% Today, Workout and Settings pages were visually inspected. At the smallest large-text setting, navigation labels can wrap; they remain readable and reachable.
+
+The success line in the archived geometry logs refers to the text layout's own measured bounds and line limit. Clipping at the viewport and parent containers was assessed through visual inspection of the captured pages.
 
 Native ADB/UIAutomator checks confirmed that both explicit theme choices survived force-stop and cold relaunch; settled Settings screens showed contrasting status/navigation icons in both themes. Today showed all three hero states: empty journal, a suggested routine and an active workout. Progress showed empty and single-workout fixtures; Before and After selected different recorded observations, while Next day correctly showed no observations. Create full backup and Restore backup opened Android DocumentsUI and were cancelled; Export CSV or PDF opened the export selection screen. No external file was saved or restored in these launcher checks.
 

@@ -29,6 +29,7 @@ import com.emmah.inshape.data.PhotoAsset
 import com.emmah.inshape.media.PhotoStore
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -47,24 +48,25 @@ internal fun exerciseThumbnail(
     photo: PhotoAsset?,
     store: PhotoStore,
     size: Dp,
-    showIllustration: Boolean
+    showIllustration: Boolean,
+    ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ): (@Composable () -> Unit)? {
     if (photo != null) return { PhotoImage(photo, store, Modifier.size(size).clip(InShapeShapes.field), maxSize = 256) }
     if (!showIllustration) return null
     val artwork = remember(exercise.equipmentName, exercise.name) { equipmentArtwork(exercise.equipmentName, exercise.name) }
-    return artwork?.let { { EquipmentThumbnail(it.drawable, size) } }
+    return artwork?.let { { EquipmentThumbnail(it.drawable, size, ioDispatcher) } }
 }
 
 @Composable
-private fun EquipmentThumbnail(@DrawableRes resource: Int, size: Dp) {
+private fun EquipmentThumbnail(@DrawableRes resource: Int, size: Dp, ioDispatcher: CoroutineDispatcher) {
     val resources = LocalResources.current
     val edge = with(LocalDensity.current) { (size - Dimens.innerSmall).roundToPx() }.coerceAtLeast(1)
     var visible by remember { mutableStateOf(false) }
     Box(Modifier.size(size).onVisibilityChanged(minFractionVisible = .1f) { visible = it }) {
         if (visible) {
-            key(resources, resource, edge) {
+            key(resources, resource, edge, ioDispatcher) {
                 val bitmap by produceState<Bitmap?>(null) {
-                    value = withContext(Dispatchers.IO) { decoders.withPermit { thumbnail(resources, resource, edge) } }
+                    value = withContext(ioDispatcher) { decoders.withPermit { thumbnail(resources, resource, edge) } }
                 }
                 bitmap?.let {
                     Image(it.asImageBitmap(), null, Modifier.size(size).padding(Dimens.innerTiny), contentScale = ContentScale.Fit)
@@ -79,7 +81,7 @@ private fun thumbnail(resources: Resources, @DrawableRes resource: Int, edge: In
     var sample = 1
     while (768 / (sample * 2) >= edge) sample *= 2
     val key = ThumbnailKey(resource, sample)
-    return thumbnails.get(key) ?: BitmapFactory.decodeResource(
+    return thumbnails[key] ?: BitmapFactory.decodeResource(
         resources,
         resource,
         BitmapFactory.Options().apply {

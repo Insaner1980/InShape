@@ -2,6 +2,7 @@ package com.emmah.inshape.transfer
 
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.storage.StorageManager
 import android.util.Log
 import androidx.room.withTransaction
 import com.emmah.inshape.AppContainer
@@ -14,7 +15,12 @@ import com.emmah.inshape.data.Preferences
 import com.emmah.inshape.data.newId
 import java.io.File
 import java.io.IOException
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -30,10 +36,13 @@ class ValidatedBackup internal constructor(val staged: StagedBackup, internal va
     }
 }
 
-class BackupService(private val container: AppContainer) {
+class BackupService(
+    private val container: AppContainer,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+) {
     private val root = File(container.storageRoot, "transfer-staging")
     private val transferLock = Mutex()
-    suspend fun createBackup(destination: Uri) = withContext(Dispatchers.IO) {
+    suspend fun createBackup(destination: Uri) = withContext(ioDispatcher) {
         transferLock.withLock {
             container.photos.assetLock.withLock {
                 val directory = newStaging()
@@ -75,7 +84,7 @@ class BackupService(private val container: AppContainer) {
             }
         }
     }
-    suspend fun validateBackup(source: Uri): ValidatedBackup = withContext(Dispatchers.IO) {
+    suspend fun validateBackup(source: Uri): ValidatedBackup = withContext(ioDispatcher) {
         transferLock.withLock {
             val directory = newStaging()
             var validated = false
@@ -84,7 +93,7 @@ class BackupService(private val container: AppContainer) {
                     container.context.contentResolver.openInputStream(source)
                         ?: throw IOException("Could not open this backup")
                     ).use {
-                    BackupArchive.read(it, directory)
+                    BackupArchive.read(it, directory) { bytes -> reserveRestoreSpace(directory, bytes) }
                 }
                 staged.data.photos.forEach { asset ->
                     validateImage(File(directory, asset.path), asset.mediaType)
@@ -95,7 +104,22 @@ class BackupService(private val container: AppContainer) {
             }
         }
     }
-    suspend fun replaceJournal(backup: ValidatedBackup, confirmedIdentity: String) = withContext(Dispatchers.IO) {
+
+    private fun reserveRestoreSpace(directory: File, bytes: Long) {
+        if (directory.usableSpace >= bytes) return
+        val storage = container.context.getSystemService(StorageManager::class.java)
+        try {
+            val volume = storage.getUuidForPath(directory)
+            if (storage.getAllocatableBytes(volume) < bytes) {
+                throw IOException("Insufficient allocatable storage")
+            }
+            storage.allocateBytes(volume, bytes)
+        } catch (failure: IOException) {
+            throw IOException("Not enough free storage to stage this backup safely", failure)
+        }
+    }
+
+    suspend fun replaceJournal(backup: ValidatedBackup, confirmedIdentity: String) = withContext(ioDispatcher) {
         transferLock.withLock {
             container.healthSharing.lock.withLock {
                 container.photos.assetLock.withLock {
@@ -116,11 +140,13 @@ class BackupService(private val container: AppContainer) {
                             }
                             asset.copy(path = "${generation.name}/${target.name}")
                         }
-                        replaceData(data, restoredPhotos)
-                        committed = true
-                        backup.consumed = true
-                        removeStaging(backup.staged.directory)
-                        removeUnreferencedPhotos()
+                        currentCoroutineContext().ensureActive()
+                        withContext(NonCancellable) {
+                            replaceData(data, restoredPhotos)
+                            committed = true
+                            backup.consumed = true
+                        }
+                        cleanupCommittedRestore(backup)
                         container.onForeground()
                     } finally {
                         if (!committed) {
@@ -130,6 +156,18 @@ class BackupService(private val container: AppContainer) {
                     }
                 }
             }
+        }
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private suspend fun cleanupCommittedRestore(backup: ValidatedBackup) {
+        try {
+            removeStaging(backup.staged.directory)
+            removeUnreferencedPhotos()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            Log.w("BackupService", "Journal was restored; startup recovery will retry photo and staging cleanup")
         }
     }
 
@@ -151,7 +189,15 @@ class BackupService(private val container: AppContainer) {
             dao.clearDrafts()
             dao.clearHealthStates()
             dao.clearOutbox()
+            dao.clearProgramEnrollment()
+            dao.clearProgramLinks()
+            dao.clearAssistantDrafts()
+            dao.clearAssistantReceipts()
+            dao.clearAssistantMemories()
             data.exercises.forEach { dao.put(it) }
+            data.programEnrollment?.let { dao.put(it) }
+            data.programLinks.forEach { dao.put(it) }
+            data.assistantMemories.forEach { dao.put(it) }
             data.routines.forEach { dao.put(it) }
             data.routineItems.forEach { dao.put(it) }
             data.workouts.forEach { dao.insertWorkout(it) }
@@ -260,7 +306,7 @@ class BackupService(private val container: AppContainer) {
             }
         }
     }
-    suspend fun recoverOwnedStaging() = withContext(Dispatchers.IO) {
+    suspend fun recoverOwnedStaging() = withContext(ioDispatcher) {
         transferLock.withLock {
             container.photos.assetLock.withLock {
                 root.listFiles()?.filter {

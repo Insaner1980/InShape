@@ -2,32 +2,24 @@ package com.emmah.inshape.feature.progress
 
 import com.emmah.inshape.data.BodyObservation
 import com.emmah.inshape.data.DateRange
+import com.emmah.inshape.data.MeasurementBasis
 import com.emmah.inshape.data.Workout
 import com.emmah.inshape.data.weekStart
 import java.math.BigDecimal
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 private const val MAX_ATTENDANCE_WEEKS = 260L
 
-enum class ExerciseMetric(val label: String) {
-    WEIGHT("Heaviest weight"),
-    REPS("Most reps"),
-    REPS_AT_LOAD("Reps at a set weight"),
-    LOAD_AT_REPS("Weight for a rep target"),
-    SET_COUNT("Number of sets")
-}
 data class ExerciseMetricQuery(
     val exerciseId: String,
     val equipmentId: String,
     val basis: String,
-    val range: DateRange,
-    val metric: ExerciseMetric = ExerciseMetric.WEIGHT,
-    val fixedLoad: BigDecimal? = null,
-    val minimumReps: Int = 10
+    val range: DateRange
 )
 data class MetricPoint(val workoutId: String, val date: LocalDate, val value: BigDecimal?)
-data class PersonalBest(val point: MetricPoint, val previous: MetricPoint?, val isNewRecord: Boolean)
 data class WeekCount(val week: LocalDate, val count: Int)
 fun calculateExerciseSeries(records: List<Workout>, query: ExerciseMetricQuery): List<MetricPoint> = records
     .filter { it.qualifiesForAttendance && it.row.journalDate in query.range }
@@ -40,41 +32,18 @@ fun calculateExerciseSeries(records: List<Workout>, query: ExerciseMetricQuery):
         }
         if (items.isEmpty()) return@mapNotNull null
         val sets = items.flatMap { it.completedSets }
-        val value = when (query.metric) {
-            ExerciseMetric.WEIGHT -> sets.mapNotNull { it.load?.toBigDecimal() }.maxOrNull()
-
-            ExerciseMetric.REPS -> sets.mapNotNull { it.reps?.toBigDecimal() }.maxOrNull()
-
-            ExerciseMetric.REPS_AT_LOAD -> sets.filter { set ->
-                query.fixedLoad != null &&
-                    set.load?.toBigDecimal()?.compareTo(query.fixedLoad) == 0
-            }.mapNotNull { it.reps?.toBigDecimal() }.maxOrNull()
-
-            ExerciseMetric.LOAD_AT_REPS -> sets.filter {
-                (it.reps ?: 0) >= query.minimumReps
-            }.mapNotNull { it.load?.toBigDecimal() }.maxOrNull()
-
-            ExerciseMetric.SET_COUNT -> sets.size.toBigDecimal()
+        val value = when (MeasurementBasis.fromKey(query.basis)) {
+            MeasurementBasis.Weight, MeasurementBasis.MachineLevel -> sets.mapNotNull { it.load?.toBigDecimalOrNull() }.maxOrNull()
+            MeasurementBasis.Assistance -> sets.mapNotNull { it.load?.toBigDecimalOrNull() }.minOrNull()
+            MeasurementBasis.Bodyweight -> sets.mapNotNull { it.reps }.maxOrNull()?.toBigDecimal()
+            MeasurementBasis.Time -> items.mapNotNull { item ->
+                item.row.durationSeconds?.toBigDecimal() ?: item.completedSets
+                    .mapNotNull { it.load?.toBigDecimalOrNull()?.multiply(60.toBigDecimal()) }
+                    .maxOrNull()
+            }.maxOrNull()
         }
         MetricPoint(workout.row.id, LocalDate.parse(workout.row.journalDate), value)
     }
-fun calculatePersonalBest(records: List<Workout>, query: ExerciseMetricQuery): PersonalBest? {
-    if (query.basis.startsWith("assistance") &&
-        query.metric in listOf(ExerciseMetric.WEIGHT, ExerciseMetric.LOAD_AT_REPS)
-    ) {
-        return null
-    }
-    val points = calculateExerciseSeries(records, query).filter { it.value != null }
-    val best = points.maxByOrNull { it.value!! } ?: return null
-    val previous = points.takeWhile {
-        it !== best
-    }.filter { it.value!! < best.value!! }.maxByOrNull { it.value!! }
-    return PersonalBest(
-        best,
-        previous,
-        points.size > 1 && points.last() === best && previous != null
-    )
-}
 fun weeklyAttendance(records: List<Workout>, range: DateRange): List<WeekCount> {
     if (range.start > range.end) return emptyList()
     val lastWeek = weekStart(range.end)
@@ -109,29 +78,26 @@ fun averageWeeklyAttendance(records: List<Workout>, range: DateRange, today: Loc
     return count.toDouble() / fullWeeks.coerceAtLeast(1)
 }
 
-data class ObservationPoint(val date: LocalDate, val pain: Int?, val stiffness: Int?)
+data class ObservationPoint(val date: LocalDate, val phase: String, val observation: BodyObservation)
 
 fun observationSeries(
     history: List<Workout>,
     observations: List<BodyObservation>,
     region: String,
-    phase: String,
     range: DateRange
-): List<ObservationPoint> = history
-    .filter { it.qualifiesForAttendance && it.row.journalDate in range }
-    .sortedWith(compareBy({ it.row.journalDate }, { it.row.createdAt }))
-    .mapNotNull { workout ->
-        val check = workout.checkIns.find { it.phase == phase } ?: return@mapNotNull null
-        val observation =
-            observations.find { it.checkInId == check.id && it.region == region }
-                ?: return@mapNotNull null
-        if (observation.pain == null && observation.stiffness == null) {
-            null
-        } else {
-            ObservationPoint(
-                LocalDate.parse(workout.row.journalDate),
-                observation.pain,
-                observation.stiffness
-            )
+): List<ObservationPoint> {
+    val observationsByCheckIn = observations.asSequence()
+        .filter { it.region == region && (it.pain != null || it.stiffness != null) }
+        .associateBy { it.checkInId }
+    return history.asSequence()
+        .filter { it.qualifiesForAttendance && it.row.journalDate in range }
+        .flatMap { it.checkIns.asSequence() }
+        .mapNotNull { check ->
+            val observation = observationsByCheckIn[check.id] ?: return@mapNotNull null
+            val instant = Instant.parse(check.observedAt)
+            instant to ObservationPoint(instant.atZone(ZoneId.of(check.zoneId)).toLocalDate(), check.phase, observation)
         }
-    }
+        .sortedByDescending { it.first }
+        .map { it.second }
+        .toList()
+}

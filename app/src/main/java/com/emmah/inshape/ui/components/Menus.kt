@@ -12,16 +12,24 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.DpOffset
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
 
 @Composable
-fun AppMenu(expanded: Boolean, onDismiss: () -> Unit, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+fun AppMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    inHeader: Boolean = false,
+    content: @Composable ColumnScope.() -> Unit
+) {
     DropdownMenu(
         expanded,
         onDismiss,
         modifier,
+        offset = DpOffset(if (inHeader) -Dimens.headerActionEnd else Dimens.zero, Dimens.zero),
         shape = InShapeShapes.card,
         containerColor = InShapeTheme.colors.background,
         tonalElevation = Dimens.zero,

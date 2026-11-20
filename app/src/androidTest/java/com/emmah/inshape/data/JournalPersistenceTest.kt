@@ -1,5 +1,6 @@
 package com.emmah.inshape.data
 
+import com.emmah.inshape.testContext
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -23,7 +24,7 @@ class JournalPersistenceTest {
         val name = "persistence-${newId()}.db"
         var db = Room.databaseBuilder(context, JournalDatabase::class.java, name).build()
         try {
-            var repo = JournalRepository(db, Clock.systemUTC())
+            var repo = JournalRepository(db, Clock.systemUTC(), testContext())
             val exercise = Exercise(name = "Machine", settings = listOf(Setting("Seat", "4")))
             repo.saveExercise(exercise)
             val ids =
@@ -49,7 +50,7 @@ class JournalPersistenceTest {
             )
             db.close()
             db = Room.databaseBuilder(context, JournalDatabase::class.java, name).build()
-            repo = JournalRepository(db, Clock.systemUTC())
+            repo = JournalRepository(db, Clock.systemUTC(), testContext())
             val snapshot = repo.snapshot()
             assertEquals(ids.first(), snapshot.active!!.row.id)
             assertEquals("27.5", snapshot.sets.first { it.id == set }.load)

@@ -14,36 +14,105 @@ import com.emmah.inshape.data.newId
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-class PhotoStore(private val context: Context, private val db: JournalDatabase, val root: File = File(context.filesDir, "photos")) {
+class PhotoStore(
+    private val context: Context,
+    private val db: JournalDatabase,
+    val root: File = File(context.filesDir, "photos"),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+) {
     val assetLock = Mutex()
-    suspend fun importPhoto(exerciseId: String, uri: Uri): PhotoAsset = withContext(Dispatchers.IO) {
-        assetLock.withLock { import(exerciseId, uri, null) }
+    suspend fun importPhoto(exerciseId: String, uri: Uri): PhotoAsset = assetLock.withLock {
+        import(exerciseId, uri, null)
     }
-    suspend fun replacePhoto(assetId: String, uri: Uri): PhotoAsset = withContext(Dispatchers.IO) {
-        assetLock.withLock {
-            val previous = db.journal().photos().first { it.id == assetId }
-            import(previous.exerciseId, uri, previous)
+    suspend fun replacePhoto(assetId: String, uri: Uri): PhotoAsset = assetLock.withLock {
+        val previous = db.journal().photos().first { it.id == assetId }
+        import(previous.exerciseId, uri, previous)
+    }
+    private suspend fun import(exerciseId: String, uri: Uri, previous: PhotoAsset?): PhotoAsset = withContext(ioDispatcher) {
+        val position = previous?.position ?: db.journal().photos().count { it.exerciseId == exerciseId }
+        val asset = stagePhoto(exerciseId, uri, position, previous?.id ?: newId())
+        var committed = false
+        try {
+            currentCoroutineContext().ensureActive()
+            withContext(NonCancellable) {
+                db.withTransaction { db.journal().put(asset) }
+                committed = true
+            }
+            previous?.let { removeUnusedFile(file(it)) }
+            asset
+        } finally {
+            if (!committed) removeUnusedFile(file(asset))
         }
     }
-    private suspend fun import(exerciseId: String, uri: Uri, previous: PhotoAsset?): PhotoAsset {
+
+    internal suspend fun <T> withNewPhotos(
+        exerciseId: String,
+        uris: List<Uri>,
+        write: suspend (List<PhotoAsset>) -> T
+    ): T = assetLock.withLock {
+        withContext(ioDispatcher) {
+            val photos = mutableListOf<PhotoAsset>()
+            var committed = false
+            try {
+                val firstPosition = db.journal().photos().filter { it.exerciseId == exerciseId }.maxOfOrNull { it.position } ?: -1
+                uris.forEachIndexed { index, uri ->
+                    photos.add(stagePhoto(exerciseId, uri, firstPosition + index + 1, newId()))
+                }
+                currentCoroutineContext().ensureActive()
+                withContext(NonCancellable) {
+                    db.withTransaction { write(photos) }.also { committed = true }
+                }
+            } finally {
+                if (!committed) photos.forEach { removeUnusedFile(file(it)) }
+            }
+        }
+    }
+
+    internal suspend fun uploadDerivative(uri: Uri, cropCenter: Boolean = false): ByteArray = withContext(ioDispatcher) {
+        val temporary = File.createTempFile("inshape-image-", ".tmp", context.cacheDir)
+        try {
+            copyPhoto(uri, temporary)
+            val original = requireNotNull(decode(temporary, 2048)) { "Could not read the selected image." }
+            val bitmap = if (cropCenter && original.width >= 8 && original.height >= 8) {
+                Bitmap.createBitmap(original, original.width / 8, original.height / 8, original.width * 3 / 4, original.height * 3 / 4)
+                    .also { if (it !== original) original.recycle() }
+            } else {
+                original
+            }
+            try {
+                val out = java.io.ByteArrayOutputStream()
+                for (quality in listOf(90, 80, 65, 50)) {
+                    out.reset()
+                    check(bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out))
+                    if (out.size() <= 1_572_864) return@withContext out.toByteArray()
+                }
+                throw IllegalArgumentException("Choose a smaller image or crop.")
+            } finally {
+                bitmap.recycle()
+            }
+        } finally {
+            removeUnusedFile(temporary)
+        }
+    }
+
+    private fun stagePhoto(exerciseId: String, uri: Uri, position: Int, assetId: String): PhotoAsset {
         check(root.isDirectory || root.mkdirs()) { "Could not create photo storage" }
         val token = newId()
         val temporary = File(root, ".import-$token")
-        var owned: File? = null
-        var committed = false
         try {
             val (length, checksum) = copyPhoto(uri, temporary)
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(temporary.path, bounds)
-            require(
-                bounds.outWidth > 0 && bounds.outHeight > 0 &&
-                    bounds.outWidth.toLong() * bounds.outHeight <= 100_000_000
-            ) {
+            require(bounds.outWidth > 0 && bounds.outHeight > 0 && bounds.outWidth.toLong() * bounds.outHeight <= 100_000_000) {
                 "Choose a supported, readable photo"
             }
             val extension = when (bounds.outMimeType) {
@@ -54,28 +123,12 @@ class PhotoStore(private val context: Context, private val db: JournalDatabase, 
                 "image/gif" -> "gif"
                 else -> throw IllegalArgumentException("Unsupported image format")
             }
-            decode(temporary, 512)?.recycle()
-                ?: throw IllegalArgumentException("Could not decode this photo")
-            owned = File(root, "$token.$extension")
+            decode(temporary, 512)?.recycle() ?: throw IllegalArgumentException("Could not decode this photo")
+            val owned = File(root, "$token.$extension")
             check(temporary.renameTo(owned)) { "Could not save photo" }
-            val asset =
-                PhotoAsset(
-                    previous?.id ?: newId(),
-                    exerciseId,
-                    owned.name,
-                    bounds.outMimeType,
-                    length,
-                    checksum,
-                    previous?.position
-                        ?: db.journal().photos().count { it.exerciseId == exerciseId }
-                )
-            db.withTransaction { db.journal().put(asset) }
-            committed = true
-            previous?.let { removeUnusedFile(file(it)) }
-            return asset
+            return PhotoAsset(assetId, exerciseId, owned.name, bounds.outMimeType, length, checksum, position)
         } finally {
             removeUnusedFile(temporary)
-            if (!committed) owned?.let(::removeUnusedFile)
         }
     }
 
@@ -97,7 +150,7 @@ class PhotoStore(private val context: Context, private val db: JournalDatabase, 
                 output.fd.sync()
             }
         }
-        return length to digest.digest().joinToString("") { "%02x".format(it) }
+        return length to digest.digest().toHexString()
     }
 
     private fun copyPhotoBytes(input: java.io.InputStream, output: java.io.OutputStream, digest: MessageDigest): Long {
@@ -114,7 +167,7 @@ class PhotoStore(private val context: Context, private val db: JournalDatabase, 
         return length
     }
 
-    suspend fun removePhoto(assetId: String) = withContext(Dispatchers.IO) {
+    suspend fun removePhoto(assetId: String) = withContext(ioDispatcher) {
         assetLock.withLock {
             val asset = db.journal().photos().firstOrNull { it.id == assetId } ?: return@withLock
             db.journal().deletePhoto(assetId)
@@ -129,7 +182,7 @@ class PhotoStore(private val context: Context, private val db: JournalDatabase, 
             }
         }
     }
-    suspend fun thumbnail(asset: PhotoAsset, maxSize: Int = 1024): Bitmap? = withContext(Dispatchers.IO) { decode(file(asset), maxSize) }
+    suspend fun thumbnail(asset: PhotoAsset, maxSize: Int = 1024): Bitmap? = withContext(ioDispatcher) { decode(file(asset), maxSize) }
     private fun decode(file: File, maxSize: Int): Bitmap? {
         val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.path, options)

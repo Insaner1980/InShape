@@ -1,5 +1,6 @@
 package com.emmah.inshape.ui.components
 
+import com.emmah.inshape.ui.theme.Dimens
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -19,7 +20,6 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
 import com.emmah.inshape.ui.theme.hasArtworkColumns
 
 @Composable
@@ -30,14 +30,15 @@ internal fun ArtworkHeader(
     modifier: Modifier = Modifier,
     cropEnd: Boolean = false,
     mirror: Boolean = false,
+    gap: Dp = Dimens.itemGap,
     content: @Composable () -> Unit
 ) {
     BoxWithConstraints(modifier.fillMaxWidth()) {
-        val width = minOf(artWidth, maxWidth * .4f, maxWidth - 184.dp)
+        val width = minOf(artWidth, maxWidth * .4f, maxWidth - Dimens.artworkTextMinWidth)
         val showArtwork = hasArtworkColumns()
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(gap),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(Modifier.weight(1f)) { content() }

@@ -1,5 +1,11 @@
 package com.emmah.inshape.transfer
 
+import com.emmah.inshape.R
+import com.emmah.inshape.quantity
+import com.emmah.inshape.ui
+import com.emmah.inshape.testContext
+import org.robolectric.RobolectricTestRunner
+import org.junit.runner.RunWith
 import com.emmah.inshape.data.BodyObservation
 import com.emmah.inshape.data.CheckIn
 import com.emmah.inshape.data.Exercise
@@ -16,6 +22,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@RunWith(RobolectricTestRunner::class)
 class ExportTest {
     private val time = "2026-11-13T10:00:00Z"
     private fun fixture(): JournalSnapshot {
@@ -90,7 +97,7 @@ class ExportTest {
     }
     private fun export(selection: ExportSelection): Map<String, String> {
         val output = ByteArrayOutputStream()
-        JournalExports.csv(fixture(), selection, output)
+        JournalExports.csv(testContext(), fixture(), selection, output)
         return buildMap {
             ZipInputStream(ByteArrayInputStream(output.toByteArray())).use { zip ->
                 while (true) {
@@ -106,6 +113,7 @@ class ExportTest {
         val files = export(ExportSelection(setOf("workout"), true, true))
         assertEquals(6, files.size)
         val workouts = files.getValue("workouts.csv")
+        assertTrue(workouts.contains(ui(R.string.csv_workout_id)))
         assertTrue(workouts.contains("'="))
         assertTrue(workouts.contains("\"\"Näyttö\"\""))
         assertTrue(workouts.contains("Private\nWorkout"))

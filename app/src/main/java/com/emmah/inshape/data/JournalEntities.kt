@@ -15,7 +15,7 @@ fun newId(): String = UUID.randomUUID().toString()
 
 @Serializable data class SavedLink(val label: String, val url: String)
 
-@Serializable data class SetTarget(val load: String? = null, val reps: Int? = null)
+@Serializable data class SetTarget(val load: String? = null, val reps: Int? = null, val plannedReps: PlannedReps? = null)
 
 @Serializable
 @Entity(indices = [Index("name"), Index("equipmentId")])
@@ -93,7 +93,8 @@ data class RoutineItem(
     val mode: String = "SETS",
     val durationSeconds: Long? = null,
     val note: String = "",
-    val sets: List<SetTarget> = emptyList()
+    val sets: List<SetTarget> = emptyList(),
+    val plan: ExercisePlan? = null
 )
 
 @Serializable
@@ -122,7 +123,8 @@ data class WorkoutEntity(
     val currentItemId: String? = null,
     val revision: Long = 1,
     val createdAt: String,
-    val modifiedAt: String
+    val modifiedAt: String,
+    val program: ProgramWorkoutSource? = null
 )
 
 @Serializable
@@ -155,7 +157,8 @@ data class SessionItem(
     val quickCompletedAt: String? = null,
     val durationSeconds: Long? = null,
     val targetDurationSeconds: Long? = null,
-    val mode: String = "SETS"
+    val mode: String = "SETS",
+    val plan: ExercisePlan? = null
 )
 
 @Serializable
@@ -180,7 +183,10 @@ data class SessionSet(
     val rawReps: String = "",
     val load: String? = null,
     val reps: Int? = null,
-    val completedAt: String? = null
+    val completedAt: String? = null,
+    val plannedReps: PlannedReps? = null,
+    val rir: Int? = null,
+    val perSide: Boolean? = null
 )
 
 @Serializable

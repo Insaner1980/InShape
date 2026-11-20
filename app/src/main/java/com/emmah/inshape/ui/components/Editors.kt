@@ -1,8 +1,14 @@
 package com.emmah.inshape.ui.components
 
-import androidx.compose.foundation.clickable
+import androidx.compose.ui.res.stringResource
+import com.emmah.inshape.R
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.Row
@@ -11,13 +17,20 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,8 +42,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import com.emmah.inshape.ui.theme.Dimens
@@ -48,6 +59,8 @@ fun SelectField(
     optionLabel: (String) -> String = { it }
 ) {
     var open by remember { mutableStateOf(false) }
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
     Column(modifier) {
         if (!inline) GroupLabel(label, Modifier.padding(bottom = Dimens.innerSmall))
         Surface(
@@ -59,11 +72,13 @@ fun SelectField(
                     "$label, ${optionLabel(selected)}"
             },
             shape = InShapeShapes.field,
-            color = if (inline) androidx.compose.ui.graphics.Color.Transparent else InShapeTheme.colors.surface
+            color = InShapeTheme.colors.background,
+            border = fieldBorder(focused),
+            interactionSource = interaction
         ) {
             Row(
                 Modifier.padding(
-                    horizontal = if (inline) Dimens.zero else Dimens.inner,
+                    horizontal = Dimens.inner,
                     vertical = Dimens.innerSmall
                 ),
                 verticalAlignment = Alignment.CenterVertically
@@ -78,23 +93,61 @@ fun SelectField(
         }
     }
     if (open) {
-        AlertDialog(onDismissRequest = { open = false }, title = { Text(label) }, text = {
-            LazyColumn {
-                items(options) { option ->
-                    Row(
-                        Modifier.fillMaxWidth().heightIn(min = Dimens.touch).clickable {
-                            onSelect(option)
-                            open =
-                                false
-                        },
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(option == selected, null)
-                        Text(optionLabel(option), Modifier.padding(Dimens.itemGap))
-                    }
-                }
+        SelectionSheet(label, options, selected, optionLabel, onSelect) { open = false }
+    }
+}
+
+@Composable
+internal fun SelectionSheet(
+    label: String,
+    options: List<String>,
+    selected: String? = null,
+    optionLabel: (String) -> String = { it },
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    EditorSheet(label, onDismiss) {
+        LazyColumn(Modifier.fillMaxWidth().selectableGroup()) {
+            items(options) { option ->
+                ListRow(
+                    optionLabel(option),
+                    Modifier.selectable(option == selected) {
+                        onSelect(option)
+                        onDismiss()
+                    },
+                    trailing = if (option == selected) ({ Icon(Icons.Rounded.Check, null) }) else null,
+                    showChevron = false
+                )
             }
-        }, confirmButton = {}, dismissButton = { DialogAction("Cancel", { open = false }) })
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun EditorSheet(
+    title: String,
+    onDismiss: () -> Unit,
+    contentModifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val colors = InShapeTheme.colors
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded)),
+        containerColor = colors.background,
+        contentColor = colors.text,
+        scrimColor = colors.scrim,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = colors.divider) }
+    ) {
+        Column(
+            Modifier.fillMaxWidth().then(contentModifier).imePadding()
+                .padding(start = Dimens.screenPadding, end = Dimens.screenPadding, bottom = Dimens.inner),
+            verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)
+        ) {
+            Text(title, style = MaterialTheme.typography.titleLarge)
+            content()
+        }
     }
 }
 
@@ -127,11 +180,21 @@ fun DialogAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifie
 
 @Composable
 fun ConfirmDialog(title: String, message: String, confirm: String, destructive: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    if (!destructive) {
+        EditorSheet(title, onDismiss) {
+            Text(message)
+            ActionRow(Modifier.align(Alignment.End)) {
+                DialogAction(stringResource(R.string.cancel), onDismiss)
+                DialogAction(confirm, onConfirm)
+            }
+        }
+        return
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Text(message) },
         confirmButton = { DialogAction(confirm, onConfirm, destructive = destructive) },
-        dismissButton = { DialogAction("Cancel", onDismiss) }
+        dismissButton = { DialogAction(stringResource(R.string.cancel), onDismiss) }
     )
 }

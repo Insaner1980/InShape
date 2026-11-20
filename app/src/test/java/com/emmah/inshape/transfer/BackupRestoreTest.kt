@@ -22,6 +22,7 @@ import com.emmah.inshape.feature.workout.FinishDraft
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.IOException
 import java.security.MessageDigest
 import java.time.DateTimeException
 import java.time.Instant
@@ -48,6 +49,7 @@ class BackupRestoreTest {
             Exercise(
                 name = "Näyttö, \"one\"",
                 settings = listOf(Setting("Seat", "4")),
+                instructions = "Keep shoulders down",
                 notes = "First\nSecond",
                 favorite = true
             )
@@ -152,6 +154,8 @@ class BackupRestoreTest {
         BackupArchive.write(data, { photo }, it, time, "1.0")
     }.toByteArray()
 
+    private fun readArchive(input: ByteArrayInputStream, directory: File) = BackupArchive.read(input, directory) {}
+
     @Test fun backupCreationTimeMustFitInEpochMilliseconds() {
         val (data, photo) = fixture()
         val latest = Instant.ofEpochMilli(Long.MAX_VALUE)
@@ -162,7 +166,7 @@ class BackupRestoreTest {
         assertEquals(0, output.size())
 
         BackupArchive.write(data, { photo }, output, latest.toString(), "1.0")
-        val staged = BackupArchive.read(ByteArrayInputStream(output.toByteArray()), temporary.newFolder())
+        val staged = readArchive(ByteArrayInputStream(output.toByteArray()), temporary.newFolder())
         assertEquals(latest.toString(), staged.manifest.createdAt)
     }
 
@@ -171,7 +175,7 @@ class BackupRestoreTest {
         val state = HealthShareState(newId(), clientVersion = 5, acknowledgedRevision = 3)
         val deletion = HealthOutbox(state.workoutId, state.clientRecordId, 5, "DELETE")
         val source = data.copy(healthStates = data.healthStates + state, outbox = listOf(deletion))
-        val restored = BackupArchive.read(
+        val restored = readArchive(
             ByteArrayInputStream(archive(source, photo)),
             temporary.newFolder()
         ).data
@@ -183,7 +187,7 @@ class BackupRestoreTest {
         val finish = FinishDraft(end = time, note = "Unfinished workout note", unknownTimes = true)
         val draft = EditorDraft("finish:${fixture.workouts.single().id}", "finish", Json.encodeToString(finish), time)
         val data = fixture.copy(drafts = fixture.drafts + draft)
-        val staged = BackupArchive.read(
+        val staged = readArchive(
             ByteArrayInputStream(archive(data, photo)),
             temporary.newFolder()
         )
@@ -246,7 +250,7 @@ class BackupRestoreTest {
             entries + ("unlisted.json" to byteArrayOf(1))
         ).forEach { changed ->
             assertThrows(Exception::class.java) {
-                BackupArchive.read(ByteArrayInputStream(zip(changed)), temporary.newFolder())
+                readArchive(ByteArrayInputStream(zip(changed)), temporary.newFolder())
             }
         }
     }
@@ -260,16 +264,22 @@ class BackupRestoreTest {
         ).jsonObject
         val newer = JsonObject(manifest + ("formatVersion" to JsonPrimitive(999)))
         assertThrows(Exception::class.java) {
-            BackupArchive.read(
+            readArchive(
                 ByteArrayInputStream(
                     zip(entries + ("manifest.json" to newer.toString().toByteArray()))
                 ),
                 temporary.newFolder()
             )
         }
-        assertThrows(Exception::class.java) {
-            BackupArchive.read(ByteArrayInputStream(original), temporary.newFolder(), 2)
+        val staging = temporary.newFolder()
+        val required = entries.filterKeys { it != "manifest.json" }.values.sumOf { it.size.toLong() } + 10L * 1024 * 1024
+        assertThrows(IOException::class.java) {
+            BackupArchive.read(ByteArrayInputStream(original), staging) { bytes ->
+                assertEquals(required, bytes)
+                throw IOException("Insufficient staging space")
+            }
         }
+        assertEquals(emptyList<String>(), staging.list()?.toList())
     }
 
     @Test fun declaredTraversalPathsAreRejectedBeforeWriting() {
@@ -284,7 +294,7 @@ class BackupRestoreTest {
                 ("manifest.json" to changed.toString().toByteArray())
             val directory = temporary.newFolder()
             val error = assertThrows(IllegalArgumentException::class.java) {
-                BackupArchive.read(ByteArrayInputStream(zip(archive)), directory)
+                readArchive(ByteArrayInputStream(zip(archive)), directory)
             }
             assertEquals("Unsafe or unknown backup path", error.message)
             assertEquals(0, directory.list()!!.size)
@@ -359,7 +369,7 @@ class BackupRestoreTest {
             preferences = base.preferences.copy(weeklyGoal = 3, lastBackupAt = time),
             outbox = listOf(HealthOutbox(state.workoutId, state.clientRecordId, 15, "UPSERT"))
         )
-        val staged = BackupArchive.read(ByteArrayInputStream(archive(data, photo)), temporary.newFolder())
+        val staged = readArchive(ByteArrayInputStream(archive(data, photo)), temporary.newFolder())
         assertEquals(
             data.copy(
                 photos = base.photos.map { it.copy(path = "photos/${it.id}.png") },
@@ -381,7 +391,7 @@ class BackupRestoreTest {
         )
         val olderArchive = entries + ("journal.json" to olderJournal) +
             ("manifest.json" to Json.encodeToString(updatedManifest).toByteArray())
-        val restored = BackupArchive.read(ByteArrayInputStream(zip(olderArchive)), temporary.newFolder()).data
+        val restored = readArchive(ByteArrayInputStream(zip(olderArchive)), temporary.newFolder()).data
         assertEquals(data.copy(photos = restored.photos), restored)
     }
 
@@ -401,7 +411,7 @@ class BackupRestoreTest {
         val directory = temporary.newFolder()
         val existing = File(directory, "existing.txt").apply { writeText("Keep this file") }
         val error = assertThrows(IllegalArgumentException::class.java) {
-            BackupArchive.read(ByteArrayInputStream(archive(data, photo)), directory)
+            readArchive(ByteArrayInputStream(archive(data, photo)), directory)
         }
         assertEquals("Restore staging must be empty", error.message)
         assertEquals("Keep this file", existing.readText())
@@ -459,6 +469,7 @@ class BackupRestoreTest {
             "zero workout revision" to data.copy(workouts = listOf(workout.copy(revision = 0))),
             "current item from another workout" to data.copy(workouts = listOf(workout, past.copy(currentItemId = item.id))),
             "unknown duration source" to data.copy(workouts = listOf(workout.copy(durationSource = ""))),
+            "duplicate session item" to data.copy(items = listOf(item, item.copy(position = 1))),
             "session item without an exercise" to data.copy(items = listOf(item.copy(exerciseId = newId()))),
             "negative session item position" to data.copy(items = listOf(item.copy(position = -1))),
             "unknown exercise disposition" to data.copy(items = listOf(item.copy(disposition = ""))),

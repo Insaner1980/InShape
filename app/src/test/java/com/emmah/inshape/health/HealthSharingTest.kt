@@ -1,5 +1,9 @@
 package com.emmah.inshape.health
 
+import com.emmah.inshape.ui
+import com.emmah.inshape.R
+import com.emmah.inshape.ui.UiException
+import com.emmah.inshape.testContext
 import com.emmah.inshape.data.Exercise
 import com.emmah.inshape.data.JournalDatabase
 import com.emmah.inshape.data.JournalRepository
@@ -42,9 +46,10 @@ class HealthSharingTest {
         repo =
             JournalRepository(
                 db,
-                Clock.fixed(Instant.parse("2026-11-13T08:00:00Z"), ZoneId.of("UTC"))
+                Clock.fixed(Instant.parse("2026-11-13T08:00:00Z"), ZoneId.of("UTC")),
+                testContext()
             )
-        service = HealthSharing(repo, gateway)
+        service = HealthSharing(repo, gateway, testContext())
     }
 
     @After fun close() = db.close()
@@ -117,6 +122,43 @@ class HealthSharingTest {
         assertEquals(1, gateway.rows.size)
     }
 
+    @Test fun clearingTimingDropsOnlyTheAffectedUpsertAndItsError() = runBlocking {
+        val affected = completed()
+        val removed = completed()
+        val retained = completed()
+        service.removeShared(removed)
+        gateway.allowed = false
+        assertFalse(service.sync())
+        val row = repo.snapshot().workout(affected)!!.row
+
+        repo.correctWorkout(affected, row.revision, row.title, row.journalDate, row.note, WorkoutTiming())
+
+        val snapshot = repo.snapshot()
+        assertEquals(mapOf(removed to "DELETE", retained to "UPSERT"), snapshot.outbox.associate { it.workoutId to it.operation })
+        val state = snapshot.healthStates.single { it.workoutId == affected }
+        assertEquals("SHARE_UNCONFIRMED", state.status)
+        assertNull(state.error)
+        repo.deleteWorkout(affected)
+        assertEquals("DELETE", repo.snapshot().outbox.single { it.workoutId == affected }.operation)
+    }
+
+    @Test fun syncDiscardsAnIneligibleUpdateLeftByAnOlderAppVersion() = runBlocking {
+        val id = completed()
+        assertTrue(service.sync())
+        repo.saveWorkoutNote(id, "Updated")
+        val row = repo.snapshot().workout(id)!!.row
+        db.journal().put(row.copy(timingConfirmed = false))
+        gateway.allowed = false
+
+        assertTrue(service.sync())
+
+        val snapshot = repo.snapshot()
+        assertTrue(snapshot.outbox.isEmpty())
+        assertEquals("SHARED", snapshot.healthStates.single().status)
+        assertNull(snapshot.healthStates.single().error)
+        assertEquals(1, gateway.rows.size)
+    }
+
     @Test fun aFailedOlderWriteDoesNotAttachItsErrorToTheNewerQueuedRevision() = runBlocking {
         val id = completed()
         val original = repo.snapshot().outbox.single()
@@ -166,7 +208,7 @@ class HealthSharingTest {
 
         val snapshot = repo.snapshot()
         val failed = snapshot.outbox.single()
-        val failureMessage = "Health Connect could not finish this operation. Retry when access is available."
+        val failureMessage = ui(R.string.health_retry_failed)
         val successfulId = (setOf(first, second) - failed.workoutId).single()
         val failedState = snapshot.healthStates.single { it.workoutId == failed.workoutId }
         assertEquals(1, failed.attempts)
@@ -212,7 +254,7 @@ class HealthSharingTest {
         val original = repo.snapshot()
         val disabled = runCatching { service.reconcile(id) }.exceptionOrNull()
         assertTrue(disabled is IllegalArgumentException)
-        assertEquals("Enable workout sharing first.", disabled?.message)
+        assertEquals(R.string.health_turn_on_sharing, (disabled as? UiException)?.text)
         assertTrue(repo.snapshot().outbox.isEmpty())
 
         repo.updatePreferences(Preferences(shareWorkouts = true))
@@ -238,7 +280,7 @@ class HealthSharingTest {
         val failure = runCatching { service.reconcile(id) }.exceptionOrNull()
 
         assertTrue(failure is IllegalArgumentException)
-        assertEquals("This workout changed. Review it and try again.", failure?.message)
+        assertEquals(R.string.health_workout_changed, (failure as? UiException)?.text)
         val snapshot = repo.snapshot()
         assertEquals(restored, snapshot.healthStates.single())
         assertTrue(snapshot.outbox.isEmpty())

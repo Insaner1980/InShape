@@ -19,7 +19,6 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import com.emmah.inshape.feature.music.PlaybackBars
-import com.emmah.inshape.feature.music.PlaybackRibbon
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.ThemeMode
 import kotlin.math.abs
@@ -42,7 +41,6 @@ class PlaybackVisualsTest {
         compose.setContent {
             InShapeTheme(ThemeMode.Dark) {
                 Column(Modifier.width(280.dp).background(InShapeTheme.colors.background)) {
-                    PlaybackRibbon(playing, Modifier.testTag("Ribbon"))
                     PlaybackBars(playing, Modifier.testTag("Bars"))
                 }
             }
@@ -69,7 +67,7 @@ class PlaybackVisualsTest {
         assertFramesMatch(resting, captureAfter(48), true)
     }
 
-    private val graphicTags = listOf("Ribbon", "Bars")
+    private val graphicTags = listOf("Bars")
 
     private fun captureAfter(millis: Long): List<Bitmap> {
         compose.mainClock.advanceTimeBy(millis)

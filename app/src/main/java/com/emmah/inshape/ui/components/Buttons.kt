@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ProvideTextStyle
@@ -23,19 +24,31 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
 
 @Composable
-private fun RowScope.ButtonLabel(text: String, icon: ImageVector?) {
+private fun RowScope.ButtonLabel(text: String, icon: ImageVector?, textAlign: TextAlign = TextAlign.Center) {
     if (icon !=
         null
     ) {
         Icon(icon, null, Modifier.size(Dimens.buttonIcon))
         Spacer(Modifier.width(Dimens.innerSmall))
     }
-    Text(text)
+    Text(text, textAlign = textAlign)
+}
+
+@Composable
+fun HeaderIconButton(icon: ImageVector, label: String, onClick: () -> Unit, primaryAdd: Boolean = false, enabled: Boolean = true) {
+    if (primaryAdd) {
+        IconCircleButton(icon, label, onClick, enabled = enabled)
+    } else {
+        IconButton(onClick, Modifier.size(Dimens.touch), enabled = enabled) {
+            Icon(icon, label, Modifier.size(Dimens.icon))
+        }
+    }
 }
 
 enum class ButtonSize { Medium, Large }
@@ -60,7 +73,7 @@ fun PrimaryButton(
         colors = ButtonDefaults.buttonColors(
             containerColor = if (inverted) InShapeTheme.colors.onInk else InShapeTheme.colors.ink,
             contentColor = if (inverted) InShapeTheme.colors.ink else InShapeTheme.colors.onInk,
-            disabledContainerColor = InShapeTheme.colors.surfaceStrong,
+            disabledContainerColor = InShapeTheme.colors.surface,
             disabledContentColor = InShapeTheme.colors.textTertiary
         )
     ) {
@@ -106,7 +119,7 @@ fun TextAction(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     color: Color = InShapeTheme.colors.text,
-    icon: ImageVector? = null,
+    icon: ImageVector?,
     enabled: Boolean = true
 ) {
     TextButton(
@@ -116,7 +129,7 @@ fun TextAction(
         colors = ButtonDefaults.textButtonColors(contentColor = color),
         contentPadding = PaddingValues(horizontal = Dimens.zero, vertical = Dimens.innerSmall)
     ) {
-        ProvideTextStyle(MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium)) { ButtonLabel(text, icon) }
+        ProvideTextStyle(MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium)) { ButtonLabel(text, icon, TextAlign.Start) }
     }
 }
 
@@ -126,7 +139,8 @@ fun IconCircleButton(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    accent: Boolean = false
+    accent: Boolean = false,
+    enabled: Boolean = true
 ) {
     Box(modifier.size(Dimens.touch), contentAlignment = Alignment.Center) {
         Surface(
@@ -135,6 +149,7 @@ fun IconCircleButton(
                 Dimens.check
             ),
             shape = InShapeShapes.pill,
+            enabled = enabled,
             color = if (accent) InShapeTheme.colors.ink else InShapeTheme.colors.surface
         ) {
             Box(contentAlignment = Alignment.Center) {

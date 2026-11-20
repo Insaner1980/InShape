@@ -1,8 +1,12 @@
 package com.emmah.inshape.transfer
 
+import com.emmah.inshape.ui.UiException
+import com.emmah.inshape.ui.uiMessage
+import com.emmah.inshape.R
 import android.net.Uri
 import com.emmah.inshape.AppContainer
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,7 +21,11 @@ data class TransferState(
     val prepared: PreparedExport? = null,
     val isError: Boolean = false
 )
-class TransferController(private val container: AppContainer, private val scope: CoroutineScope) {
+class TransferController(
+    private val container: AppContainer,
+    private val scope: CoroutineScope,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+) {
     private val mutableState = MutableStateFlow(TransferState())
     val state = mutableState.asStateFlow()
 
@@ -31,7 +39,7 @@ class TransferController(private val container: AppContainer, private val scope:
         mutableState.value = mutableState.value.copy(busy = true, message = label, isError = false)
         scope.launch {
             try {
-                val message = withContext(Dispatchers.IO) { action() }
+                val message = action()
                 mutableState.value =
                     mutableState.value.copy(message = message)
             } catch (
@@ -42,7 +50,7 @@ class TransferController(private val container: AppContainer, private val scope:
                 mutableState.value =
                     mutableState.value.copy(
                         message =
-                            failure.message ?: "Could not complete the transfer. Try again.",
+                            failure.uiMessage(container.context, R.string.transfer_failed),
                         isError = true
                     )
             } finally {
@@ -50,21 +58,23 @@ class TransferController(private val container: AppContainer, private val scope:
             }
         }
     }
-    fun backup(uri: Uri) = run("Creating backup…") {
+    fun backup(uri: Uri) = run(container.context.getString(R.string.backup_in_progress)) {
         container.backups.createBackup(uri)
-        "Backup saved successfully."
+        container.context.getString(R.string.backup_saved)
     }
-    fun validate(uri: Uri) = run("Checking backup and photos…") {
-        mutableState.value.backup?.close()
-        mutableState.value = mutableState.value.copy(backup = null)
-        val backup = container.backups.validateBackup(uri)
-        mutableState.value = mutableState.value.copy(backup = backup)
-        "Backup checked. Review the replacement below."
+    fun validate(uri: Uri) = run(container.context.getString(R.string.backup_checking)) {
+        withContext(ioDispatcher) {
+            mutableState.value.backup?.close()
+            mutableState.value = mutableState.value.copy(backup = null)
+            val backup = container.backups.validateBackup(uri)
+            mutableState.value = mutableState.value.copy(backup = backup)
+        }
+        container.context.getString(R.string.backup_checked)
     }
-    fun restore(backup: ValidatedBackup) = run("Restoring journal…") {
+    fun restore(backup: ValidatedBackup) = run(container.context.getString(R.string.backup_restoring)) {
         try {
             container.backups.replaceJournal(backup, backup.identity)
-            "Journal restored. Health sharing is off and restored reminders are paused."
+            container.context.getString(R.string.backup_restored)
         } finally {
             mutableState.value = mutableState.value.copy(backup = null)
         }
@@ -73,43 +83,50 @@ class TransferController(private val container: AppContainer, private val scope:
         if (!mutableState.value.busy) {
             mutableState.value.backup?.close()
             mutableState.value =
-                TransferState(message = "Restore cancelled. Your journal is unchanged.")
+                TransferState(message = container.context.getString(R.string.restore_cancelled))
         }
     }
     fun pickerCancelled() {
         if (!mutableState.value.busy) {
             mutableState.value =
                 mutableState.value.copy(
-                    message = "Cancelled. No file was saved or restored.",
+                    message = container.context.getString(R.string.transfer_cancelled),
                     isError = false
                 )
         }
     }
-    fun prepareExport(format: String, selection: ExportSelection) = run("Preparing $format export…") {
-        container.exports.release(mutableState.value.prepared)
-        mutableState.value = mutableState.value.copy(prepared = null)
-        val prepared = container.exports.prepare(format, selection)
-        mutableState.value = mutableState.value.copy(prepared = prepared)
+    fun prepareExport(format: String, selection: ExportSelection) = run(container.context.getString(R.string.export_preparing, format)) {
+        withContext(ioDispatcher) {
+            container.exports.release(mutableState.value.prepared)
+            mutableState.value = mutableState.value.copy(prepared = null)
+            val prepared = container.exports.prepare(format, selection)
+            mutableState.value = mutableState.value.copy(prepared = prepared)
+        }
         ""
     }
-    fun exportCancelled() {
+    fun exportCancelled(id: String?, format: String) {
         if (mutableState.value.busy) return
-        container.exports.release(mutableState.value.prepared)
-        mutableState.value = mutableState.value.copy(prepared = null, message = "Export cancelled.", isError = false)
+        id?.let { container.exports.release(it, format) }
+        mutableState.value = mutableState.value.copy(prepared = null, message = container.context.getString(R.string.export_cancelled), isError = false)
+    }
+
+    fun savePickerFailed() {
+        mutableState.value = mutableState.value.copy(message = container.context.getString(R.string.export_picker_failed), isError = true)
     }
 
     fun shareFailed() {
-        mutableState.value = mutableState.value.copy(message = "Could not open a share app. Save the file instead.", isError = true)
+        mutableState.value = mutableState.value.copy(message = container.context.getString(R.string.export_share_failed), isError = true)
     }
 
-    fun saveExport(uri: Uri) {
-        val prepared = mutableState.value.prepared ?: return
-        run("Saving export…") {
-            container.exports.save(prepared, uri)
-            container.exports.release(prepared)
+    fun saveExport(uri: Uri, id: String?, format: String) = run(container.context.getString(R.string.export_saving)) {
+        val exportId = id ?: throw UiException(R.string.export_missing)
+        withContext(ioDispatcher) {
+            val file = container.exports.findPreparedFile(exportId, format) ?: throw UiException(R.string.export_missing)
+            container.exports.save(file, uri)
+            container.exports.release(exportId, format)
             mutableState.value = mutableState.value.copy(prepared = null)
-            "${prepared.format} export saved successfully."
         }
+        container.context.getString(R.string.export_saved, format)
     }
     fun close() {
         mutableState.value.backup?.close()

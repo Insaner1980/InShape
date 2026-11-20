@@ -1,5 +1,12 @@
 package com.emmah.inshape.health
 
+import androidx.compose.ui.res.stringResource
+import com.emmah.inshape.R
+import androidx.compose.material.icons.outlined.LockOpen
+import com.emmah.inshape.ui.theme.workoutTime
+import com.emmah.inshape.ui.theme.formatDuration
+import com.emmah.inshape.ui.components.KeyValueRow
+import android.text.format.DateFormat
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
@@ -16,7 +23,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -47,131 +53,82 @@ import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeTheme
 import java.time.ZonedDateTime
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 
 // Slot content: siblings use the caller's layout and spacing, so there is no single modifier root.
 @Suppress("ModifierMissing", "ktlint:compose:modifier-missing-check")
 @Composable
 fun ColumnScope.HealthSettings(data: JournalSnapshot, vm: JournalViewModel) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     var grants by remember { mutableStateOf(emptySet<String>()) }
     var sources by remember { mutableStateOf(emptyList<String>()) }
-    var message by remember { mutableStateOf("") }
+    var refreshGeneration by remember { mutableIntStateOf(0) }
+    var refreshFailed by remember { mutableStateOf(false) }
+    var settingsOpenFailed by remember { mutableStateOf(false) }
     var heldRemoval by remember { mutableStateOf<String?>(null) }
     val gateway = vm.container.healthGateway
     val available =
         gateway.availability() == HealthConnectClient.SDK_AVAILABLE &&
             vm.container.integrationsEnabled
-    fun refresh() {
-        scope.launch {
-            if (!vm.container.integrationsEnabled) return@launch
-            try {
-                grants = gateway.grants()
-                if (data.preferences.readHeartRate &&
-                    HealthCapability.HEART.permission in grants
-                ) {
-                    sources =
-                        gateway.readContext(
-                            Preferences(readHeartRate = true),
-                            ZonedDateTime.now(vm.container.clock)
-                        ).heartSources
-                }
-            } catch (_: Exception) {
-                message =
-                    "Health Connect could not be reached. Your local journal is available."
+    LaunchedEffect(available, data.preferences.readHeartRate, refreshGeneration) {
+        sources = emptyList()
+        if (!available) {
+            grants = emptySet()
+            return@LaunchedEffect
+        }
+        try {
+            val currentGrants = gateway.grants()
+            coroutineContext.ensureActive()
+            grants = currentGrants
+            if (data.preferences.readHeartRate && HealthCapability.HEART.permission in currentGrants) {
+                val context = gateway.readContext(
+                    Preferences(readHeartRate = true),
+                    ZonedDateTime.now(vm.container.clock)
+                )
+                coroutineContext.ensureActive()
+                sources = context.heartSources
             }
+            refreshFailed = false
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            coroutineContext.ensureActive()
+            grants = emptySet()
+            refreshFailed = true
         }
     }
     val request =
         rememberLauncherForActivityResult(
             PermissionController.createRequestPermissionResultContract()
         ) {
-            refresh()
+            refreshGeneration++
             vm.container.onForeground()
         }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { refresh() }
-    LaunchedEffect(data.preferences.readHeartRate) { refresh() }
-    SectionHeader("Health Connect")
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { refreshGeneration++ }
+    SectionHeader(stringResource(R.string.health_connect))
     if (!available) {
-        Text(
-            "Health Connect is not available on this phone.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = InShapeTheme.colors.textSecondary
-        )
-        return
+        Text(stringResource(R.string.not_available_on_phone), style = MaterialTheme.typography.bodyMedium, color = InShapeTheme.colors.textSecondary)
     }
-    ListCard {
-        HealthCapability.entries.forEach { capability ->
-            item {
-                val enabled = capability.enabled(data.preferences)
-                ListRow(
-                    if (capability ==
-                        HealthCapability.HEART
-                    ) {
-                        "Latest heart rate"
-                    } else {
-                        capability.label
-                    },
-                    titleStyle = MaterialTheme.typography.bodyLarge,
-                    subtitle = if (available && enabled && capability.permission !in grants) {
-                        "Permission needed"
-                    } else {
-                        null
-                    },
-                    trailing = {
-                        InShapeSwitch(enabled, { checked ->
-                            vm.write {
-                                updatePreferences(
-                                    capability.change(snapshot().preferences, checked)
-                                )
-                            }
-                            if (checked && available &&
-                                capability.permission !in grants
-                            ) {
-                                request.launch(setOf(capability.permission))
-                            }
-                        }, capability.label, enabled = available || enabled)
-                    }
-                )
-                if (enabled && available &&
-                    capability.permission !in grants
-                ) {
-                    TextAction("Allow access", {
-                        request.launch(setOf(capability.permission))
-                    })
-                }
-            }
-        }
-        if (available) {
-            item {
-                ListRow("Manage Health Connect", titleStyle = MaterialTheme.typography.bodyLarge, onClick = {
-                    try {
-                        context.startActivity(
-                            Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS)
-                        )
-                    } catch (
-                        _: android.content.ActivityNotFoundException
-                    ) {
-                        message =
-                            "Open Android Settings and search for Health Connect."
-                    }
-                })
-            }
+    HealthCapabilitiesCard(data.preferences, vm, available, grants, { request.launch(it) }) {
+        try {
+            context.startActivity(Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS))
+            settingsOpenFailed = false
+        } catch (_: android.content.ActivityNotFoundException) {
+            settingsOpenFailed = true
         }
     }
-    if (data.preferences.readHeartRate &&
-        sources.isNotEmpty()
-    ) {
+    val hasHeartRateAccess = data.preferences.readHeartRate && HealthCapability.HEART.permission in grants
+    if (available && hasHeartRateAccess && sources.isNotEmpty()) {
         SelectField(
-            "Heart rate source",
+            stringResource(R.string.heart_rate_source),
             data.preferences.heartRateSource
                 ?: if (sources.size ==
                     1
                 ) {
                     sources.single()
                 } else {
-                    "Choose a source"
+                    stringResource(R.string.choose_source)
                 },
             sources,
             { source ->
@@ -183,7 +140,7 @@ fun ColumnScope.HealthSettings(data: JournalSnapshot, vm: JournalViewModel) {
     }
     if (data.outbox.isNotEmpty()) {
         Text(
-            "${data.outbox.size} sharing or removal operations pending",
+            stringResource(R.string.pending_health_operations, data.outbox.size),
             style = MaterialTheme.typography.bodySmall
         )
         data.outbox.mapNotNull {
@@ -191,13 +148,13 @@ fun ColumnScope.HealthSettings(data: JournalSnapshot, vm: JournalViewModel) {
         }.distinct().forEach {
             Text(it, style = MaterialTheme.typography.bodySmall, color = InShapeTheme.colors.error)
         }
-        OutlineButton("Retry pending operations", {
+        OutlineButton(stringResource(R.string.retry_operations), {
             HealthSyncWorker.enqueue(context, retryNow = true)
         }, enabled = available)
         if (available && data.outbox.any { it.operation == "DELETE" } &&
             HealthCapability.SHARE.permission !in grants
         ) {
-            OutlineButton("Allow pending removals", {
+            OutlineButton(stringResource(R.string.allow_removals), {
                 request.launch(setOf(HealthCapability.SHARE.permission))
             })
         }
@@ -207,32 +164,38 @@ fun ColumnScope.HealthSettings(data: JournalSnapshot, vm: JournalViewModel) {
         }
     ) {
         Text(
-            "Restored or removed records stay on hold. Open an individual workout to reconcile and share it explicitly.",
+            stringResource(R.string.health_hold_message),
             style = MaterialTheme.typography.bodySmall
         )
     }
     data.healthStates.filter { it.status == "REMOVAL_HELD" }.forEach { state ->
         Text(
-            "A previously requested removal needs confirmation on this installation. Workout ${state.workoutId}",
+            stringResource(R.string.health_removal_confirmation_needed, state.workoutId),
             style = MaterialTheme.typography.bodySmall
         )
-        TextAction("Remove previously deleted shared workout", {
+        TextAction(stringResource(R.string.remove_previous_shared), {
             heldRemoval = state.workoutId
         }, enabled = available, color = InShapeTheme.colors.error, icon = Icons.Outlined.Delete)
     }
-    if (message.isNotEmpty()) {
+    if (available && refreshFailed) {
         Text(
-            message,
+            stringResource(R.string.health_unreachable),
+            style = MaterialTheme.typography.bodySmall,
+            color = InShapeTheme.colors.error
+        )
+    }
+    if (settingsOpenFailed) {
+        Text(
+            stringResource(R.string.open_android_health_settings),
             style = MaterialTheme.typography.bodySmall,
             color = InShapeTheme.colors.error
         )
     }
     heldRemoval?.let { id ->
         ConfirmDialog(
-            "Remove the old shared summary?",
-            "This removes only InShape's Health Connect summary for workout $id. No restored local " +
-                "workout is deleted. Access is required before removal can finish.",
-            "Confirm removal",
+            stringResource(R.string.remove_old_shared_question),
+            stringResource(R.string.remove_health_old_message, id),
+            stringResource(R.string.confirm_removal),
             destructive = true,
             {
                 heldRemoval =
@@ -244,6 +207,48 @@ fun ColumnScope.HealthSettings(data: JournalSnapshot, vm: JournalViewModel) {
     }
 }
 
+@Composable
+private fun HealthCapabilitiesCard(
+    preferences: Preferences,
+    vm: JournalViewModel,
+    available: Boolean,
+    grants: Set<String>,
+    requestPermission: (Set<String>) -> Unit,
+    openSettings: () -> Unit
+) {
+    val capabilities = HealthCapability.entries.filter { available || it.enabled(preferences) }
+    if (capabilities.isEmpty()) return
+    ListCard {
+        capabilities.forEach { capability ->
+            item {
+                val enabled = capability.enabled(preferences)
+                val needsGrant = available && capability.permission !in grants
+                ListRow(
+                    if (capability == HealthCapability.HEART) stringResource(R.string.latest_heart_rate) else stringResource(capability.label),
+                    titleStyle = MaterialTheme.typography.bodyLarge,
+                    subtitle = if (enabled && needsGrant) stringResource(R.string.permission_needed) else null,
+                    trailing = {
+                        InShapeSwitch(enabled, { checked ->
+                            vm.write {
+                                updatePreferences(capability.change(snapshot().preferences, checked))
+                            }
+                            if (checked && needsGrant) requestPermission(setOf(capability.permission))
+                        }, stringResource(capability.label), enabled = available || enabled)
+                    }
+                )
+                if (enabled && needsGrant) {
+                    TextAction(stringResource(R.string.allow_access), { requestPermission(setOf(capability.permission)) }, icon = Icons.Outlined.LockOpen)
+                }
+            }
+        }
+        if (available) {
+            item {
+                ListRow(stringResource(R.string.manage_health), titleStyle = MaterialTheme.typography.bodyLarge, onClick = openSettings)
+            }
+        }
+    }
+}
+
 // Slot content: siblings use the caller's layout and spacing, so there is no single modifier root.
 @Suppress("ModifierMissing", "ktlint:compose:modifier-missing-check")
 @Composable
@@ -252,9 +257,11 @@ fun HealthToday(preferences: Preferences, container: AppContainer) {
     if (!container.integrationsEnabled || !readsEnabled) {
         return
     }
-    var context by remember { mutableStateOf<HealthContext?>(null) }
+    var context by remember(preferences.readSteps, preferences.readSleep, preferences.readHeartRate, preferences.heartRateSource) {
+        mutableStateOf<HealthContext?>(null)
+    }
     var generation by remember { mutableIntStateOf(0) }
-    var error by remember { mutableStateOf(false) }
+    val uses24Hours = DateFormat.is24HourFormat(LocalContext.current)
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { generation++ }
     LaunchedEffect(
         preferences.readSteps,
@@ -264,67 +271,25 @@ fun HealthToday(preferences: Preferences, container: AppContainer) {
         generation
     ) {
         try {
-            context =
-                container.healthGateway.readContext(preferences, ZonedDateTime.now(container.clock))
-            error =
-                false
-        } catch (
-            cancelled: kotlinx.coroutines.CancellationException
-        ) {
+            context = container.healthGateway.readContext(preferences, ZonedDateTime.now(container.clock))
+        } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
             context = null
-            error = true
         }
     }
-    SectionHeader("Health context")
-    if (error) {
-        Text(
-            "Health Connect is unavailable. Your journal is ready to use.",
-            style = MaterialTheme.typography.bodySmall
-        )
-    } else if (context ==
-        null
-    ) {
-        Text("Loading optional context...", style = MaterialTheme.typography.bodySmall)
-    }
-    listOf(
-        "Steps today" to context?.steps,
-        "Sleep last night" to context?.sleep,
-        "Latest recorded heart rate" to context?.heart
-    )
-        .filter { it.second != null }.chunked(2).forEach { row ->
-            ResponsiveRow {
-                row.forEach { (label, value) ->
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)) {
-                        Text(value!!.text, style = MaterialTheme.typography.headlineSmall)
-                        Text(
-                            label,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = InShapeTheme.colors.textSecondary
-                        )
-                        Text(
-                            value.period,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = InShapeTheme.colors.textSecondary
-                        )
-                        if (value.sources.isNotEmpty()) {
-                            Text(
-                                "Source: ${value.sources.joinToString(", ")}",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                        value.error?.let {
-                            Text(
-                                it,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = InShapeTheme.colors.error
-                            )
-                        }
-                    }
-                }
-            }
+    val values = listOfNotNull(
+        context?.steps?.let { stringResource(R.string.steps_today) to it.toString() },
+        context?.sleepSeconds?.let { stringResource(R.string.sleep_last_night) to formatDuration(it) },
+        context?.heart?.let { sample ->
+            stringResource(R.string.heart_rate) to stringResource(R.string.heart_rate_at_time, sample.beats, sample.time.workoutTime(container.clock.zone, uses24Hours))
         }
+    ).take(2)
+    if (values.isNotEmpty()) {
+        InShapeCard(color = InShapeTheme.colors.surface, inset = true, gap = Dimens.zero) {
+            values.forEach { (label, value) -> KeyValueRow(label, value, numeric = true) }
+        }
+    }
 }
 
 @Composable
@@ -342,16 +307,16 @@ fun WorkoutHealthControls(workout: Workout, data: JournalSnapshot, vm: JournalVi
             if (readPermission in result) vm.write { vm.container.healthSharing.reconcile(id) }
         }
     InShapeCard(modifier) {
-        SectionHeader("Health Connect")
+        SectionHeader(stringResource(R.string.health_connect))
         Text(
             state?.error
                 ?: if (state?.restoredHold ==
                     true
                 ) {
-                    "On hold until you explicitly reconcile this record"
+                    stringResource(R.string.sharing_on_hold)
                 } else {
                     state?.status?.lowercase()?.replace('_', ' ')
-                        ?: "Not shared"
+                        ?: stringResource(R.string.not_shared)
                 }
         )
         if (!HealthSharing.eligible(
@@ -359,20 +324,20 @@ fun WorkoutHealthControls(workout: Workout, data: JournalSnapshot, vm: JournalVi
             )
         ) {
             Text(
-                "Sharing needs performed work and confirmed actual start and end times. Correct timing above if known."
+                stringResource(R.string.sharing_needs_timing)
             )
         }
-        if (state?.platformId != null ||
+        if (state?.status == "SHARE_UNCONFIRMED" || state?.platformId != null ||
             (state?.acknowledgedRevision ?: 0) > 0
         ) {
-            TextAction("Remove shared copy", {
+            TextAction(stringResource(R.string.remove_shared_copy), {
                 remove = true
             }, color = InShapeTheme.colors.error, icon = Icons.Outlined.Delete)
         }
         if (state?.restoredHold == true && data.preferences.shareWorkouts &&
             HealthSharing.eligible(workout)
         ) {
-            OutlineButton("Reconcile and share this workout", {
+            OutlineButton(stringResource(R.string.reconcile_workout), {
                 reconcile =
                     true
             })
@@ -380,10 +345,9 @@ fun WorkoutHealthControls(workout: Workout, data: JournalSnapshot, vm: JournalVi
     }
     if (remove) {
         ConfirmDialog(
-            "Remove the shared summary?",
-            "Keep your local workout. Its Health Connect copy will be removed when access is " +
-                "available, and this workout will stay on hold.",
-            "Remove shared copy",
+            stringResource(R.string.remove_shared_question),
+            stringResource(R.string.remove_health_message),
+            stringResource(R.string.remove_shared_copy),
             destructive = true,
             {
                 remove =
@@ -395,10 +359,9 @@ fun WorkoutHealthControls(workout: Workout, data: JournalSnapshot, vm: JournalVi
     }
     if (reconcile) {
         ConfirmDialog(
-            "Reconcile this workout?",
-            "Exercise-read access is needed to find this app's existing summary and preserve its " +
-                "identity. Only this selected workout will be queued for sharing.",
-            "Continue",
+            stringResource(R.string.reconcile_question),
+            stringResource(R.string.reconcile_health_message),
+            stringResource(R.string.continue_action),
             destructive = false,
             {
                 reconcile =

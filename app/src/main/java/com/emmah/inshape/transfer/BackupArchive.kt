@@ -9,6 +9,9 @@ import com.emmah.inshape.data.HealthShareState
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.PhotoAsset
 import com.emmah.inshape.data.Preferences
+import com.emmah.inshape.data.ProgramEnrollment
+import com.emmah.inshape.data.AssistantMemory
+import com.emmah.inshape.data.ProgramExerciseLink
 import com.emmah.inshape.data.Routine
 import com.emmah.inshape.data.RoutineItem
 import com.emmah.inshape.data.SessionItem
@@ -47,7 +50,10 @@ data class StagedBackup(val manifest: BackupManifest, val data: JournalSnapshot,
     val observations: List<BodyObservation>,
     val drafts: List<EditorDraft>,
     val healthStates: List<HealthShareState>,
-    val pendingDeletions: List<HealthOutbox> = emptyList()
+    val pendingDeletions: List<HealthOutbox> = emptyList(),
+    val programEnrollment: ProgramEnrollment? = null,
+    val programLinks: List<ProgramExerciseLink> = emptyList(),
+    val assistantMemories: List<AssistantMemory> = emptyList()
 )
 
 @Serializable private data class BackupLibrary(
@@ -59,11 +65,13 @@ data class StagedBackup(val manifest: BackupManifest, val data: JournalSnapshot,
 object BackupArchive {
     private const val MAX_TOTAL_BYTES = 1024L * 1024 * 1024
     private const val MAX_JSON_BYTES = 16L * 1024 * 1024
+    private const val JOURNAL_ENTRY = "journal.json"
+    private const val LIBRARY_ENTRY = "library.json"
+    private const val PREFERENCES_ENTRY = "preferences.json"
     private val json = Json { encodeDefaults = true }
-    private val metadataNames = setOf("journal.json", "library.json", "preferences.json")
+    private val metadataNames = setOf(JOURNAL_ENTRY, LIBRARY_ENTRY, PREFERENCES_ENTRY)
     private fun digest() = MessageDigest.getInstance("SHA-256")
-    private fun ByteArray.hex() = joinToString("") { "%02x".format(it) }
-    private fun counts(data: JournalSnapshot) = mapOf(
+    private fun counts(data: JournalSnapshot, version: Int) = mapOf(
         "workouts" to data.workouts.size,
         "items" to data.items.size, "sets" to data.sets.size,
         "checkIns" to data.checkIns.size, "observations" to data.observations.size,
@@ -71,7 +79,11 @@ object BackupArchive {
         "pendingDeletions" to data.outbox.count { it.operation == "DELETE" },
         "exercises" to data.exercises.size, "photos" to data.photos.size,
         "routines" to data.routines.size, "routineItems" to data.routineItems.size
-    )
+    ) + if (version == 2) mapOf(
+        "programEnrollment" to (if (data.programEnrollment == null) 0 else 1),
+        "programLinks" to data.programLinks.size,
+        "assistantMemories" to data.assistantMemories.size
+    ) else emptyMap()
     fun write(data: JournalSnapshot, photoFile: (PhotoAsset) -> File, output: OutputStream, createdAt: String, appVersion: String) {
         validateBackupData(data)
         parseWorkoutInstant(createdAt)
@@ -87,7 +99,7 @@ object BackupArchive {
         val entries = linkedMapOf<String, BackupEntry>()
         metadata.forEach { (name, bytes) ->
             entries[name] =
-                BackupEntry(bytes.size.toLong(), digest().digest(bytes).hex())
+                BackupEntry(bytes.size.toLong(), digest().digest(bytes).toHexString())
         }
         data.photos.zip(photos).forEach { (original, portable) ->
             verifyPhoto(original, photoFile)
@@ -100,15 +112,20 @@ object BackupArchive {
         ) { "Backup exceeds the 1 GB or 2000-photo limit" }
         val manifest = json.encodeToString(
             BackupManifest(
+                formatVersion = 2,
                 createdAt = createdAt,
                 appVersion = appVersion,
-                counts = counts(data),
+                counts = counts(data, 2),
                 entries = entries
             )
         ).toByteArray(Charsets.UTF_8)
         require(manifest.size <= 1024 * 1024)
         // Finish ZIP structure without closing the caller's stream, so it can fsync before closing.
         ZipOutputStream(object : FilterOutputStream(output) {
+            override fun write(bytes: ByteArray, offset: Int, length: Int) {
+                output.write(bytes, offset, length)
+            }
+
             override fun close() {
                 flush()
             }
@@ -133,12 +150,12 @@ object BackupArchive {
             }
         }
     }
-    fun read(input: InputStream, directory: File, availableBytes: Long = directory.usableSpace): StagedBackup {
+    fun read(input: InputStream, directory: File, reserveSpace: (Long) -> Unit): StagedBackup {
         require(directory.isDirectory && directory.list()?.isEmpty() == true) {
             "Restore staging must be empty"
         }
         ZipInputStream(input.buffered()).use { zip ->
-            val manifest = readManifest(zip, availableBytes)
+            val manifest = readManifest(zip, reserveSpace)
             val seen = mutableSetOf<String>()
             while (true) {
                 val entry = zip.nextEntry ?: break
@@ -156,7 +173,7 @@ object BackupArchive {
     }
     private fun metadata(data: JournalSnapshot, photos: List<PhotoAsset>): LinkedHashMap<String, ByteArray> {
         val metadata = linkedMapOf(
-            "journal.json" to
+            JOURNAL_ENTRY to
                 json.encodeToString(
                     BackupJournal(
                         data.workouts,
@@ -169,14 +186,17 @@ object BackupArchive {
                         data.outbox.filter {
                             it.operation ==
                                 "DELETE"
-                        }
+                        },
+                        data.programEnrollment,
+                        data.programLinks,
+                        data.assistantMemories
                     )
                 ).toByteArray(Charsets.UTF_8),
-            "library.json" to
+            LIBRARY_ENTRY to
                 json.encodeToString(
                     BackupLibrary(data.exercises, photos, data.routines, data.routineItems)
                 ).toByteArray(Charsets.UTF_8),
-            "preferences.json" to
+            PREFERENCES_ENTRY to
                 json.encodeToString(
                     data.preferences.copy(lastBackupAt = null)
                 ).toByteArray(Charsets.UTF_8)
@@ -202,17 +222,17 @@ object BackupArchive {
                 hash.update(buffer, 0, read)
             }
         }
-        require(hash.digest().hex() == original.checksum) {
+        require(hash.digest().toHexString() == original.checksum) {
             "A journal photo failed its checksum"
         }
     }
 
-    private fun readManifest(zip: ZipInputStream, availableBytes: Long): BackupManifest {
+    private fun readManifest(zip: ZipInputStream, reserveSpace: (Long) -> Unit): BackupManifest {
         require(zip.nextEntry?.name == "manifest.json") { "This is not an InShape backup" }
         val manifest = json.decodeFromString<BackupManifest>(
             readBounded(zip, 1024 * 1024).decodeToString(throwOnInvalidSequence = true)
         )
-        require(manifest.formatVersion == 1) {
+        require(manifest.formatVersion in 1..2) {
             "Unsupported backup version ${manifest.formatVersion}. Update InShape before restoring."
         }
         parseWorkoutInstant(manifest.createdAt)
@@ -241,9 +261,7 @@ object BackupArchive {
         }
         val total = manifest.entries.values.sumOf { it.bytes }
         require(total <= MAX_TOTAL_BYTES) { "Backup exceeds the 1 GB limit" }
-        require(availableBytes >= total + 10L * 1024 * 1024) {
-            "Not enough free storage to stage this backup safely"
-        }
+        reserveSpace(total + 10L * 1024 * 1024)
         return manifest
     }
 
@@ -273,7 +291,7 @@ object BackupArchive {
             }
             target.fd.sync()
         }
-        require(written == declared.bytes && hash.digest().hex() == declared.sha256) {
+        require(written == declared.bytes && hash.digest().toHexString() == declared.sha256) {
             "Backup is incomplete or failed its checksum"
         }
     }
@@ -282,19 +300,19 @@ object BackupArchive {
         val journal = json.decodeFromString<BackupJournal>(
             File(
                 directory,
-                "journal.json"
+                JOURNAL_ENTRY
             ).readBytes().decodeToString(throwOnInvalidSequence = true)
         )
         val library = json.decodeFromString<BackupLibrary>(
             File(
                 directory,
-                "library.json"
+                LIBRARY_ENTRY
             ).readBytes().decodeToString(throwOnInvalidSequence = true)
         )
         val preferences = json.decodeFromString<Preferences>(
             File(
                 directory,
-                "preferences.json"
+                PREFERENCES_ENTRY
             ).readBytes().decodeToString(throwOnInvalidSequence = true)
         )
         require(
@@ -316,10 +334,13 @@ object BackupArchive {
                 preferences,
                 journal.drafts,
                 journal.healthStates,
-                journal.pendingDeletions
+                journal.pendingDeletions,
+                if (manifest.formatVersion == 2) journal.programEnrollment else null,
+                if (manifest.formatVersion == 2) journal.programLinks else emptyList(),
+                if (manifest.formatVersion == 2) journal.assistantMemories else emptyList()
             )
         validateBackupData(data)
-        require(counts(data) == manifest.counts) { "Backup record counts do not match" }
+        require(counts(data, manifest.formatVersion) == manifest.counts) { "Backup record counts do not match" }
         require(
             manifest.entries.keys == metadataNames + data.photos.map {
                 it.path

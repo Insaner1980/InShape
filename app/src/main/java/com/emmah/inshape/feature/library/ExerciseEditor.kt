@@ -1,11 +1,16 @@
 package com.emmah.inshape.feature.library
 
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.emmah.inshape.R
+import com.emmah.inshape.data.validExerciseLink
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
@@ -13,9 +18,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,12 +27,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import com.emmah.inshape.JournalViewModel
-import com.emmah.inshape.R
 import com.emmah.inshape.data.Exercise
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.MeasurementBasis
@@ -52,63 +50,79 @@ import kotlinx.serialization.json.Json
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ExerciseEditor(id: String, data: JournalSnapshot, vm: JournalViewModel, onSave: (String) -> Unit, modifier: Modifier = Modifier) {
+fun ExerciseEditor(
+    id: String,
+    data: JournalSnapshot,
+    vm: JournalViewModel,
+    onCreated: (String) -> Unit,
+    onArchived: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val creating = id == "new"
+    val key = "exercise:$id"
+    val origin = rememberSaveable(id) { newId() }
+    val submissions by vm.submissions.collectAsStateWithLifecycle()
+    val submission = submissions[key]
+    val saving = submission?.result == null && submission != null
+    val notifyCreated by rememberUpdatedState(onCreated)
+    val createdId = submission?.result?.takeIf { result -> data.exercises.any { it.id == result } }
+    LaunchedEffect(submission, createdId) {
+        if (submission != null && createdId != null && vm.consumeSubmission(key, submission) && submission.origin == origin) {
+            notifyCreated(createdId)
+        }
+    }
     var exercise by remember(id) {
-        mutableStateOf(
-            data.drafts.find {
+        val stored = data.drafts.find {
                 it.id == "exercise:$id"
             }?.let { runCatching { Json.decodeFromString<Exercise>(it.payload) }.getOrNull() }
                 ?: data.exercises.find { it.id == id }
                 ?: Exercise(id = if (id == "new") newId() else id)
+        mutableStateOf(
+            if (stored.notes.isBlank()) stored else stored.copy(
+                instructions = listOf(stored.instructions, stored.notes).filter(String::isNotBlank).joinToString("\n\n"),
+                notes = ""
+            )
         )
     }
     fun edit(value: Exercise) {
+        if (saving) return
         exercise = value
-        vm.saveDraft("exercise:$id", "exercise", Json.encodeToString(value))
+        vm.saveDraft(key, "exercise", Json.encodeToString(value))
+        if (!creating && value.name.isNotBlank() && value.links.all { validExerciseLink(it.url) }) {
+            vm.write { saveExercise(value, draftId = key, preserveFavorite = true) }
+        }
     }
-    var more by remember(id) { mutableStateOf(false) }
     var archive by remember { mutableStateOf(false) }
     var picker by rememberSaveable(id) { mutableStateOf(false) }
-    var showNameError by remember(id) { mutableStateOf(false) }
-    Page(modifier, bottomBar = {
-        PrimaryButton("Save exercise", {
-            if (exercise.name.isBlank()) {
-                showNameError = true
-            } else {
-                vm.write {
-                    saveExercise(exercise)
-                    deleteEditorDraft("exercise:$id")
-                    onSave(exercise.id)
-                }
-            }
-        }, Modifier.fillMaxWidth().heightIn(min = Dimens.button))
-    }) {
+    Page(modifier, bottomBar = if (creating) {
+        {
+            PrimaryButton(stringResource(R.string.create_exercise), {
+                val submitted = exercise
+                vm.submit(key, origin) { saveExercise(submitted, draftId = key, preserveFavorite = true) }
+            }, Modifier.fillMaxWidth().heightIn(min = Dimens.button), enabled = exercise.name.isNotBlank() && !saving)
+        }
+    } else null) {
         TextField(
             exercise.name,
-            "Exercise name",
+            stringResource(R.string.exercise_name),
             { edit(exercise.copy(name = it)) },
             singleLine = true,
-            error = "Enter an exercise name".takeIf { showNameError && exercise.name.isBlank() }
+            error = stringResource(R.string.exercise_name_required).takeIf { !creating && exercise.name.isBlank() }
         )
-        if (id == "new") {
-            SectionHeader("Photos")
-            Text(
-                "Save this exercise, then add photos on its details page.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = InShapeTheme.colors.textSecondary
-            )
-        }
-        GroupLabel("Machine settings")
+        val context = LocalContext.current
+        SelectField(stringResource(R.string.type), exercise.category, exerciseCategories, { edit(exercise.copy(category = it)) },
+            optionLabel = { it.categoryLabel(context) })
+        SelectField(
+            stringResource(R.string.measurement),
+            exercise.basis,
+            MeasurementBasis.entries.map { it.key },
+            { edit(exercise.copy(basis = it)) },
+            optionLabel = { context.getString(MeasurementBasis.fromKey(it).optionLabel) }
+        )
+        GroupLabel(stringResource(R.string.machine_settings))
         androidx.compose.foundation.layout.Column(
             verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Dimens.itemGap)
         ) {
-            if (exercise.settings.isNotEmpty()) {
-                Row(horizontalArrangement = Arrangement.spacedBy(Dimens.innerSmall)) {
-                    GroupLabel("Setting", Modifier.weight(1f))
-                    GroupLabel("Value", Modifier.weight(1f))
-                    Spacer(Modifier.width(Dimens.touch))
-                }
-            }
             exercise.settings.forEachIndexed { index, setting ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -126,9 +140,10 @@ fun ExerciseEditor(id: String, data: JournalSnapshot, vm: JournalViewModel, onSa
                                 )
                             )
                         },
-                        Modifier.weight(1f).semantics { contentDescription = "Setting ${index + 1} name" },
+                        Modifier.weight(1f),
                         singleLine = true,
-                        placeholder = "Seat height"
+                        placeholder = stringResource(R.string.seat_height),
+                        accessibilityLabel = stringResource(R.string.setting_number_name, index + 1)
                     )
                     TextField(
                         setting.value,
@@ -142,16 +157,17 @@ fun ExerciseEditor(id: String, data: JournalSnapshot, vm: JournalViewModel, onSa
                                 )
                             )
                         },
-                        Modifier.weight(1f).semantics { contentDescription = "Setting ${index + 1} value" },
+                        Modifier.weight(1f),
                         singleLine = true,
-                        placeholder = "4"
+                        placeholder = "4",
+                        accessibilityLabel = stringResource(R.string.setting_number_value, index + 1)
                     )
                     IconButton({
                         edit(exercise.copy(settings = exercise.settings.filterIndexed { i, _ -> i != index }))
-                    }) { Icon(Icons.Outlined.Close, "Remove setting ${index + 1}") }
+                    }) { Icon(Icons.Outlined.Close, stringResource(R.string.remove_setting_number, index + 1)) }
                 }
             }
-            TextAction("Add setting", {
+            TextAction(stringResource(R.string.add_setting), {
                 edit(
                     exercise.copy(
                         settings =
@@ -160,93 +176,57 @@ fun ExerciseEditor(id: String, data: JournalSnapshot, vm: JournalViewModel, onSa
                 )
             }, icon = Icons.Outlined.Add)
         }
-        SelectField(
-            "Measurement",
-            exercise.basis,
-            MeasurementBasis.entries.map { it.key },
-            { edit(exercise.copy(basis = it)) },
-            optionLabel = { MeasurementBasis.fromKey(it).optionLabel }
-        )
-        Text(
-            stringResource(R.string.exercise_measurement_help),
-            style = MaterialTheme.typography.bodyMedium,
-            color = InShapeTheme.colors.textSecondary
-        )
-        com.emmah.inshape.ui.components.ListRow(
-            "More details",
-            subtitle = listOfNotNull(
-                exercise.category.takeIf { it.isNotBlank() },
-                exercise.location.takeIf { it.isNotBlank() },
-                exercise.links.size.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.link_count, it, it) }
-            ).joinToString(", "),
-            onClick = { more = !more }
-        )
-        if (more) {
-            TextField(exercise.nickname, "Nickname (optional)", { edit(exercise.copy(nickname = it)) }, singleLine = true)
-            SelectField("Type", exercise.category, exerciseCategories, { edit(exercise.copy(category = it)) })
-            TextField(exercise.muscles, "Muscles or labels", { edit(exercise.copy(muscles = it)) })
-            TextField(exercise.location, "Location", { edit(exercise.copy(location = it)) }, singleLine = true)
-            TextField(exercise.equipmentName, "Machine name (as shown on the machine)", {
-                edit(exercise.copy(equipmentName = it))
-            }, singleLine = true)
-            GroupLabel("Notes")
-            androidx.compose.foundation.layout.Column(
-                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Dimens.itemGap)
-            ) {
-                TextField(exercise.instructions, "My instructions", {
-                    edit(exercise.copy(instructions = it))
-                })
-                TextField(exercise.notes, "Personal notes", { edit(exercise.copy(notes = it)) })
-            }
-            GroupLabel("Links")
-            androidx.compose.foundation.layout.Column(
-                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Dimens.itemGap)
-            ) {
-                exercise.links.forEachIndexed { index, link ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        TextField(link.label, "Link label", { text ->
-                            edit(exercise.copy(links = exercise.links.toMutableList().also { it[index] = link.copy(label = text) }))
-                        }, modifier = Modifier.weight(1f), singleLine = true)
-                        IconButton({
-                            edit(exercise.copy(links = exercise.links.filterIndexed { i, _ -> i != index }))
-                        }) {
-                            Icon(Icons.Outlined.Close, "Remove link")
-                        }
+        TextField(exercise.instructions, stringResource(R.string.notes), { edit(exercise.copy(instructions = it)) })
+        TextField(exercise.muscles, stringResource(R.string.muscles_or_labels), { edit(exercise.copy(muscles = it)) })
+        TextField(exercise.location.locationLabel(context), stringResource(R.string.location), { edit(exercise.copy(location = it)) }, singleLine = true)
+        GroupLabel(stringResource(R.string.links))
+        androidx.compose.foundation.layout.Column(
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Dimens.itemGap)
+        ) {
+            exercise.links.forEachIndexed { index, link ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextField(link.label, stringResource(R.string.link_label), { text ->
+                        edit(exercise.copy(links = exercise.links.toMutableList().also { it[index] = link.copy(label = text) }))
+                    }, modifier = Modifier.weight(1f), singleLine = true)
+                    IconButton({
+                        edit(exercise.copy(links = exercise.links.filterIndexed { i, _ -> i != index }))
+                    }) {
+                        Icon(Icons.Outlined.Close, stringResource(R.string.remove_link))
                     }
-                    TextField(link.url, "Web address", { text ->
-                        edit(
-                            exercise.copy(
-                                links = exercise.links.toMutableList().also {
-                                    it[index] =
-                                        link.copy(url = text)
-                                }
-                            )
+                }
+                TextField(link.url, stringResource(R.string.web_address), { text ->
+                    edit(
+                        exercise.copy(
+                            links = exercise.links.toMutableList().also {
+                                it[index] =
+                                    link.copy(url = text)
+                            }
                         )
+                    )
+                }, error = stringResource(R.string.invalid_web_address).takeIf { link.url.isNotBlank() && !validExerciseLink(link.url) })
+            }
+            TextAction(stringResource(R.string.add_link), {
+                edit(exercise.copy(links = exercise.links + SavedLink("", "")))
+            }, icon = Icons.Outlined.Add)
+        }
+        GroupLabel(stringResource(R.string.alternatives))
+        ListCard {
+            exercise.alternatives.forEach { optionId ->
+                val option = data.exercises.find { it.id == optionId } ?: return@forEach
+                item {
+                    ListRow(option.name, trailing = {
+                        IconButton({ edit(exercise.copy(alternatives = exercise.alternatives - optionId)) }) {
+                            Icon(Icons.Outlined.Close, stringResource(R.string.remove_named_alternative, option.name))
+                        }
                     })
                 }
-                TextAction("Add link", {
-                    edit(exercise.copy(links = exercise.links + SavedLink("", "")))
-                }, icon = Icons.Outlined.Add)
             }
-            GroupLabel("Alternatives")
-            ListCard {
-                exercise.alternatives.forEach { optionId ->
-                    val option = data.exercises.find { it.id == optionId } ?: return@forEach
-                    item {
-                        ListRow(option.name, trailing = {
-                            IconButton({ edit(exercise.copy(alternatives = exercise.alternatives - optionId)) }) {
-                                Icon(Icons.Outlined.Close, "Remove ${option.name} from alternatives")
-                            }
-                        })
-                    }
-                }
-            }
-            TextAction("Add alternative", { picker = true }, icon = Icons.Outlined.Add)
         }
+        TextAction(stringResource(R.string.add_alternative), { picker = true }, icon = Icons.Outlined.Add)
         if (id !=
             "new"
         ) {
-            TextAction("Archive exercise", {
+            TextAction(stringResource(R.string.archive_exercise), {
                 archive = true
             }, color = InShapeTheme.colors.error, icon = Icons.Outlined.Delete)
         }
@@ -254,7 +234,7 @@ fun ExerciseEditor(id: String, data: JournalSnapshot, vm: JournalViewModel, onSa
     if (picker) {
         ModalBottomSheet(onDismissRequest = { picker = false }, containerColor = InShapeTheme.colors.background) {
             Page {
-                SectionHeader("Add alternative")
+                SectionHeader(stringResource(R.string.add_alternative))
                 ExercisePickerList(data, vm.container.photos, { alternative ->
                     edit(exercise.copy(alternatives = exercise.alternatives + alternative))
                     picker = false
@@ -264,15 +244,15 @@ fun ExerciseEditor(id: String, data: JournalSnapshot, vm: JournalViewModel, onSa
     }
     if (archive) {
         ConfirmDialog(
-            "Archive exercise?",
-            "Historical records and photos are kept. This exercise will no longer appear in new selections.",
-            "Archive",
+            stringResource(R.string.archive_exercise_question),
+            stringResource(R.string.archive_exercise_message),
+            stringResource(R.string.archive),
             destructive = true,
             {
                 vm.write {
                     archiveExercise(id)
                     deleteEditorDraft("exercise:$id")
-                    onSave(id)
+                    onArchived()
                 }
                 archive =
                     false

@@ -8,39 +8,40 @@ import com.emmah.inshape.feature.music.SavedPlaylist
 
 internal object DemoMusic {
     const val NIGHT_DRIVE_ID = "night-drive"
+    private const val LOW_SIGNAL = "Hiljainen taajuus"
     val states = setOf("MusicHome", "MusicPlaylist", "WorkoutWithMusic")
     val catalog = MusicCatalog(
         playlists = listOf(
             playlist(
                 NIGHT_DRIVE_ID,
-                "Night Drive",
+                "Yöajo",
                 PlaylistArtworkFamily.NightDrive,
                 listOf(
-                    Triple("After Hours", "Northline", 222),
-                    Triple("Tunnel Vision", "Low Signal", 248),
-                    Triple("Coast Road", "Aster", 206),
-                    Triple("Headlights", "Northline", 252),
-                    Triple("Night Shift", "Velour", 235),
-                    Triple("Long Way Home", "Aster", 204),
-                    Triple("Between Streets", "Velour", 253),
-                    Triple("Overpass", "Northline", 226),
-                    Triple("Window Lights", "Aster", 232),
-                    Triple("Empty Avenue", "Low Signal", 263),
-                    Triple("Southbound", "Velour", 216),
-                    Triple("First Light", "Northline", 241)
+                    Triple("Illan jälkeen", "Northline", 222),
+                    Triple("Tunnelinäkö", LOW_SIGNAL, 248),
+                    Triple("Rantatie", "Aster", 206),
+                    Triple("Ajovalot", "Northline", 252),
+                    Triple("Yövuoro", "Velour", 235),
+                    Triple("Pitkä kotimatka", "Aster", 204),
+                    Triple("Katujen välissä", "Velour", 253),
+                    Triple("Ylikulkusilta", "Northline", 226),
+                    Triple("Ikkunoiden valot", "Aster", 232),
+                    Triple("Tyhjä katu", LOW_SIGNAL, 263),
+                    Triple("Kohti etelää", "Velour", 216),
+                    Triple("Aamunkoitto", "Northline", 241)
                 )
             ),
             playlist(
                 "heavy-rotation",
-                "Heavy Rotation",
+                "Tehotoistossa",
                 PlaylistArtworkFamily.HeavyRotation,
-                List(18) { Triple("Rotation ${it + 1}", "Low Signal", 190 + it * 3) }
+                List(18) { Triple("Kierros ${it + 1}", LOW_SIGNAL, 190 + it * 3) }
             ),
             playlist(
                 "slow-motion",
-                "Slow Motion",
+                "Hidastus",
                 PlaylistArtworkFamily.SlowMotion,
-                List(9) { Triple("Tide ${it + 1}", "Aster", 224 + it * 7) }
+                List(9) { Triple("Aalto ${it + 1}", "Aster", 224 + it * 7) }
             )
         )
     ).let { it.copy(songs = it.playlists.flatMap(SavedPlaylist::tracks)) }

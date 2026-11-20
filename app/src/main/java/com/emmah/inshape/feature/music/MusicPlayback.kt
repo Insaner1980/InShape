@@ -1,8 +1,11 @@
 package com.emmah.inshape.feature.music
 
+import com.emmah.inshape.R
 import android.content.ComponentName
 import android.content.Context
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.LifecycleStartEffect
@@ -14,10 +17,19 @@ import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionToken
 import com.emmah.inshape.AppContainer
 import com.google.common.util.concurrent.ListenableFuture
+import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
-data class QueuedSong(val index: Int, val id: String, val title: String, val artist: String, val uri: String?)
+data class QueuedSong(
+    val index: Int,
+    val id: String,
+    val title: String,
+    val artist: String,
+    val uri: String?,
+    val occurrence: String = UUID.randomUUID().toString()
+)
 
 enum class MusicRepeat { Off, All, One }
 
@@ -44,20 +56,21 @@ interface MusicPlayback {
     fun toggle()
     fun skip()
     fun previous()
-    fun seek(position: Long)
-    fun jump(index: Int)
+    fun seek(position: Long, song: QueuedSong? = state.value.song)
+    fun jump(song: QueuedSong)
     fun toggleShuffle()
     fun cycleRepeat()
     fun stop()
+    fun assistantGain(owner: String, reduction: Float?) {}
 }
 
 @androidx.annotation.OptIn(UnstableApi::class)
 @Composable
-internal fun rememberMusicPlayback(container: AppContainer, initial: List<MusicTrack>, observe: Boolean): MusicPlayback {
+internal fun rememberMusicPlayback(container: AppContainer, initial: List<MusicTrack>): MusicPlayback {
     val playback = remember(container, initial) {
         if (container.integrationsEnabled) SessionPlayback(container.context) else IsolatedPlayback(initial)
     }
-    if (playback is SessionPlayback && observe) {
+    if (playback is SessionPlayback) {
         LifecycleStartEffect(playback) {
             playback.connect()
             onStopOrDispose { playback.disconnect() }
@@ -66,8 +79,9 @@ internal fun rememberMusicPlayback(container: AppContainer, initial: List<MusicT
     return playback
 }
 
-private class IsolatedPlayback(initial: List<MusicTrack>) : MusicPlayback {
-    override val state = MutableStateFlow(PlaybackState())
+internal class IsolatedPlayback(initial: List<MusicTrack>) : MusicPlayback {
+    private val playbackState = MutableStateFlow(PlaybackState())
+    override val state = playbackState.asStateFlow()
     private val durations = mutableMapOf<String, Long?>()
 
     init {
@@ -79,8 +93,8 @@ private class IsolatedPlayback(initial: List<MusicTrack>) : MusicPlayback {
         durations.putAll(ordered.associate { it.id to it.durationMs })
         val queue = ordered.mapIndexed { index, track -> QueuedSong(index, track.id, track.title, track.artist, track.uri) }
         val first = queue.firstOrNull { it.id == startId } ?: queue.firstOrNull() ?: return
-        state.value = state.value.copy(queue = queue, shuffle = shuffle, playing = true)
-        jump(first.index)
+        playbackState.value = state.value.copy(queue = queue, shuffle = shuffle, playing = true)
+        jump(first)
     }
 
     override fun playAfterCurrent(track: MusicTrack) {
@@ -93,12 +107,12 @@ private class IsolatedPlayback(initial: List<MusicTrack>) : MusicPlayback {
             val index = queue.indexOf(current.song) + 1
             durations[track.id] = track.durationMs
             queue.add(index, QueuedSong((queue.maxOfOrNull { it.index } ?: 0) + 1, track.id, track.title, track.artist, track.uri))
-            state.value = current.copy(queue = queue, canSkip = true)
+            playbackState.value = current.copy(queue = queue, canSkip = true)
         }
     }
 
     override fun toggle() {
-        state.value = state.value.copy(playing = !state.value.playing)
+        playbackState.value = state.value.copy(playing = !state.value.playing)
     }
 
     override fun skip() {
@@ -106,46 +120,54 @@ private class IsolatedPlayback(initial: List<MusicTrack>) : MusicPlayback {
     }
 
     override fun previous() {
-        if (state.value.position > 3_000) seek(0) else move(-1)
+        val current = state.value
+        if (current.seekable && (current.position > 3_000 || current.song == current.queue.firstOrNull())) {
+            seek(0)
+        } else {
+            move(-1)
+        }
     }
 
     private fun move(offset: Int) {
         val current = state.value
         current.queue.getOrNull(current.queue.indexOf(current.song) + offset)?.let {
-            jump(it.index)
-            state.value = state.value.copy(playing = current.playing)
+            jump(it)
+            playbackState.value = state.value.copy(playing = current.playing)
         }
     }
 
-    override fun seek(position: Long) {
-        state.value = state.value.copy(position = position.coerceAtLeast(0))
+    override fun seek(position: Long, song: QueuedSong?) {
+        val current = state.value
+        if (song != null && current.song?.occurrence == song.occurrence && current.seekable) {
+            playbackState.value = current.copy(position = position.coerceAtLeast(0))
+        }
     }
 
-    override fun jump(index: Int) {
+    override fun jump(song: QueuedSong) {
         val current = state.value
-        val song = current.queue.find { it.index == index } ?: return
-        val duration = durations[song.id]
-        state.value = current.copy(
-            song = song,
+        val entry = current.queue.find { it.occurrence == song.occurrence } ?: return
+        val duration = durations[entry.id]
+        playbackState.value = current.copy(
+            song = entry,
             position = 0,
             duration = duration,
             seekable = duration != null,
             playing = true,
-            canGoBack = duration != null || song != current.queue.first(),
-            canSkip = song != current.queue.last()
+            canGoBack = duration != null || entry != current.queue.first(),
+            canSkip = entry != current.queue.last()
         )
     }
 
     override fun toggleShuffle() {
-        state.value = state.value.copy(shuffle = !state.value.shuffle)
+        playbackState.value = state.value.copy(shuffle = !state.value.shuffle)
     }
 
     override fun cycleRepeat() {
-        state.value = state.value.copy(repeat = MusicRepeat.entries[(state.value.repeat.ordinal + 1) % MusicRepeat.entries.size])
+        playbackState.value = state.value.copy(repeat = MusicRepeat.entries[(state.value.repeat.ordinal + 1) % MusicRepeat.entries.size])
     }
 
     override fun stop() {
-        state.value = PlaybackState()
+        playbackState.value = PlaybackState()
     }
 }
 
@@ -158,13 +180,23 @@ internal class SessionPlayback(private val context: Context) : MusicPlayback {
     private val pendingCommands = ArrayDeque<Pair<SessionCommand, Bundle>>()
     private var inFlightCommands = 0
     private var releaseWhenIdle = false
+    private var observing = false
+    private var retryDelay = 500L
+    private val handler = Handler(Looper.getMainLooper())
+    private val retryConnection = Runnable(::connectIfNeeded)
     private val executor = androidx.core.content.ContextCompat.getMainExecutor(context)
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) = refresh()
     }
 
     fun connect() {
+        observing = true
         releaseWhenIdle = false
+        connectIfNeeded()
+    }
+
+    private fun connectIfNeeded() {
+        handler.removeCallbacks(retryConnection)
         if (connection != null) return
         val token = SessionToken(context, ComponentName(context, MusicService::class.java))
         val future = MediaController.Builder(context, token).setListener(object : MediaController.Listener {
@@ -172,8 +204,7 @@ internal class SessionPlayback(private val context: Context) : MusicPlayback {
 
             override fun onDisconnected(controller: MediaController) {
                 if (this@SessionPlayback.controller === controller) {
-                    release()
-                    playbackState.value = PlaybackState(error = "Music player disconnected.")
+                    reconnectAfterFailure(context.getString(R.string.music_disconnected))
                 }
             }
         }).buildAsync()
@@ -184,9 +215,9 @@ internal class SessionPlayback(private val context: Context) : MusicPlayback {
                     controller = runCatching { future.get() }.getOrNull()
                     val active = controller
                     if (active == null) {
-                        release()
-                        playbackState.value = PlaybackState(error = "Could not connect to the music player.")
+                        reconnectAfterFailure(context.getString(R.string.music_connect_failed))
                     } else {
+                        retryDelay = 500L
                         active.addListener(listener)
                         refresh()
                         pendingCommands.forEach { (command, args) -> sendToSession(active, command, args) }
@@ -200,6 +231,9 @@ internal class SessionPlayback(private val context: Context) : MusicPlayback {
     }
 
     fun disconnect() {
+        observing = false
+        retryDelay = 500L
+        handler.removeCallbacks(retryConnection)
         // Leave the connection open until the service has handled commands accepted from the UI.
         releaseWhenIdle = true
         releaseIfIdle()
@@ -207,6 +241,15 @@ internal class SessionPlayback(private val context: Context) : MusicPlayback {
 
     private fun releaseIfIdle() {
         if (releaseWhenIdle && pendingCommands.isEmpty() && inFlightCommands == 0) release()
+    }
+
+    private fun reconnectAfterFailure(message: String) {
+        release()
+        playbackState.value = PlaybackState(error = message)
+        if (observing) {
+            handler.postDelayed(retryConnection, retryDelay)
+            retryDelay = (retryDelay * 2).coerceAtMost(8_000L)
+        }
     }
 
     private fun release() {
@@ -255,9 +298,13 @@ internal class SessionPlayback(private val context: Context) : MusicPlayback {
         if (active != null) {
             sendToSession(active, command, args)
         } else {
-            if (command == chooseQueue || command == endPlayback) pendingCommands.clear()
+            if (command == endPlayback) pendingCommands.clear()
+            if (command == chooseQueue) pendingCommands.removeAll { it.first != endPlayback }
             pendingCommands.addLast(command to args)
-            if (connection == null) connect()
+            if (connection == null) {
+                releaseWhenIdle = false
+                connectIfNeeded()
+            }
         }
     }
 
@@ -306,16 +353,26 @@ internal class SessionPlayback(private val context: Context) : MusicPlayback {
         controller?.seekToPrevious()
     }
 
-    override fun seek(position: Long) {
-        controller?.seekTo(position)
+    override fun seek(position: Long, song: QueuedSong?) {
+        val active = controller ?: return
+        if (song == null || active.currentMediaItem?.mediaId != song.occurrence) return
+        sendToSession(
+            active,
+            seekInOccurrence,
+            Bundle().apply {
+                putString(MUSIC_OCCURRENCE, song.occurrence)
+                putLong(MUSIC_POSITION, position)
+            }
+        )
     }
 
-    override fun jump(index: Int) {
-        val player = controller ?: return
-        if (index !in 0 until player.mediaItemCount) return
-        player.seekToDefaultPosition(index)
-        if (player.playbackState == Player.STATE_IDLE) player.prepare()
-        player.play()
+    override fun jump(song: QueuedSong) {
+        val active = controller ?: return
+        sendToSession(
+            active,
+            jumpToOccurrence,
+            Bundle().apply { putString(MUSIC_OCCURRENCE, song.occurrence) }
+        )
     }
 
     override fun toggleShuffle() {
@@ -333,12 +390,20 @@ internal class SessionPlayback(private val context: Context) : MusicPlayback {
     }
 
     override fun stop() = send(endPlayback)
+
+    override fun assistantGain(owner: String, reduction: Float?) {
+        send(assistantGainChange, Bundle().apply {
+            putString("owner", owner)
+            if (reduction != null) putFloat("gain", reduction)
+        })
+    }
 }
 
 private fun MediaItem.toQueuedSong(index: Int) = QueuedSong(
     index,
-    mediaId,
+    trackId,
     mediaMetadata.title?.toString().orEmpty(),
     mediaMetadata.artist?.toString().orEmpty(),
-    mediaMetadata.extras?.getString("localUri")
+    mediaMetadata.extras?.getString("localUri"),
+    mediaId
 )

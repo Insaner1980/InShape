@@ -1,8 +1,10 @@
 package com.emmah.inshape.feature.music
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,23 +26,33 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.emmah.inshape.R
 import com.emmah.inshape.ui.components.AppMenu
 import com.emmah.inshape.ui.components.BottomActionBar
 import com.emmah.inshape.ui.components.ButtonSize
+import com.emmah.inshape.ui.components.EditorSheet
 import com.emmah.inshape.ui.components.DialogAction
 import com.emmah.inshape.ui.components.EmptyState
 import com.emmah.inshape.ui.components.ListRow
@@ -48,13 +60,15 @@ import com.emmah.inshape.ui.components.MenuAction
 import com.emmah.inshape.ui.components.PrimaryButton
 import com.emmah.inshape.ui.components.PushedHeader
 import com.emmah.inshape.ui.components.ReorderHandle
-import com.emmah.inshape.ui.components.SearchField
 import com.emmah.inshape.ui.components.TextField
+import com.emmah.inshape.ui.components.SearchField
 import com.emmah.inshape.ui.components.reorderActions
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 @Composable
 internal fun PlaylistDetailEditor(
@@ -68,20 +82,11 @@ internal fun PlaylistDetailEditor(
     when (action) {
         "add" -> PlaylistEditor(store, catalog.songs, playlist = playlist, onClose = onClose)
 
-        "edit" -> ReorderPlaylist(store, playlist, onClose)
+        "edit" -> EditSavedPlaylist(store, playlist, onClose)
 
-        "rename" -> PlaylistPrompt("Rename playlist", "Save", onClose, initialName = playlist.name) { name ->
-            store.rename(playlist.id, name)
-            onClose()
-        }
+        "rename" -> EditSavedPlaylist(store, playlist, onClose, renameOnly = true)
 
-        "delete" -> PlaylistPrompt(
-            "Delete playlist?",
-            "Delete playlist",
-            onClose,
-            message = "Delete ${playlist.name} and its song list?",
-            destructive = true
-        ) {
+        "delete" -> DeletePlaylistDialog(onClose) {
             store.delete(playlist.id)
             onClose()
             onDelete()
@@ -95,43 +100,85 @@ internal fun PlaylistEditor(
     songs: List<MusicTrack>,
     onClose: () -> Unit,
     playlist: SavedPlaylist? = null,
-    firstSong: String? = null
+    firstSong: String? = null,
+    onCreated: (String) -> Unit = { onClose() }
 ) {
     var name by rememberSaveable { mutableStateOf("") }
     var search by rememberSaveable { mutableStateOf("") }
     var selected by rememberSaveable { mutableStateOf(listOfNotNull(firstSong)) }
     val existing = remember(playlist) { playlist?.tracks?.map { it.id }?.toSet().orEmpty() }
-    val shown = remember(songs, existing, search) {
+    val shown = remember(songs, existing, search, selected) {
         val query = search.trim()
-        songs.filter { it.available && it.id !in existing && (it.title.contains(query, true) || it.artist.contains(query, true)) }
+        songs.filter {
+            it.id !in existing && if (it.available) {
+                it.title.contains(query, true) || it.artist.contains(query, true)
+            } else {
+                it.id in selected
+            }
+        }
     }
+    val addableIds = remember(songs, existing) { songs.map { it.id }.toSet() - existing }
+    val selectedIds = selected.filter { it in addableIds }
+    val count = selectedIds.size
+    val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val snackbar = remember { SnackbarHostState() }
+    var saving by remember { mutableStateOf(false) }
+    val canEdit = { !saving }
     MusicEditor(
-        title = if (playlist == null) "New playlist" else "Add songs",
-        onClose = onClose,
-        saveEnabled = if (playlist == null) name.isNotBlank() else selected.isNotEmpty(),
-        onSave = {
-            if (playlist == null) store.create(name, selected) else store.add(playlist.id, selected)
+        title = if (playlist == null) stringResource(R.string.new_playlist) else stringResource(R.string.add_songs),
+        onClose = { if (!saving) onClose() },
+        snackbar = snackbar,
+        primaryAction = {
+            PrimaryButton(
+                when {
+                    playlist == null -> stringResource(R.string.create_playlist)
+                    count == 0 -> stringResource(R.string.add_songs)
+                    else -> stringResource(R.string.add_songs_count, pluralStringResource(R.plurals.song_count, count, count))
+                },
+                onClick = {
+                    if (!saving) {
+                        saving = true
+                        scope.launch {
+                            try {
+                                if (playlist == null) {
+                                    onCreated(store.create(name, selectedIds))
+                                } else {
+                                    store.add(playlist.id, selectedIds)
+                                    onClose()
+                                }
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                launch { snackbar.showSnackbar(context.getString(R.string.playlist_save_retry)) }
+                            } finally {
+                                saving = false
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !saving && if (playlist == null) name.isNotBlank() else count > 0,
+                size = ButtonSize.Large
+            )
         }
     ) {
         LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = Dimens.screenPadding)) {
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)) {
-                    if (playlist == null) {
-                        TextField(name, "Playlist name", { name = it }, singleLine = true)
-                    }
-                    if (songs.any { it.available }) {
-                        SearchField(search, { search = it }, "Find songs", Modifier.fillMaxWidth())
-                    }
-                    if (shown.isEmpty()) {
-                        val message = if (search.isBlank()) "Choose a music folder with more songs." else "Try another word."
-                        EmptyState("No songs to add", message, Modifier.padding(vertical = Dimens.inner))
-                    }
-                }
+                PlaylistEditorFields(
+                    name = name.takeIf { playlist == null },
+                    onNameChange = { name = it },
+                    search = search,
+                    onSearchChange = { search = it },
+                    hasAvailableSongs = songs.any { it.available },
+                    shownEmpty = shown.isEmpty(),
+                    canEdit = canEdit
+                )
             }
             items(shown, key = { it.id }) { track ->
                 val checked = track.id in selected
-                TrackCheckbox(track, checked, {
-                    selected = if (checked) selected - track.id else selected + track.id
+                TrackCheckbox(track, checked, enabled = canEdit(), onToggle = { include ->
+                    if (canEdit()) selected = if (include) selected + track.id else selected - track.id
                 })
                 MusicDivider()
             }
@@ -140,8 +187,97 @@ internal fun PlaylistEditor(
 }
 
 @Composable
-private fun ReorderPlaylist(store: MusicStore, playlist: SavedPlaylist, onClose: () -> Unit) {
+private fun PlaylistEditorFields(
+    name: String?,
+    onNameChange: (String) -> Unit,
+    search: String,
+    onSearchChange: (String) -> Unit,
+    hasAvailableSongs: Boolean,
+    shownEmpty: Boolean,
+    canEdit: () -> Boolean
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)) {
+        if (name != null) {
+            TextField(name, stringResource(R.string.playlist_name), { if (canEdit()) onNameChange(it) }, singleLine = true, enabled = canEdit())
+        }
+        if (hasAvailableSongs) {
+            SearchField(search, { if (canEdit()) onSearchChange(it) }, stringResource(R.string.search_songs), enabled = canEdit())
+        }
+        if (shownEmpty) {
+            val message = if (search.isBlank()) stringResource(R.string.choose_more_songs_folder) else stringResource(R.string.try_another_word)
+            EmptyState(stringResource(R.string.no_songs_to_add), message, Modifier.padding(vertical = Dimens.inner))
+        }
+    }
+}
+
+@Composable
+internal fun EditSavedPlaylist(store: MusicStore, playlist: SavedPlaylist, onClose: () -> Unit, renameOnly: Boolean = false) {
+    var name by rememberSaveable(playlist.id) { mutableStateOf(playlist.name) }
     var order by rememberSaveable(playlist.id) { mutableStateOf(playlist.tracks.map { it.id }) }
+    var savedName by remember(playlist.id) { mutableStateOf(playlist.name) }
+    var savedOrder by remember(playlist.id) { mutableStateOf(playlist.tracks.map { it.id }) }
+    val writeLock = remember(playlist.id) { Mutex() }
+    val scope = rememberCoroutineScope()
+    val snackbar = remember { SnackbarHostState() }
+    var closing by remember { mutableStateOf(false) }
+    var saveFailed by remember { mutableStateOf(false) }
+    suspend fun saveLatest(): Boolean = writeLock.withLock {
+        val nextName = name.trim()
+        val nextOrder = order
+        try {
+            if (nextName.isNotEmpty() && nextName != savedName) {
+                store.rename(playlist.id, nextName)
+                savedName = nextName
+            }
+            if (nextOrder != savedOrder) {
+                store.saveOrder(playlist.id, nextOrder)
+                savedOrder = nextOrder
+            }
+            saveFailed = false
+            true
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            saveFailed = true
+            false
+        }
+    }
+    LaunchedEffect(playlist.id) {
+        snapshotFlow { name to order }.collect { saveLatest() }
+    }
+    val retry = stringResource(R.string.retry)
+    val saveError = stringResource(R.string.playlist_save_failed)
+    LaunchedEffect(saveFailed) {
+        while (saveFailed && snackbar.showSnackbar(
+                saveError, actionLabel = retry, duration = SnackbarDuration.Indefinite
+            ) == SnackbarResult.ActionPerformed
+        ) {
+            saveLatest()
+        }
+    }
+    fun close() {
+        if (closing) return
+        closing = true
+        scope.launch {
+            // Back can run before the autosave collector receives the latest draft.
+            if (saveLatest()) onClose() else closing = false
+        }
+    }
+    val nameField: @Composable () -> Unit = {
+        TextField(
+            name, stringResource(R.string.playlist_name), { if (!closing) name = it }, singleLine = true,
+            error = stringResource(R.string.playlist_name_required).takeIf { name.isBlank() }, enabled = !closing
+        )
+    }
+    if (renameOnly) {
+        EditorSheet(stringResource(R.string.rename_playlist), ::close) {
+            nameField()
+            PlaylistSnackbarHost(snackbar)
+            DialogAction(stringResource(R.string.close), ::close, Modifier.align(Alignment.End), enabled = !closing)
+        }
+        return
+    }
+
     var menu by remember { mutableStateOf<String?>(null) }
     val byId = remember(playlist.tracks) { playlist.tracks.associateBy { it.id } }
     fun move(id: String, offset: Int) {
@@ -150,41 +286,22 @@ private fun ReorderPlaylist(store: MusicStore, playlist: SavedPlaylist, onClose:
         val target = (index + offset).coerceIn(order.indices)
         if (target != index) order = order.toMutableList().apply { add(target, removeAt(index)) }
     }
-    MusicEditor("Edit playlist", onClose, saveEnabled = true, onSave = { store.saveOrder(playlist.id, order) }) {
+    val canEdit = { !closing }
+    MusicEditor(stringResource(R.string.edit_playlist), ::close, snackbar) {
         LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = Dimens.screenPadding)) {
+            item { nameField() }
             items(order, key = { it }) { id ->
                 val track = byId[id] ?: return@items
                 val index = order.indexOf(id)
-                val canMoveUp = index > 0
-                val canMoveDown = index < order.lastIndex
-                ListRow(
-                    track.title,
-                    modifier = Modifier.reorderActions(canMoveUp, canMoveDown) { move(id, it) },
-                    subtitle = if (track.available) track.artist else "${track.artist}, unavailable",
-                    leading = { ReorderHandle(track.title) { move(id, it) } },
-                    trailing = {
-                        Box {
-                            IconButton({ menu = id }) { Icon(Icons.Outlined.MoreVert, "Options for ${track.title}") }
-                            AppMenu(menu == id, { menu = null }) {
-                                if (canMoveUp) {
-                                    MenuAction("Move up", Icons.Outlined.ArrowUpward, {
-                                        menu = null
-                                        move(id, -1)
-                                    })
-                                }
-                                if (canMoveDown) {
-                                    MenuAction("Move down", Icons.Outlined.ArrowDownward, {
-                                        menu = null
-                                        move(id, 1)
-                                    })
-                                }
-                                MenuAction("Remove from playlist", Icons.Outlined.Delete, {
-                                    menu = null
-                                    order = order - id
-                                }, destructive = true)
-                            }
-                        }
-                    }
+                ReorderPlaylistRow(
+                    track,
+                    canEdit = canEdit,
+                    canMoveUp = canEdit() && index > 0,
+                    canMoveDown = canEdit() && index < order.lastIndex,
+                    menuOpen = menu == id,
+                    onMenuChange = { menu = if (it) id else null },
+                    onMove = { move(id, it) },
+                    onRemove = { order = order - id }
                 )
                 MusicDivider()
             }
@@ -193,13 +310,59 @@ private fun ReorderPlaylist(store: MusicStore, playlist: SavedPlaylist, onClose:
 }
 
 @Composable
-private fun TrackCheckbox(track: MusicTrack, checked: Boolean, onToggle: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+private fun ReorderPlaylistRow(
+    track: MusicTrack,
+    canEdit: () -> Boolean,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    menuOpen: Boolean,
+    onMenuChange: (Boolean) -> Unit,
+    onMove: (Int) -> Unit,
+    onRemove: () -> Unit
+) {
+    val move: (Int) -> Unit = { if (canEdit()) onMove(it) }
+    ListRow(
+        track.title,
+        modifier = Modifier.reorderActions(canMoveUp, canMoveDown, move),
+        subtitle = if (track.available) track.artist else stringResource(R.string.unavailable_artist, track.artist),
+        leading = { ReorderHandle(track.title, enabled = canEdit(), onMove = move) },
+        trailing = {
+            Box {
+                IconButton({ onMenuChange(true) }, enabled = canEdit()) {
+                    Icon(Icons.Outlined.MoreVert, stringResource(R.string.named_options, track.title))
+                }
+                AppMenu(canEdit() && menuOpen, { onMenuChange(false) }) {
+                    if (canMoveUp) {
+                        MenuAction(stringResource(R.string.move_up), Icons.Outlined.ArrowUpward, {
+                            onMenuChange(false)
+                            move(-1)
+                        })
+                    }
+                    if (canMoveDown) {
+                        MenuAction(stringResource(R.string.move_down), Icons.Outlined.ArrowDownward, {
+                            onMenuChange(false)
+                            move(1)
+                        })
+                    }
+                    MenuAction(stringResource(R.string.remove_from_playlist), Icons.Outlined.Delete, {
+                        onMenuChange(false)
+                        if (canEdit()) onRemove()
+                    }, destructive = true)
+                }
+            }
+        }
+    )
+}
+
+@Composable
+private fun TrackCheckbox(track: MusicTrack, checked: Boolean, enabled: Boolean, onToggle: (Boolean) -> Unit) {
     Row(
-        modifier.fillMaxWidth().heightIn(min = Dimens.rowMinTwoLine).toggleable(checked, role = Role.Checkbox, onValueChange = onToggle),
+        Modifier.fillMaxWidth().heightIn(min = Dimens.rowMinTwoLine)
+            .toggleable(checked, enabled = enabled, role = Role.Checkbox, onValueChange = onToggle),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Dimens.innerSmall)
+        horizontalArrangement = Arrangement.spacedBy(Dimens.itemGap)
     ) {
-        Checkbox(checked, onCheckedChange = null)
+        Checkbox(checked, onCheckedChange = null, enabled = enabled)
         TrackLabels(track, Modifier.weight(1f).padding(vertical = Dimens.innerSmall))
     }
 }
@@ -208,49 +371,27 @@ private fun TrackCheckbox(track: MusicTrack, checked: Boolean, onToggle: (Boolea
 private fun MusicEditor(
     title: String,
     onClose: () -> Unit,
-    saveEnabled: Boolean,
-    onSave: suspend () -> Unit,
-    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
+    snackbar: SnackbarHostState,
+    primaryAction: (@Composable () -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit
 ) {
-    val scope = rememberCoroutineScope()
-    var saving by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf(false) }
-    fun close() {
-        if (!saving) onClose()
-    }
-    Dialog(::close, DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+    Dialog(onClose, DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Surface(Modifier.fillMaxSize(), color = InShapeTheme.colors.background, contentColor = InShapeTheme.colors.text) {
             MusicColumn(Modifier.safeDrawingPadding().imePadding()) {
-                PushedHeader(::close, title = title)
+                PushedHeader(onClose, title = title)
                 content()
-                BottomActionBar(scrolledContent = false) {
-                    Column(verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)) {
-                        if (error) Text("Could not save playlist. Try again.", color = InShapeTheme.colors.error)
-                        PrimaryButton(
-                            "Save",
-                            {
-                                saving = true
-                                scope.launch {
-                                    try {
-                                        onSave()
-                                        onClose()
-                                    } catch (cancelled: CancellationException) {
-                                        throw cancelled
-                                    } catch (_: Exception) {
-                                        error = true
-                                    } finally {
-                                        saving = false
-                                    }
-                                }
-                            },
-                            Modifier.fillMaxWidth(),
-                            enabled = saveEnabled && !saving,
-                            size = ButtonSize.Large
-                        )
-                    }
-                }
+                PlaylistSnackbarHost(snackbar)
+                if (primaryAction != null) BottomActionBar(primaryAction)
             }
         }
+    }
+}
+
+@Composable
+private fun PlaylistSnackbarHost(state: SnackbarHostState) {
+    val colors = InShapeTheme.colors
+    SnackbarHost(state) { entry ->
+        Snackbar(entry, containerColor = colors.ink, contentColor = colors.onInk, actionColor = colors.onInk)
     }
 }
 
@@ -262,63 +403,45 @@ internal fun AddSongDialog(store: MusicStore, playlists: List<SavedPlaylist>, tr
     fun close() {
         if (!saving) onClose()
     }
-    AlertDialog(
-        onDismissRequest = ::close,
-        title = { Text("Add to playlist") },
-        text = {
-            Column {
-                LazyColumn(Modifier.heightIn(max = Dimens.bodyHeight)) {
-                    items(playlists, key = { it.id }) { playlist ->
-                        val added = playlist.tracks.any { it.id == trackId }
-                        ListRow(
-                            playlist.name,
-                            subtitle = "Already added".takeIf { added },
-                            trailing = if (added) ({ Icon(Icons.Outlined.Check, null) }) else null,
-                            enabled = !saving && !added,
-                            showChevron = false,
-                            onClick = {
-                                saving = true
-                                scope.launch {
-                                    try {
-                                        store.add(playlist.id, listOf(trackId))
-                                        onClose()
-                                    } catch (cancelled: CancellationException) {
-                                        throw cancelled
-                                    } catch (_: Exception) {
-                                        error = true
-                                    } finally {
-                                        saving = false
-                                    }
-                                }
+    EditorSheet(stringResource(R.string.add_to_playlist), ::close) {
+        LazyColumn(Modifier.weight(1f, fill = false).heightIn(max = Dimens.bodyHeight)) {
+            items(playlists, key = { it.id }) { playlist ->
+                val added = playlist.tracks.any { it.id == trackId }
+                ListRow(
+                    playlist.name,
+                    subtitle = stringResource(R.string.already_added).takeIf { added },
+                    trailing = if (added) ({ Icon(Icons.Outlined.Check, null) }) else null,
+                    enabled = !saving && !added,
+                    showChevron = false,
+                    onClick = {
+                        saving = true
+                        scope.launch {
+                            try {
+                                store.add(playlist.id, listOf(trackId))
+                                onClose()
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                error = true
+                            } finally {
+                                saving = false
                             }
-                        )
+                        }
                     }
-                }
-                if (error) Text("Could not add the song. Try again.")
+                )
             }
-        },
-        confirmButton = {
-            DialogAction("New playlist", {
-                onClose()
-                onCreate()
-            }, enabled = !saving)
-        },
-        dismissButton = { DialogAction("Cancel", ::close, enabled = !saving) }
-    )
+        }
+        if (error) Text(stringResource(R.string.add_song_failed))
+        DialogAction(stringResource(R.string.new_playlist), {
+            onClose()
+            onCreate()
+        }, Modifier.align(Alignment.End), enabled = !saving)
+    }
 }
 
 @Composable
-private fun PlaylistPrompt(
-    title: String,
-    confirm: String,
-    onClose: () -> Unit,
-    initialName: String? = null,
-    message: String? = null,
-    destructive: Boolean = false,
-    action: suspend (String) -> Unit
-) {
+private fun DeletePlaylistDialog(onClose: () -> Unit, onDelete: suspend () -> Unit) {
     val scope = rememberCoroutineScope()
-    var name by rememberSaveable(initialName) { mutableStateOf(initialName.orEmpty()) }
     var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf(false) }
     fun close() {
@@ -326,22 +449,19 @@ private fun PlaylistPrompt(
     }
     AlertDialog(
         onDismissRequest = ::close,
-        title = { Text(title) },
+        title = { Text(stringResource(R.string.delete_playlist_question)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)) {
-                if (message != null) Text(message)
-                if (initialName != null) {
-                    TextField(name, "Playlist name", { name = it }, singleLine = true)
-                }
-                if (error) Text("Could not update playlist. Try again.")
+                Text(stringResource(R.string.music_files_kept))
+                if (error) Text(stringResource(R.string.update_playlist_failed))
             }
         },
         confirmButton = {
-            DialogAction(confirm, {
+            DialogAction(stringResource(R.string.delete_playlist), {
                 saving = true
                 scope.launch {
                     try {
-                        action(name)
+                        onDelete()
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (_: Exception) {
@@ -350,8 +470,8 @@ private fun PlaylistPrompt(
                         saving = false
                     }
                 }
-            }, destructive = destructive, enabled = !saving && (initialName == null || name.isNotBlank()))
+            }, destructive = true, enabled = !saving)
         },
-        dismissButton = { DialogAction("Cancel", ::close, enabled = !saving) }
+        dismissButton = { DialogAction(stringResource(R.string.cancel), ::close, enabled = !saving) }
     )
 }

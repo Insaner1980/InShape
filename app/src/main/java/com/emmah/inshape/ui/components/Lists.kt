@@ -3,9 +3,13 @@
 
 package com.emmah.inshape.ui.components
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import com.emmah.inshape.R
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,6 +34,10 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.intl.LocaleList
+import androidx.compose.ui.text.style.Hyphens
+import androidx.compose.ui.text.style.LineBreak
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
@@ -64,8 +72,10 @@ fun ListRow(
     onClick: (() -> Unit)? = null,
     enabled: Boolean = true,
     titleStyle: TextStyle = MaterialTheme.typography.bodyLarge,
-    showChevron: Boolean = trailing == null && onClick != null,
-    details: (@Composable () -> Unit)? = null
+    trailingValue: (@Composable () -> Unit)? = null,
+    showChevron: Boolean = trailing == null && trailingValue == null && onClick != null,
+    details: (@Composable () -> Unit)? = null,
+    titleColor: Color = Color.Unspecified
 ) {
     val large = LocalDensity.current.fontScale >= 1.3f
     val rowModifier = modifier.fillMaxWidth().heightIn(
@@ -89,13 +99,12 @@ fun ListRow(
         .padding(vertical = Dimens.rowPadding)
     Row(
         rowModifier,
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(Dimens.itemGap)
     ) {
-        if (!large) leading?.invoke()
+        leading?.invoke()
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.innerTiny)) {
-            if (large) leading?.invoke()
-            Text(title, style = titleStyle)
+            ListRowTitle(title, titleStyle, titleColor, large)
             if (!subtitle.isNullOrBlank()) {
                 Text(
                     subtitle,
@@ -104,9 +113,10 @@ fun ListRow(
                 )
             }
             details?.invoke()
-            if (large) trailing?.invoke()
+            if (large) trailingValue?.invoke()
         }
-        if (!large) trailing?.invoke()
+        if (!large) trailingValue?.invoke()
+        trailing?.invoke()
         if (showChevron) {
             Icon(
                 Icons.AutoMirrored.Outlined.KeyboardArrowRight,
@@ -115,6 +125,24 @@ fun ListRow(
                 tint = InShapeTheme.colors.textTertiary
             )
         }
+    }
+}
+
+@Composable
+private fun ListRowTitle(title: String, style: TextStyle, color: Color, large: Boolean) {
+    val paragraph = style.copy(localeList = LocaleList("fi-FI"), hyphens = Hyphens.Auto, lineBreak = LineBreak.Paragraph)
+    val body = MaterialTheme.typography.bodyMedium
+    if (large && paragraph.fontSize > body.fontSize) {
+        BoxWithConstraints {
+            val measurer = rememberTextMeasurer()
+            val hasOversizeWord = title.split(' ').any { word ->
+                measurer.measure(word, paragraph, softWrap = false).size.width > constraints.maxWidth
+            }
+            val fitted = if (hasOversizeWord) paragraph.copy(fontSize = body.fontSize, lineHeight = body.lineHeight) else paragraph
+            Text(title, style = fitted, color = color)
+        }
+    } else {
+        Text(title, style = paragraph, color = color)
     }
 }
 
@@ -142,10 +170,11 @@ fun InitialsTile(text: String, modifier: Modifier = Modifier) {
 @Composable
 fun DisclosureRow(label: String, expanded: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
     val colors = InShapeTheme.colors
+    val expansionStatus = stringResource(if (expanded) R.string.expanded else R.string.collapsed)
     Row(
         modifier.fillMaxWidth().heightIn(min = Dimens.rowMin)
             .clickable(role = Role.Button, onClick = onToggle)
-            .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
+            .semantics { stateDescription = expansionStatus },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Dimens.itemGap)
     ) {

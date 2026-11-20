@@ -1,5 +1,8 @@
 package com.emmah.inshape.demo
 
+import com.emmah.inshape.R
+import com.emmah.inshape.ui.theme.withFinnishLocale
+import android.content.Context
 import android.app.Application
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -9,20 +12,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.emmah.inshape.AppContainer
+import com.emmah.inshape.JournalViewModel
 import com.emmah.inshape.navigation.AppNavigation
 import com.emmah.inshape.ui.theme.ActivityTheme
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class DemoHost(application: Application) : AndroidViewModel(application) {
     val container =
@@ -43,13 +47,12 @@ class DemoHost(application: Application) : AndroidViewModel(application) {
         if (loaded == name) return
         viewModelScope.launch {
             try {
-                withContext(Dispatchers.IO) { DemoFixtures.load(container, name) }
-                loaded =
-                    name
+                DemoFixtures.load(container, name)
+                loaded = name
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
-            } catch (failure: Exception) {
-                error = failure.message
+            } catch (_: Exception) {
+                error = container.context.getString(R.string.demo_load_failed)
             }
         }
     }
@@ -58,6 +61,10 @@ class DemoHost(application: Application) : AndroidViewModel(application) {
     }
 }
 class DemoActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase.withFinnishLocale())
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -67,32 +74,33 @@ class DemoActivity : ComponentActivity() {
         setContent {
             val host: DemoHost = viewModel()
             ActivityTheme(host.container.themeSettings) {
-                LaunchedEffect(requested) { host.load(requested) }
-                if (host.loaded == requested) {
-                    val vm: com.emmah.inshape.JournalViewModel = viewModel {
-                        com.emmah.inshape.JournalViewModel(host.container)
-                    }
-                    LaunchedEffect(requested) {
-                        if (requested == "FailedSave") {
-                            vm.write { throw java.io.IOException("Demo: storage is full. Pending changes are retained.") }
-                        }
-                    }
-                    AppNavigation(
-                        host.container,
-                        initialRoute = DemoFixtures.route(requested),
-                        musicFixture = DemoMusic.catalog.takeIf { requested in DemoMusic.states },
-                        initialMusic = if (requested == "WorkoutWithMusic") DemoMusic.catalog.playlists.first().tracks else emptyList(),
-                        vm = vm
-                    )
-                } else {
-                    Box(
-                        Modifier.fillMaxSize(),
-                        contentAlignment = androidx.compose.ui.Alignment.Center
-                    ) {
-                        if (host.error == null) CircularProgressIndicator() else Text(host.error!!)
-                    }
-                }
+                DemoScreen(host, requested)
             }
+        }
+    }
+}
+
+@Composable
+private fun DemoScreen(host: DemoHost, requested: String) {
+    LaunchedEffect(requested) { host.load(requested) }
+    if (host.loaded == requested) {
+        val vm: JournalViewModel = viewModel { JournalViewModel(host.container) }
+        LaunchedEffect(requested) {
+            if (requested == "FailedSave") {
+                vm.write { throw java.io.IOException() }
+            }
+        }
+        AppNavigation(
+            host.container,
+            initialRoute = DemoFixtures.route(requested),
+            musicFixture = DemoMusic.catalog.takeIf { requested in DemoMusic.states },
+            initialMusic = if (requested == "WorkoutWithMusic") DemoMusic.catalog.playlists.first().tracks else emptyList(),
+            vm = vm
+        )
+    } else {
+        val error = host.error
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (error == null) CircularProgressIndicator() else Text(error)
         }
     }
 }

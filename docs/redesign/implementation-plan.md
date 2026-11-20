@@ -334,7 +334,7 @@ Bottom sheets (`ExercisePicker`, alternatives): container `surface`; rows become
 
 Mockup: `mockups/history-dark.html`. Before: `current/light-02-history-top.png`, `current/light-03-history-bottom.png`.
 
-1. `ScreenHeader("History", trailing = SecondaryButton-style pill on `surface`: plus icon and "Past workout")`. Height 44 dp, container `surface` with `cardElevation`. Opens the existing dialog.
+1. `ScreenHeader("History")` with a trailing SecondaryButton-style pill containing a plus icon and "Past workout". Height 44 dp, container `surface` with `cardElevation`. Opens the existing dialog.
 2. **Calendar card** (`InShapeCard`, padding 12 dp top, 16 dp sides and bottom, inner gap 8 dp):
    - Month row: previous and next as 48 dp icon buttons with real chevron icons (keep the content descriptions `"Previous month"`, `"Next month"`); between them the month in `titleMedium`, centred, as a text button that opens a Material 3 `DatePickerDialog`. Confirming sets the month and the selected day. This replaces the "Choose another date" text entry, the "Select date" button and the "Enter a valid date" error; delete that state.
    - Weekday row: `labelSmall` without upper-casing, `textSecondary`, centred.

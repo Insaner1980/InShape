@@ -18,7 +18,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, sdk = [33])
 class AndroidHealthGatewayTest {
-    @Test fun withoutAProviderOnlyEnabledCapabilitiesReportMissingAccess() = runBlocking {
+    @Test fun withoutAProviderNoHealthValuesAreAvailable() = runBlocking {
         val gateway = AndroidHealthGateway(ApplicationProvider.getApplicationContext<Context>())
         val now = ZonedDateTime.parse("2026-11-13T08:00:00Z")
         assertTrue(gateway.availability() != HealthConnectClient.SDK_AVAILABLE)
@@ -26,21 +26,7 @@ class AndroidHealthGatewayTest {
         assertFalse(gateway.canWrite())
 
         val context = gateway.readContext(Preferences(readSteps = true, readHeartRate = true), now)
-        assertEquals(
-            HealthContext(
-                steps = HealthValue(
-                    "Access not available",
-                    "2026-11-13, local midnight to 08:00",
-                    error = "Allow this capability in Settings to read it."
-                ),
-                heart = HealthValue(
-                    "Access not available",
-                    "Last 24 hours",
-                    error = "Allow this capability in Settings to read it."
-                )
-            ),
-            context
-        )
+        assertEquals(HealthContext(), context)
     }
 
     @Test fun eachCapabilityChangesOnlyItsOwnPreference() {

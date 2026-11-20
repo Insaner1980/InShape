@@ -1,7 +1,35 @@
 package com.emmah.inshape.feature.workout
 
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.material3.Surface
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
+import androidx.compose.material.icons.outlined.Mic
+import com.emmah.inshape.feature.library.locationLabel
+import com.emmah.inshape.feature.library.categoryLabel
+import com.emmah.inshape.feature.library.exerciseDisplayName
+import android.content.Context
+import com.emmah.inshape.ui.UiException
+import androidx.compose.ui.res.stringResource
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Flag
+import com.emmah.inshape.data.parseWholeMinutesToSeconds
+import com.emmah.inshape.data.resolveRecordedTime
+import kotlinx.serialization.json.Json
+import com.emmah.inshape.ui.theme.formatDuration
+import com.emmah.inshape.ui.components.KeyValueRow
+import com.emmah.inshape.ui.components.EditorSheet
+import com.emmah.inshape.ui.components.DialogAction
+import androidx.room.withTransaction
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.foundation.layout.FlowRow
 import android.text.format.DateFormat
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
@@ -9,6 +37,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -18,6 +47,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
@@ -28,14 +59,12 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.EditNote
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.MusicNote
+import com.emmah.inshape.feature.music.PlaybackBars
 import androidx.compose.material.icons.outlined.Save
-import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SwapHoriz
-import androidx.compose.material.icons.outlined.WbTwilight
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -47,11 +76,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -65,7 +92,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -73,37 +99,29 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.emmah.inshape.JournalViewModel
 import com.emmah.inshape.R
 import com.emmah.inshape.data.JournalSnapshot
-import com.emmah.inshape.data.MeasurementBasis
 import com.emmah.inshape.data.Workout
+import com.emmah.inshape.data.Setting
 import com.emmah.inshape.data.WorkoutItem
 import com.emmah.inshape.feature.library.ExercisePicker
 import com.emmah.inshape.feature.library.ExercisePickerList
-import com.emmah.inshape.feature.music.MiniPlayer
-import com.emmah.inshape.feature.music.MusicCatalog
-import com.emmah.inshape.feature.music.MusicChooser
 import com.emmah.inshape.feature.music.MusicPlayback
 import com.emmah.inshape.ui.components.ActionRow
 import com.emmah.inshape.ui.components.AppMenu
 import com.emmah.inshape.ui.components.ButtonSize
 import com.emmah.inshape.ui.components.ConfirmDialog
-import com.emmah.inshape.ui.components.EmptyState
 import com.emmah.inshape.ui.components.InShapeCard
 import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListRow
 import com.emmah.inshape.ui.components.MenuAction
 import com.emmah.inshape.ui.components.NumberField
-import com.emmah.inshape.ui.components.OutlineButton
 import com.emmah.inshape.ui.components.Page
-import com.emmah.inshape.ui.components.Pill
+import com.emmah.inshape.ui.components.HeaderIconButton
 import com.emmah.inshape.ui.components.PrimaryButton
-import com.emmah.inshape.ui.components.ProgressSegments
-import com.emmah.inshape.ui.components.ProgressState
 import com.emmah.inshape.ui.components.PushedHeader
 import com.emmah.inshape.ui.components.SectionHeader
 import com.emmah.inshape.ui.components.TextAction
@@ -115,42 +133,17 @@ import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.InShapeType
 import com.emmah.inshape.ui.theme.formatElapsed
 import com.emmah.inshape.ui.theme.hasArtworkColumns
-import com.emmah.inshape.ui.theme.journalDateLabel
 import com.emmah.inshape.ui.theme.rememberElapsedSeconds
+import com.emmah.inshape.ui.theme.shortDate
 import com.emmah.inshape.ui.theme.workoutTime
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 
-@Composable
-fun itemSummary(item: WorkoutItem): String = if (item.completedSets.isNotEmpty()) {
-    item.completedSets.groupBy {
-        it.load to
-            it.reps
-    }.entries.joinToString("; ") { (values, sets) ->
-        listOfNotNull(
-            "${sets.size} ${if (sets.size == 1) "set" else "sets"}",
-            values.second?.let {
-                "$it reps"
-            },
-            values.first?.let {
-                MeasurementBasis.fromKey(item.row.basis).formatValue(it)
-            }
-        ).joinToString(", ")
-    }
-} else if (item.row.quickCompletedAt !=
-    null
-) {
-    item.row.durationSeconds?.let {
-        stringResource(R.string.done_with_duration, com.emmah.inshape.ui.theme.formatDuration(it))
-    } ?: stringResource(R.string.workout_item_done)
-} else {
-    "Not completed"
-}
 
-// Keep route actions and the optional demo music fixture explicit at the navigation boundary.
 @Suppress("LongParameterList")
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -165,112 +158,117 @@ fun WorkoutScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     musicPlayback: MusicPlayback? = null,
-    musicFixture: MusicCatalog? = null
+    onMusic: () -> Unit = {},
+    onAssistantSettings: (() -> Unit)? = null,
+    onAdaptWorkout: (() -> Unit)? = null
 ) {
     val workout = data.workout(id) ?: return
-    val uses24Hours = DateFormat.is24HourFormat(LocalContext.current)
     val colors = InShapeTheme.colors
     var picker by remember { mutableStateOf(false) }
-    var alternatives by remember { mutableStateOf(false) }
+    var alternativeItemId by remember { mutableStateOf<String?>(null) }
     var discard by remember { mutableStateOf(false) }
     var remove by remember { mutableStateOf<String?>(null) }
     var routineSave by remember { mutableStateOf(false) }
+    var routineSaveRevision by remember { mutableStateOf<Long?>(null) }
     var showRemoveSetHint by remember { mutableStateOf(!vm.container.hasRemovedSet) }
-    val pending = workout.items.filter { it.row.disposition in listOf("PLANNED", "IN_PROGRESS") }
-    val current = pending.find { it.row.id == workout.row.currentItemId } ?: pending.firstOrNull()
-    var workoutMenu by remember { mutableStateOf(false) }
+    val pending = workout.pendingItems
+    val current = workout.currentItem(pending)
+    var assistantItem by rememberSaveable(id) { mutableStateOf<String?>(null) }
+    if (current != null && assistantItem == current.row.id && onAssistantSettings != null) {
+        com.emmah.inshape.feature.assistant.AssistantReview(
+            vm.container, data, workout, current, musicPlayback, onSettings = {
+                assistantItem = null
+                onAssistantSettings()
+            },
+            onDismiss = { assistantItem = null }
+        )
+    }
     val elapsed by rememberElapsedSeconds(
         workout.row.start?.takeUnless {
             workout.row.timingNeedsReview
         }?.let(Instant::parse),
         vm.container.clock
     )
+    val durationKey = "duration:${current?.row?.id}"
+    val submissions by vm.submissions.collectAsStateWithLifecycle()
+    val pastKey = "timing:$id"
+    val savePastKey = "save-past:$id"
+    val savedPast = submissions[savePastKey]
+    val savingPast = savedPast != null
+    val showSavedWorkout by rememberUpdatedState(onFinish)
+    LaunchedEffect(savedPast) {
+        if (savedPast != null && vm.consumeSubmission(savePastKey, savedPast)) showSavedWorkout()
+    }
+    var pastForm by remember(id) {
+        val draft = if (workout.isPastEntry) initialTimingDraft(workout.row, data, pastKey) else null
+        mutableStateOf(draft?.let {
+            val date = runCatching { LocalDate.parse(it.date) }.getOrNull()?.toString() ?: workout.row.journalDate
+            val zone = ZoneId.of(workout.row.zoneId)
+            val hasValidTimes = !it.unknownTimes && runCatching {
+                val start = resolveRecordedTime(it.startDate, it.startTime, zone, it.originalStart)
+                val end = resolveRecordedTime(it.endDate, it.endTime, zone, it.originalEnd)
+                end.isAfter(start)
+            }.getOrDefault(false)
+            it.copy(date = date, unknownTimes = !hasValidTimes)
+        })
+    }
+    var editMinutes by rememberSaveable(id) { mutableStateOf(false) }
+    fun updatePast(form: TimingDraft) {
+        if (savingPast) return
+        pastForm = form
+        vm.saveDraft(pastKey, "timing", Json.encodeToString(form))
+    }
+    val completingItem = submissions[durationKey]?.let { it.result == null } == true
     var duration by rememberSaveable(current?.row?.id) {
-        mutableStateOf(data.drafts.find { it.id == "duration:${current?.row?.id}" }?.payload ?: "")
+        mutableStateOf(data.drafts.find { it.id == durationKey }?.payload ?: "")
     }
     val scrollState = rememberScrollState()
     val setRequester = remember { BringIntoViewRequester() }
     val firstIncomplete = current?.sets?.firstOrNull { it.completedAt == null }?.id
-    val dragging by scrollState.interactionSource.collectIsDraggedAsState()
-    var previousItemId by remember(id) { mutableStateOf<String?>(null) }
-    var previousSetId by remember(id) { mutableStateOf<String?>(null) }
     var titleTop by remember(current?.row?.id) { mutableFloatStateOf(Float.NaN) }
     var viewportTop by remember { mutableFloatStateOf(Float.NaN) }
-    var clockHeight by remember { mutableIntStateOf(0) }
-    val screenTopPx = with(LocalDensity.current) { Dimens.screenTop.roundToPx() }
-    val showTopClock by remember(scrollState, screenTopPx) {
-        derivedStateOf { clockHeight > 0 && scrollState.value >= clockHeight + screenTopPx }
-    }
-    var chooser by rememberSaveable { mutableStateOf(false) }
     val keyboardVisible = WindowInsets.isImeVisible
-    LaunchedEffect(current?.row?.id, firstIncomplete) {
-        val itemChanged = previousItemId != current?.row?.id
-        val setChanged = previousSetId != firstIncomplete
-        previousItemId = current?.row?.id
-        previousSetId = firstIncomplete
-        if (current != null && !keyboardVisible && !dragging) {
-            withFrameNanos { }
-            if (itemChanged && workout.doneCount > 0) {
-                val target = snapshotFlow {
-                    if (titleTop.isFinite() && viewportTop.isFinite()) {
-                        (scrollState.value + titleTop - viewportTop).roundToInt().coerceIn(0, scrollState.maxValue)
-                    } else {
-                        null
-                    }
-                }.filterNotNull().first()
-                if (!dragging) scrollState.animateScrollTo(target)
-            }
-            val hasRecordedProgress = workout.doneCount > 0 || current.completedSets.isNotEmpty()
-            val hasNewIncompleteSet = setChanged && firstIncomplete != null
-            if (!dragging && hasNewIncompleteSet && hasRecordedProgress) {
-                setRequester.bringIntoView()
-            }
+    ScrollToWorkoutProgress(id, current, firstIncomplete, keyboardVisible, workout.doneCount, scrollState, setRequester) {
+        if (titleTop.isFinite() && viewportTop.isFinite()) {
+            (scrollState.value + titleTop - viewportTop).roundToInt().coerceIn(0, scrollState.maxValue)
+        } else {
+            null
         }
     }
-    val windowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
-    val inlinePlayer = LocalDensity.current.fontScale >= 1.3f || windowHeight < Dimens.inlinePlayerWindowHeight
     val addFirstExercise = workout.items.isEmpty() && !workout.isPastEntry
-    val bottomAction: (@Composable () -> Unit)? = if (keyboardVisible) {
-        null
-    } else {
+    val next = pending.filter { it.row.id != current?.row?.id }
+    val savedRoutine = data.routines.find { it.id == workout.row.sourceRoutineId }
+    val canUpdateRoutine = savedRoutine?.let { routine ->
+        val savedTargets = data.routineItems.filter { it.routineId == routine.id }.sortedBy { it.position }
+            .mapIndexed { index, item -> item.copy(id = "", position = index) }
+        workout.routinePlanItems.mapIndexed { index, item -> item.routineTarget(routine.id, index) } != savedTargets
+    } == true
+    val bottomAction: (@Composable () -> Unit)? = if (keyboardVisible) null else {
         {
-            Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
-                if (musicPlayback != null && !inlinePlayer) {
-                    MiniPlayer(musicPlayback, "Choose music", { chooser = true })
-                }
-                PrimaryButton(
-                    when {
-                        addFirstExercise -> "Add exercise"
-                        current != null -> "Exercise done"
-                        workout.isPastEntry -> "Save workout"
-                        else -> "Finish workout"
-                    },
-                    {
-                        if (addFirstExercise) {
-                            picker = true
-                        } else if (current == null) {
-                            onFinish()
-                        } else {
-                            vm.write {
-                                val seconds = if (duration.isBlank()) {
-                                    null
-                                } else {
-                                    duration.toLongOrNull()?.takeIf {
-                                        it >
-                                            0 &&
-                                            it <= Long.MAX_VALUE / 60
-                                    }?.times(60)
-                                        ?: throw IllegalArgumentException("Enter positive whole minutes")
-                                }
-                                markItemDone(current.row.id, seconds)
-                                deleteEditorDraft("duration:${current.row.id}")
+            WorkoutBottomBar(workout, current != null && next.isNotEmpty(), addFirstExercise, completingItem || savingPast) {
+                val form = pastForm
+                when {
+                    form != null -> vm.submit(savePastKey) {
+                        val timing = form.toTiming(ZoneId.of(workout.row.zoneId))
+                        db.withTransaction {
+                            if (current != null && duration.isNotBlank()) {
+                                markItemDone(current.row.id, performedSeconds(duration), draftId = durationKey)
                             }
+                            val row = snapshot().workout(id)?.row ?: throw UiException(R.string.workout_missing)
+                            if (row.state != "COMPLETED") {
+                                correctWorkout(id, row.revision, form.title, form.date, form.note, timing)
+                                finishWorkout(id, timing)
+                            }
+                            deleteEditorDraft(pastKey)
                         }
-                    },
-                    Modifier.fillMaxWidth(),
-                    icon = Icons.Outlined.Add.takeIf { addFirstExercise },
-                    size = ButtonSize.Large
-                )
+                        id
+                    }
+                    addFirstExercise -> picker = true
+                    current == null -> onFinish()
+                    else -> completeCurrentExercise(vm, current, durationKey, duration) {
+                        if (next.isEmpty()) onFinish()
+                    }
+                }
             }
         }
     }
@@ -278,362 +276,108 @@ fun WorkoutScreen(
         modifier,
         bottomBar = bottomAction,
         topBar = {
-            PushedHeader(onBack) {
-                elapsed?.takeIf { showTopClock }?.let {
-                    Text(formatElapsed(it), style = InShapeType.numeric, modifier = Modifier.padding(end = Dimens.innerSmall))
-                }
-                if (musicPlayback != null) {
-                    IconButton({ chooser = true }) { Icon(Icons.Outlined.MusicNote, "Music") }
-                }
-                OutlineButton(if (workout.isPastEntry) "Save" else "Finish", onFinish)
-                Box {
-                    IconButton({ workoutMenu = true }) { Icon(Icons.Outlined.MoreVert, "Workout options") }
-                    AppMenu(workoutMenu, { workoutMenu = false }) {
-                        MenuAction("Add exercise", Icons.Outlined.Add, {
-                            workoutMenu = false
-                            picker = true
-                        })
-                        val checkInLabel = if (workout.doneCount ==
-                            0
-                        ) {
-                            stringResource(R.string.pre_workout_check_in)
-                        } else {
-                            stringResource(R.string.add_check_in)
-                        }
-                        MenuAction(checkInLabel, Icons.Outlined.WbTwilight, {
-                            workoutMenu = false
-                            onCheckIn()
-                        })
-                        if (data.routines.any { it.id == workout.row.sourceRoutineId }) {
-                            MenuAction("Save changes to routine", Icons.Outlined.Save, {
-                                workoutMenu = false
-                                routineSave = true
-                            })
-                        }
-                        HorizontalDivider(color = colors.divider)
-                        MenuAction("Discard workout", Icons.Outlined.Delete, {
-                            workoutMenu = false
-                            discard = true
-                        }, destructive = true)
-                    }
-                }
-            }
+            WorkoutHeader(workout, elapsed, musicPlayback, onBack, onFinish, onMusic)
         },
         scrollState = scrollState,
         scrollViewportModifier = Modifier.onGloballyPositioned { viewportTop = it.positionInRoot().y }
     ) {
-        if (musicPlayback != null && inlinePlayer && !keyboardVisible) {
-            MiniPlayer(musicPlayback, "Choose music", { chooser = true })
+        val form = pastForm
+        if (form != null) {
+            Text(form.title, style = MaterialTheme.typography.headlineLarge)
+            Text(LocalDate.parse(form.date).shortDate(), color = colors.textSecondary, style = MaterialTheme.typography.bodyMedium)
+        } else if (workout.items.isNotEmpty()) {
+            WorkoutBanner(workout, elapsed)
         }
-        BoxWithConstraints(
-            Modifier.fillMaxWidth().onSizeChanged { clockHeight = it.height }
-                .clip(InShapeShapes.card).background(ArtworkWash.Active.brush()),
-            contentAlignment = Alignment.Center
-        ) {
-            if (elapsed != null && hasArtworkColumns()) {
-                val flip = LocalLayoutDirection.current == LayoutDirection.Rtl
-                val motion = if (colors.isDark) R.drawable.art_training_motion_dark else R.drawable.art_training_motion_light
-                Image(
-                    painterResource(motion),
-                    null,
-                    Modifier.align(Alignment.CenterEnd).width(minOf(maxWidth * .4f, (maxWidth - 204.dp) / 2))
-                        .height(64.dp).scale(if (flip) -1f else 1f, 1f)
-                )
-            }
-            Column(
-                Modifier.fillMaxWidth().padding(vertical = Dimens.innerSmall),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(Dimens.innerTiny)
-            ) {
-                Text(workout.row.title, style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
-                if (elapsed != null) {
-                    Text(formatElapsed(elapsed!!), style = MaterialTheme.typography.displayLarge)
-                    workout.row.start?.let {
-                        Text(
-                            "Started ${Instant.parse(it).workoutTime(ZoneId.of(workout.row.zoneId), uses24Hours)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = colors.textSecondary
-                        )
-                    }
-                } else {
-                    Text(
-                        "Started ${workout.row.journalDate.journalDateLabel()}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.textSecondary
-                    )
-                    Text("Review the timing before saving.", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
-                }
-            }
-        }
-        if (workout.items.isNotEmpty()) {
-            ProgressSegments(
-                workout.items.map {
-                    when {
-                        it.row.disposition == "DONE" -> ProgressState.Done
-
-                        it.row.id ==
-                            current?.row?.id -> ProgressState.Current
-
-                        else -> ProgressState.Pending
-                    }
-                },
-                "${workout.doneCount} of ${workout.items.size} done"
-            )
-            Text(
-                if (current == null) "All exercises done" else "Exercise ${workout.items.indexOf(current) + 1} of ${workout.items.size}",
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.textSecondary
-            )
-        }
-        if (current == null) {
-            val empty = workout.items.isEmpty()
-            EmptyState(
-                if (empty) "No exercises yet" else "Your plan is complete",
-                if (empty) "Add exercises as you go." else "Add another exercise or finish with the work you recorded.",
-                action = "Add exercise".takeUnless { addFirstExercise },
-                onAction = { picker = true },
-                icon = Icons.Outlined.Add
-            )
-        }
+        if (workout.items.isEmpty()) Text(stringResource(R.string.no_exercises), style = MaterialTheme.typography.titleLarge)
         current?.let { item ->
-            var menu by remember(item.row.id) { mutableStateOf(false) }
-            var exerciseNote by rememberSaveable(item.row.id) { mutableStateOf(item.row.note) }
-            var expanded by rememberSaveable(item.row.id) {
-                mutableStateOf(false)
-            }
-            var focusNote by remember { mutableStateOf(false) }
-            val focus = remember { FocusRequester() }
-            LaunchedEffect(expanded, focusNote) {
-                if (expanded &&
-                    focusNote
+            val canUseAssistant = onAssistantSettings != null && workout.row.activeKey == 1 && !workout.isPastEntry
+            CurrentWorkoutExercise(
+                item, data, id, vm, onExercise,
+                { titleTop = it }, { alternativeItemId = item.row.id }, { remove = item.row.id },
+                onAssistant = if (canUseAssistant) ({ assistantItem = item.row.id }) else null
+            ) {
+                if (canUseAssistant) {
+                    com.emmah.inshape.feature.assistant.WorkoutSpeech(id, item, vm.container.assistant, musicPlayback)
+                }
+                com.emmah.inshape.feature.assistant.AssistantMemories(
+                    data.assistantMemories.filter {
+                        it.exerciseId == item.row.exerciseId && it.acknowledgedAt == null && it.creationWorkoutId != id
+                    },
+                    vm,
+                    acknowledge = true
+                )
+                com.emmah.inshape.feature.program.ProgramProgressionReview(data, workout, item, vm)
+                WorkoutSetEditor(
+                    item, vm, firstIncomplete, setRequester,
+                    showRemoveSetHint && item == workout.items.firstOrNull(),
+                    { showRemoveSetHint = false }, duration, completingItem
                 ) {
-                    focus.requestFocus()
-                    focusNote = false
-                }
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
-                Row(
-                    Modifier.fillMaxWidth().onGloballyPositioned { titleTop = it.positionInRoot().y },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        item.row.name,
-                        Modifier.weight(1f),
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                    Box {
-                        IconButton({
-                            menu = true
-                        }) { Icon(Icons.Outlined.MoreVert, "More options for ${item.row.name}") }
-                        AppMenu(menu, { menu = false }) {
-                            MenuAction("Exercise details", Icons.Outlined.Info, {
-                                menu = false
-                                onExercise(item.row.exerciseId, item.row.id)
-                            })
-                            MenuAction(if (exerciseNote.isBlank()) "Add note" else "Edit note", Icons.Outlined.EditNote, {
-                                menu = false
-                                expanded = true
-                                focusNote = true
-                            })
-                            MenuAction("Swap exercise", Icons.Outlined.SwapHoriz, {
-                                menu = false
-                                alternatives = true
-                            })
-                            MenuAction("Do later", Icons.Outlined.Schedule, {
-                                menu = false
-                                vm.write { deferItem(item.row.id) }
-                            })
-                            MenuAction("Skip today", Icons.Outlined.SkipNext, {
-                                menu = false
-                                vm.write { skipItem(item.row.id) }
-                            })
-                            HorizontalDivider(color = colors.divider)
-                            MenuAction("Remove exercise", Icons.Outlined.Delete, {
-                                menu = false
-                                if (item.hasPerformedWork) remove = item.row.id else vm.write { removeItem(item.row.id) }
-                            }, destructive = true)
-                        }
-                    }
-                }
-                val settings = item.row.setup.split(", ").mapNotNull { raw ->
-                    val entry = raw.trim()
-                    val label = entry.substringBefore(": ")
-                    val value = entry.substringAfter(": ")
-                    when {
-                        value.isBlank() || value.equals("None", ignoreCase = true) -> null
-
-                        label != value && label.equals("Handle", ignoreCase = true) -> value
-
-                        label != value && label.equals("Seat height", ignoreCase = true) -> "Seat $value"
-
-                        label != value -> "$label $value"
-
-                        // Older journal entries stored the label and value without a colon.
-                        entry.endsWith(" None", ignoreCase = true) -> null
-
-                        entry.startsWith("Handle ", ignoreCase = true) -> entry.drop("Handle ".length)
-
-                        entry.startsWith("Seat height ", ignoreCase = true) -> "Seat " + entry.drop("Seat height ".length)
-
-                        else -> entry
-                    }
-                }
-                if (settings.isNotEmpty()) ActionRow { settings.forEach { Pill(it, style = MaterialTheme.typography.labelLarge) } }
-                val previous = data.history.filter {
-                    it.row.id != id
-                }.sortedWith(
-                    compareByDescending<Workout> {
-                        it.row.journalDate
-                    }.thenByDescending { it.row.createdAt }
-                ).firstNotNullOfOrNull { old ->
-                    old.items.find {
-                        it.row.exerciseId == item.row.exerciseId &&
-                            it.row.equipmentId == item.row.equipmentId &&
-                            it.row.basis == item.row.basis &&
-                            it.hasPerformedWork
-                    }?.let { old.row.journalDate to it }
-                }
-                if (previous != null) {
-                    InShapeCard(inset = true, gap = Dimens.innerTiny) {
-                        Text(
-                            "Last time, ${previous.first.journalDateLabel()}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = colors.textSecondary
-                        )
-                        Text(
-                            itemSummary(previous.second),
-                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
-                        )
-                        previous.second.row.note.takeIf(String::isNotBlank)?.let {
-                            Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
-                        }
-                    }
-                }
-                if (item.sets.isNotEmpty()) SetTableHeader(item.row.basis)
-                item.sets.forEachIndexed { index, set ->
-                    key(set.id) {
-                        SetRow(
-                            set,
-                            index + 1,
-                            item.row.basis,
-                            vm,
-                            modifier = Modifier.testTag("workout-set-${index + 1}").then(
-                                if (set.id == firstIncomplete) Modifier.bringIntoViewRequester(setRequester) else Modifier
-                            ),
-                            highlighted = set.id == firstIncomplete,
-                            onRemove = { showRemoveSetHint = false }
-                        )
-                    }
-                }
-                if (showRemoveSetHint && item == workout.items.firstOrNull() && item.sets.isNotEmpty()) {
-                    Text(
-                        "Long-press a set to remove it",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.textSecondary
-                    )
-                }
-                TextAction("Add set", {
-                    vm.write { addSet(item.row.id) }
-                }, icon = Icons.Outlined.Add)
-                if (item.row.mode == "DURATION" || item.sets.isEmpty() ||
-                    duration.isNotEmpty()
-                ) {
-                    NumberField(duration, {
+                    if (!vm.isSubmitting(durationKey)) {
                         duration = it
-                        vm.saveDraft("duration:${item.row.id}", "duration", it)
-                    }, "Performed minutes (optional)")
+                        vm.saveDraft(durationKey, "duration", it)
+                    }
                 }
-                if (expanded) {
-                    TextField(exerciseNote, "Note", {
-                        exerciseNote = it
-                        vm.write { saveItemNote(item.row.id, note = it) }
-                    }, modifier = Modifier.focusRequester(focus), placeholder = "For this exercise")
-                    ListRow("This movement felt uncomfortable", trailing = {
-                        Checkbox(item.row.discomfort, { value ->
-                            vm.write { saveItemNote(item.row.id, discomfort = value) }
-                        })
-                    })
-                }
-                if (!expanded && exerciseNote.isNotBlank()) {
-                    Text(
-                        exerciseNote,
-                        Modifier.fillMaxWidth().heightIn(min = Dimens.touch).clickable {
-                            expanded = true
-                            focusNote = true
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.textSecondary
-                    )
+                if (form != null) {
+                    TextAction(stringResource(R.string.exercise_done), {
+                        completeCurrentExercise(vm, item, durationKey, duration) {}
+                    }, icon = Icons.Outlined.Check, enabled = !completingItem && !savingPast)
                 }
             }
         }
-        val next = pending.filter { it.row.id != current?.row?.id }
-        if (next.isNotEmpty()) {
-            SectionHeader("Up next")
+        RemainingWorkoutItems(workout, next, vm)
+        if (!addFirstExercise) {
+            TextAction(stringResource(R.string.add_exercise), { picker = true }, Modifier.padding(top = Dimens.sectionGap), icon = Icons.Outlined.Add)
+        }
+        if (form != null) {
+            KeyValueRow(
+                stringResource(R.string.duration),
+                runCatching { form.toTiming(ZoneId.of(workout.row.zoneId)).durationSeconds }.getOrNull()?.let(::formatDuration)
+                    ?: stringResource(R.string.unknown),
+                enabled = !savingPast,
+                onClick = { editMinutes = true }
+            )
+            TextField(form.note, stringResource(R.string.note), { updatePast(form.copy(note = it)) }, enabled = !savingPast)
+        }
+        if (!addFirstExercise) {
             ListCard {
-                next.forEach { nextItem ->
+                if (form == null) {
                     item {
-                        ListRow(nextItem.row.name, trailing = {
-                            Text(
-                                nextItem.row.targetDurationSeconds?.let { com.emmah.inshape.ui.theme.formatDuration(it) }
-                                    ?: if (nextItem.row.mode ==
-                                        "QUICK"
-                                    ) {
-                                        "Completion only"
-                                    } else {
-                                        "${nextItem.sets.size} sets"
-                                    },
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = colors.textSecondary
-                            )
-                        })
+                        ListRow(stringResource(R.string.add_check_in), onClick = onCheckIn,
+                            leading = { Icon(Icons.Outlined.FavoriteBorder, null, tint = colors.textSecondary) })
+                    }
+                    if (onAdaptWorkout != null) item {
+                        ListRow(stringResource(R.string.adapt_workout), onClick = onAdaptWorkout,
+                            leading = { Icon(Icons.Outlined.Edit, null, tint = colors.textSecondary) })
+                    }
+                    if (canUpdateRoutine) item {
+                        ListRow(stringResource(R.string.save_changes_routine), onClick = {
+                            routineSaveRevision = savedRoutine?.revision
+                            routineSave = true
+                        }, leading = { Icon(Icons.Outlined.Save, null, tint = colors.textSecondary) }, showChevron = false)
                     }
                 }
-            }
-        }
-        val done = workout.items.filter { it.row.disposition == "DONE" }
-        if (done.isNotEmpty()) {
-            SectionHeader("Done")
-            ListCard {
-                done.forEach { doneItem ->
-                    item {
-                        ListRow(doneItem.row.name, subtitle = itemSummary(doneItem), trailing = {
-                            IconButton({
-                                vm.write { reopenItem(doneItem.row.id) }
-                            }) {
-                                Icon(
-                                    Icons.Filled.CheckCircle,
-                                    "Reopen ${doneItem.row.name}",
-                                    tint = colors.ink
-                                )
-                            }
-                        })
-                    }
-                }
-            }
-        }
-        val skipped = workout.items.filter { it.row.disposition in listOf("SKIPPED", "INCOMPLETE") }
-        if (skipped.isNotEmpty()) {
-            SectionHeader("Skipped")
-            ListCard {
-                skipped.forEach { skippedItem ->
-                    item {
-                        ListRow(
-                            skippedItem.row.name,
-                            subtitle = if (skippedItem.hasPerformedWork) "Remainder skipped, recorded work kept" else "Skipped today",
-                            trailing = {
-                                TextAction("Reopen", {
-                                    vm.write { reopenItem(skippedItem.row.id) }
-                                }, icon = Icons.AutoMirrored.Outlined.Undo)
-                            }
-                        )
-                    }
+                item {
+                    ListRow(stringResource(R.string.discard_workout), onClick = { discard = true },
+                        leading = { Icon(Icons.Outlined.Delete, null, tint = colors.error) },
+                        titleColor = colors.error, showChevron = false)
                 }
             }
         }
     }
-    if (chooser && musicPlayback != null) {
-        MusicChooser(vm.container.music, musicPlayback, { chooser = false }, musicFixture)
+    val form = pastForm
+    if (editMinutes && form != null) {
+        var entered by rememberSaveable { mutableStateOf(form.duration) }
+        val valid = entered == form.duration || runCatching { performedSeconds(entered) }.isSuccess
+        EditorSheet(stringResource(R.string.duration), { editMinutes = false }) {
+            NumberField(entered, { entered = it }, stringResource(R.string.minutes))
+            ActionRow(Modifier.align(Alignment.End)) {
+                DialogAction(stringResource(R.string.cancel), { editMinutes = false })
+                DialogAction(stringResource(R.string.done), {
+                    updatePast(form.copy(duration = entered))
+                    editMinutes = false
+                }, enabled = valid)
+            }
+        }
     }
     if (picker) {
         ModalBottomSheet(onDismissRequest = { picker = false }, containerColor = colors.background) {
@@ -647,36 +391,14 @@ fun WorkoutScreen(
             })
         }
     }
-    if (alternatives &&
-        current != null
-    ) {
-        ModalBottomSheet(onDismissRequest = {
-            alternatives = false
-        }, containerColor = colors.background) {
-            val currentId = current.row.exerciseId
-            val ids = data.exercises.find { it.id == currentId }?.alternatives.orEmpty()
-            val saved = data.exercises.filter { it.id != currentId && it.id in ids && !it.archived }
-            val swap: (String) -> Unit = { exerciseId ->
-                vm.write { useAlternative(current.row.id, exerciseId) }
-                alternatives = false
-            }
-            Page {
-                SectionHeader("Your alternatives")
-                if (saved.isEmpty()) Text("Add your alternatives by editing this exercise in Library.")
-                ListCard {
-                    saved.forEach { exercise ->
-                        item {
-                            ListRow(exercise.name, subtitle = exercise.equipmentName, onClick = { swap(exercise.id) })
-                        }
-                    }
-                }
-                SectionHeader("All exercises", quiet = true)
-                ExercisePickerList(data, vm.container.photos, swap, excluded = saved.mapTo(mutableSetOf(currentId)) { it.id })
-            }
-        }
+    LaunchedEffect(current?.row?.id) {
+        if (alternativeItemId != current?.row?.id) alternativeItemId = null
+    }
+    if (current != null && alternativeItemId == current.row.id) {
+        WorkoutAlternativeSheet(data, current, vm) { alternativeItemId = null }
     }
     if (discard) {
-        ConfirmDialog("Discard this workout?", "The session and all work recorded in it will be deleted.", "Discard", destructive = true, {
+        ConfirmDialog(stringResource(R.string.discard_workout_question), stringResource(R.string.discard_workout_message), stringResource(R.string.discard), destructive = true, {
             vm.write {
                 deleteWorkout(id)
                 onDelete()
@@ -687,9 +409,9 @@ fun WorkoutScreen(
     }
     remove?.let { item ->
         ConfirmDialog(
-            "Delete recorded work?",
-            "All sets, notes and completion for this exercise will be removed from this workout.",
-            "Delete",
+            stringResource(R.string.delete_recorded_work_question),
+            stringResource(R.string.delete_recorded_work_message),
+            stringResource(R.string.delete),
             destructive = true,
             {
                 vm.write { removeItem(item, true) }
@@ -699,21 +421,556 @@ fun WorkoutScreen(
             { remove = null }
         )
     }
-    if (routineSave) {
+    if (routineSave && savedRoutine != null) {
         ConfirmDialog(
-            "Update the saved routine?",
-            "Replace its exercise order and planned targets with:\n" +
-                workout.items.joinToString("\n") {
-                    "${it.row.name}, ${it.sets.size} planned sets"
-                },
-            "Update routine",
+            stringResource(R.string.update_named_routine, savedRoutine.title),
+            stringResource(R.string.update_routine_message),
+            stringResource(R.string.update_routine),
             destructive = false,
             {
-                vm.write { saveSessionPlanToRoutine(id, workout.row.sourceRoutineId!!) }
-                routineSave =
-                    false
+                val revision = routineSaveRevision
+                vm.write { saveSessionPlanToRoutine(id, savedRoutine.id, expectedRevision = revision) }
+                routineSave = false
             },
             { routineSave = false }
         )
+    }
+}
+
+private fun completeCurrentExercise(
+    vm: JournalViewModel,
+    current: WorkoutItem,
+    durationKey: String,
+    submittedDuration: String,
+    onCompleted: () -> Unit
+) {
+    vm.submit(durationKey) {
+        markItemDone(current.row.id, performedSeconds(submittedDuration), draftId = durationKey)
+        onCompleted()
+        null
+    }
+}
+
+private fun performedSeconds(minutes: String): Long? {
+    if (minutes.isBlank()) return null
+    return parseWholeMinutesToSeconds(minutes)
+        ?: throw UiException(R.string.positive_whole_minutes)
+}
+
+@Composable
+private fun WorkoutBottomBar(
+    workout: Workout,
+    hasMoreExercises: Boolean,
+    addFirstExercise: Boolean,
+    completingItem: Boolean,
+    onPrimary: () -> Unit
+) {
+    PrimaryButton(
+        when {
+            addFirstExercise -> stringResource(R.string.add_exercise)
+            workout.isPastEntry -> stringResource(R.string.save_workout)
+            hasMoreExercises -> stringResource(R.string.exercise_done)
+            else -> stringResource(R.string.finish)
+        },
+        onPrimary,
+        Modifier.fillMaxWidth(),
+        enabled = !completingItem,
+        icon = Icons.Outlined.Add.takeIf { addFirstExercise },
+        size = ButtonSize.Large
+    )
+}
+
+@Composable
+private fun WorkoutHeader(
+    workout: Workout,
+    elapsed: Long?,
+    musicPlayback: MusicPlayback?,
+    onBack: () -> Unit,
+    onFinish: () -> Unit,
+    onMusic: () -> Unit
+) {
+    val colors = InShapeTheme.colors
+    val compactActions = LocalWindowInfo.current.containerDpSize.width < Dimens.pickerWidth && LocalDensity.current.fontScale >= 1.3f
+    PushedHeader(
+        onBack,
+        trailingText = !workout.isPastEntry,
+        titleContent = if (workout.isPastEntry) null else {
+            {
+                BoxWithConstraints {
+                    val clock = elapsed?.let(::formatElapsed) ?: "–"
+                    val textMeasurer = rememberTextMeasurer()
+                    val clockStyle = if (textMeasurer.measure(clock, InShapeType.workoutClock, softWrap = false).size.width <= constraints.maxWidth) {
+                        InShapeType.workoutClock
+                    } else {
+                        InShapeType.workoutClockCompact
+                    }
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.innerSmall),
+                        itemVerticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            clock,
+                            color = colors.text,
+                            style = clockStyle,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                        if (workout.items.isNotEmpty()) {
+                            Text(
+                                "${workout.doneCount} / ${workout.items.size}",
+                                color = colors.textSecondary,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    ) {
+        if (musicPlayback != null) {
+            val playback by musicPlayback.state.collectAsStateWithLifecycle()
+            val label = stringResource(if (playback.song != null) R.string.now_playing else R.string.music)
+            if (playback.playing) {
+                IconButton(onMusic, Modifier.size(Dimens.touch).semantics { contentDescription = label }) {
+                    PlaybackBars(playing = true, Modifier.size(Dimens.icon))
+                }
+            } else {
+                HeaderIconButton(Icons.Outlined.MusicNote, label, onMusic)
+            }
+        }
+        if (!workout.isPastEntry) {
+            TextAction(stringResource(R.string.finish), onFinish, icon = if (compactActions) null else Icons.Outlined.Flag)
+        }
+    }
+}
+
+@Composable
+private fun WorkoutBanner(workout: Workout, elapsed: Long?) {
+    val colors = InShapeTheme.colors
+    val uses24Hours = DateFormat.is24HourFormat(LocalContext.current)
+    BoxWithConstraints(
+        Modifier.fillMaxWidth().heightIn(min = Dimens.rowMinTwoLine)
+            .clip(InShapeShapes.card).background(ArtworkWash.Active.brush()),
+        contentAlignment = Alignment.Center
+    ) {
+        if (elapsed != null && hasArtworkColumns()) {
+            val flip = LocalLayoutDirection.current == LayoutDirection.Rtl
+            val motion = if (colors.isDark) R.drawable.art_training_motion_dark else R.drawable.art_training_motion_light
+            Image(
+                painterResource(motion),
+                null,
+                Modifier.align(Alignment.CenterEnd).width(minOf(maxWidth * .4f, (maxWidth - Dimens.workoutArtworkTextWidth) / 2))
+                    .height(Dimens.rowMinTwoLine).scale(if (flip) -1f else 1f, 1f)
+            )
+        }
+        Column(
+            Modifier.fillMaxWidth().padding(vertical = Dimens.innerSmall),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Dimens.innerTiny)
+        ) {
+            Text(workout.row.title, style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+            if (elapsed != null) {
+                workout.row.start?.let {
+                    Text(
+                        stringResource(R.string.started_at, Instant.parse(it).workoutTime(ZoneId.of(workout.row.zoneId), uses24Hours)),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colors.textSecondary
+                    )
+                }
+            } else {
+                Text(
+                    stringResource(R.string.started_at, LocalDate.parse(workout.row.journalDate).shortDate()),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.textSecondary
+                )
+                Text(stringResource(R.string.review_workout_timing), style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+            }
+        }
+    }
+}
+
+internal fun workoutSetupLabels(context: Context, setup: String, settings: List<Setting> = emptyList()): List<Pair<String?, String>> {
+    val knownLabels = mapOf(
+        "Handle" to context.getString(R.string.handle),
+        "Seat height" to context.getString(R.string.seat_height),
+        "Backrest" to context.getString(R.string.backrest)
+    )
+    val emptyValues = listOf(context.getString(R.string.none), context.getString(R.string.no), "None", "-")
+    fun setting(label: String?, value: String): Pair<String?, String>? {
+        if (value.isBlank() || emptyValues.any { it.equals(value, ignoreCase = true) }) return null
+        val localizedLabel = knownLabels.entries.firstOrNull { it.key.equals(label, ignoreCase = true) }?.value ?: label
+        return localizedLabel to value
+    }
+    if (settings.isNotEmpty()) return settings.mapNotNull { setting(it.label.trim(), it.value.trim()) }
+    return setup.split(", ").mapNotNull { raw ->
+        val entry = raw.trim()
+        val separator = entry.indexOf(':')
+        val legacyLabel = knownLabels.asSequence().flatMap { (key, label) -> sequenceOf(key, label) }
+            .firstOrNull { entry.startsWith("$it ", ignoreCase = true) }
+        val lastToken = entry.substringAfterLast(' ')
+        when {
+            separator >= 0 -> setting(entry.take(separator).trim(), entry.drop(separator + 1).trim())
+            legacyLabel != null -> setting(legacyLabel, entry.drop(legacyLabel.length + 1).trim())
+            lastToken != entry && (lastToken.replace(',', '.').toBigDecimalOrNull() != null || lastToken.length <= 8) ->
+                setting(entry.substringBeforeLast(' ').trimEnd(), lastToken)
+            else -> setting(null, entry)
+        }
+    }
+}
+
+@Composable
+private fun WorkoutSetup(setup: String, storedSettings: List<Setting>) {
+    val settings = workoutSetupLabels(LocalContext.current, setup, storedSettings)
+    val colors = InShapeTheme.colors
+    if (settings.isNotEmpty()) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(Dimens.innerTiny),
+            verticalArrangement = Arrangement.spacedBy(Dimens.innerTiny)
+        ) {
+            settings.forEach { (label, value) ->
+                Surface(shape = InShapeShapes.chip, color = colors.surface, contentColor = colors.text) {
+                    Text(
+                        buildAnnotatedString {
+                            if (!label.isNullOrBlank()) withStyle(SpanStyle(color = colors.textSecondary)) { append("$label ") }
+                            withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(value) }
+                        },
+                        Modifier.padding(horizontal = Dimens.pillPadding, vertical = Dimens.innerTiny),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PreviousWorkoutResult(data: JournalSnapshot, id: String, item: WorkoutItem) {
+    val colors = InShapeTheme.colors
+    val previous = data.history.filter {
+        it.row.id != id
+    }.sortedWith(
+        compareByDescending<Workout> {
+            it.row.journalDate
+        }.thenByDescending { it.row.createdAt }
+    ).firstNotNullOfOrNull { old ->
+        old.items.find {
+            it.row.exerciseId == item.row.exerciseId &&
+                it.row.equipmentId == item.row.equipmentId &&
+                it.row.basis == item.row.basis &&
+                it.hasPerformedWork
+        }?.let { old.row.journalDate to it }
+    }
+    if (previous != null) {
+        InShapeCard(inset = true, gap = Dimens.innerTiny) {
+            Text(
+                stringResource(R.string.last_time_date, LocalDate.parse(previous.first).shortDate()),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.textSecondary
+            )
+            Text(
+                itemSummary(LocalContext.current, previous.second),
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
+            )
+            previous.second.row.note.takeIf(String::isNotBlank)?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ColumnScope.WorkoutSetEditor(
+    item: WorkoutItem,
+    vm: JournalViewModel,
+    firstIncomplete: String?,
+    setRequester: BringIntoViewRequester,
+    showRemoveSetHint: Boolean,
+    onRemoveSet: () -> Unit,
+    duration: String,
+    completingItem: Boolean,
+    onDurationChange: (String) -> Unit
+) {
+    val colors = InShapeTheme.colors
+    item.sets.mapNotNull { it.plannedReps }.distinct().forEach { reps ->
+        Text(stringResource(R.string.rep_target, reps.localizedDisplay(LocalContext.current)), style = MaterialTheme.typography.bodySmall)
+    }
+    if (item.sets.isNotEmpty()) SetTableHeader(item.row.basis)
+    item.sets.forEachIndexed { index, set ->
+        key(set.id) {
+            SetRow(
+                set,
+                index + 1,
+                item.row.basis,
+                vm,
+                modifier = Modifier.testTag("workout-set-${index + 1}").then(
+                    if (set.id == firstIncomplete) Modifier.bringIntoViewRequester(setRequester) else Modifier
+                ),
+                highlighted = set.id == firstIncomplete,
+                onRemove = onRemoveSet
+            )
+        }
+    }
+    if (showRemoveSetHint && item.sets.isNotEmpty()) {
+        Text(
+            stringResource(R.string.tap_set_remove),
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textSecondary
+        )
+    }
+    TextAction(stringResource(R.string.add_set), {
+        vm.write { addSet(item.row.id) }
+    }, icon = Icons.Outlined.Add)
+    if (item.row.mode == "DURATION" || item.sets.isEmpty() ||
+        duration.isNotEmpty()
+    ) {
+        NumberField(duration, onDurationChange, stringResource(R.string.performed_minutes_optional), readOnly = completingItem)
+    }
+}
+
+@Composable
+private fun CurrentWorkoutExercise(
+    item: WorkoutItem,
+    data: JournalSnapshot,
+    id: String,
+    vm: JournalViewModel,
+    onExercise: (String, String) -> Unit,
+    onTitlePositioned: (Float) -> Unit,
+    onSwap: () -> Unit,
+    onRemoveRecorded: () -> Unit,
+    onAssistant: (() -> Unit)?,
+    setEditor: @Composable ColumnScope.() -> Unit
+) {
+    val colors = InShapeTheme.colors
+    var menu by remember(item.row.id) { mutableStateOf(false) }
+    var exerciseNote by rememberSaveable(item.row.id) { mutableStateOf(item.row.note) }
+    var expanded by rememberSaveable(item.row.id) {
+        mutableStateOf(false)
+    }
+    var focusNote by remember { mutableStateOf(false) }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(expanded, focusNote) {
+        if (expanded &&
+            focusNote
+        ) {
+            focus.requestFocus()
+            focusNote = false
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
+        Row(
+            Modifier.fillMaxWidth().onGloballyPositioned { onTitlePositioned(it.positionInRoot().y) },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                item.row.name.exerciseDisplayName(LocalContext.current),
+                Modifier.weight(1f).heightIn(min = Dimens.touch)
+                    .clickable(onClickLabel = stringResource(R.string.exercise_details)) { onExercise(item.row.exerciseId, item.row.id) }
+                    .padding(vertical = Dimens.innerSmall),
+                style = MaterialTheme.typography.titleLarge
+            )
+            Box {
+                IconButton({
+                    menu = true
+                }) { Icon(Icons.Outlined.MoreVert, stringResource(R.string.named_options, item.row.name.exerciseDisplayName(LocalContext.current))) }
+                AppMenu(menu, { menu = false }) {
+                    if (onAssistant != null) {
+                        MenuAction(stringResource(R.string.workout_assistant), Icons.Outlined.Mic, {
+                            menu = false
+                            onAssistant()
+                        })
+                    }
+                    MenuAction(if (exerciseNote.isBlank()) stringResource(R.string.add_note) else stringResource(R.string.edit_note), Icons.Outlined.EditNote, {
+                        menu = false
+                        expanded = true
+                        focusNote = true
+                    })
+                    MenuAction(stringResource(R.string.swap_exercise), Icons.Outlined.SwapHoriz, {
+                        menu = false
+                        onSwap()
+                    })
+                    MenuAction(stringResource(R.string.skip_for_now), Icons.Outlined.SkipNext, {
+                        menu = false
+                        vm.write { skipItemForNow(item.row.id) }
+                    })
+                    HorizontalDivider(color = colors.divider)
+                    MenuAction(stringResource(R.string.remove_exercise), Icons.Outlined.Delete, {
+                        menu = false
+                        if (item.hasPerformedWork) onRemoveRecorded() else vm.write { removeItem(item.row.id) }
+                    }, destructive = true)
+                }
+            }
+        }
+        val settings = data.exercises.firstOrNull { it.id == item.row.exerciseId && it.equipmentId == item.row.equipmentId }?.settings
+        WorkoutSetup(item.row.setup, settings.orEmpty())
+        PreviousWorkoutResult(data, id, item)
+        setEditor()
+        if (expanded) {
+            TextField(exerciseNote, stringResource(R.string.note), {
+                exerciseNote = it
+                vm.write { saveItemNote(item.row.id, note = it) }
+            }, modifier = Modifier.focusRequester(focus), placeholder = stringResource(R.string.for_this_exercise))
+            ListRow(stringResource(R.string.discomfort_example), trailing = {
+                Checkbox(item.row.discomfort, { value ->
+                    vm.write { saveItemNote(item.row.id, discomfort = value) }
+                })
+            })
+        }
+        if (!expanded && exerciseNote.isNotBlank()) {
+            Text(
+                exerciseNote,
+                Modifier.fillMaxWidth().heightIn(min = Dimens.touch).clickable {
+                    expanded = true
+                    focusNote = true
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.textSecondary
+            )
+        }
+    }
+}
+
+@Composable
+private fun ColumnScope.RemainingWorkoutItems(workout: Workout, next: List<WorkoutItem>, vm: JournalViewModel) {
+    val colors = InShapeTheme.colors
+    if (next.isNotEmpty()) {
+        SectionHeader(stringResource(R.string.next_up))
+        ListCard {
+            next.forEach { nextItem ->
+                item {
+                    val summary = plannedItemSummary(LocalContext.current, nextItem)
+                    ListRow(nextItem.row.name.exerciseDisplayName(LocalContext.current), trailingValue = if (summary.isNotEmpty()) ({
+                        Text(summary, style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+                    }) else null)
+                }
+            }
+        }
+    }
+    val done = workout.items.filter { it.row.disposition == "DONE" }
+    if (done.isNotEmpty()) {
+        SectionHeader(stringResource(R.string.workout_done_section))
+        ListCard {
+            done.forEach { doneItem ->
+                item {
+                    ListRow(doneItem.row.name.exerciseDisplayName(LocalContext.current), subtitle = itemSummary(LocalContext.current, doneItem), trailing = {
+                        IconButton({
+                            vm.write { reopenItem(doneItem.row.id) }
+                        }) {
+                            Icon(
+                                Icons.Filled.CheckCircle,
+                                stringResource(R.string.reopen_named, doneItem.row.name.exerciseDisplayName(LocalContext.current)),
+                                tint = colors.ink
+                            )
+                        }
+                    })
+                }
+            }
+        }
+    }
+    val skipped = workout.items.filter { it.row.disposition == "SKIPPED" }
+    if (skipped.isNotEmpty()) {
+        SectionHeader(stringResource(R.string.skipped))
+        ListCard {
+            skipped.forEach { skippedItem ->
+                item {
+                    ListRow(
+                        skippedItem.row.name.exerciseDisplayName(LocalContext.current),
+                        subtitle = if (skippedItem.hasPerformedWork) stringResource(R.string.remainder_skipped) else stringResource(R.string.skipped_today),
+                        trailing = {
+                            TextAction(stringResource(R.string.reopen), {
+                                vm.write { reopenItem(skippedItem.row.id) }
+                            }, icon = Icons.AutoMirrored.Outlined.Undo)
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WorkoutAlternativeSheet(data: JournalSnapshot, current: WorkoutItem, vm: JournalViewModel, onDismiss: () -> Unit) {
+    val colors = InShapeTheme.colors
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = colors.background) {
+        val currentId = current.row.exerciseId
+        val ids = data.exercises.find { it.id == currentId }?.alternatives.orEmpty()
+        val saved = data.exercises.filter { it.id != currentId && it.id in ids && !it.archived }
+        val swap: (String) -> Unit = { exerciseId ->
+            vm.write { useAlternative(current.row.id, exerciseId, requireCurrent = true) }
+            onDismiss()
+        }
+        Page {
+            val source = data.workouts.find { it.id == current.row.workoutId }?.program
+            val planned = source?.let { vm.container.programs.session(it.programId, it.day) }?.exercises
+                ?.find { it.exerciseId == current.row.plan?.originalCatalogExerciseId }
+            if (planned != null && planned.alternatives.isNotEmpty()) {
+                SectionHeader(stringResource(R.string.program_alternatives))
+                ListCard {
+                    planned.alternatives.filter { it.exerciseId != current.row.plan?.catalogExerciseId }.forEach { alternative ->
+                        val linked = data.programLinks.filter { it.catalogExerciseId == alternative.exerciseId }.map { it.exerciseId }.toSet()
+                        data.exercises.filter { it.id in linked && it.id != currentId && !it.archived }.forEach { exercise ->
+                            item {
+                                ListRow(exercise.name.exerciseDisplayName(LocalContext.current), subtitle = listOf(exercise.location.locationLabel(LocalContext.current), exercise.equipmentName.exerciseDisplayName(LocalContext.current)).joinToString(", "), onClick = {
+                                    vm.write { useProgramAlternative(current.row.id, planned, alternative, exercise.id) }
+                                    onDismiss()
+                                })
+                            }
+                        }
+                        item {
+                            ListRow(alternative.label, subtitle = stringResource(R.string.create_from_template), onClick = {
+                                vm.write { useProgramAlternative(current.row.id, planned, alternative, null) }
+                                onDismiss()
+                            })
+                        }
+                    }
+                }
+            }
+            SectionHeader(stringResource(R.string.your_alternatives))
+            if (saved.isEmpty()) Text(stringResource(R.string.edit_alternatives_hint))
+            ListCard {
+                saved.forEach { exercise ->
+                    item {
+                        ListRow(exercise.name.exerciseDisplayName(LocalContext.current), subtitle = exercise.category.categoryLabel(LocalContext.current), onClick = { swap(exercise.id) })
+                    }
+                }
+            }
+            SectionHeader(stringResource(R.string.all_exercises))
+            ExercisePickerList(data, vm.container.photos, swap, excluded = saved.mapTo(mutableSetOf(currentId)) { it.id })
+        }
+    }
+}
+
+@Composable
+private fun ScrollToWorkoutProgress(
+    id: String,
+    current: WorkoutItem?,
+    firstIncomplete: String?,
+    keyboardVisible: Boolean,
+    doneCount: Int,
+    scrollState: ScrollState,
+    setRequester: BringIntoViewRequester,
+    scrollTarget: () -> Int?
+) {
+    val dragging by scrollState.interactionSource.collectIsDraggedAsState()
+    var previousItemId by rememberSaveable(id) { mutableStateOf<String?>(null) }
+    var previousSetId by rememberSaveable(id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(current?.row?.id, firstIncomplete) {
+        val itemChanged = previousItemId != current?.row?.id
+        val setChanged = previousSetId != firstIncomplete
+        previousItemId = current?.row?.id
+        previousSetId = firstIncomplete
+        if (current != null && !keyboardVisible && !dragging) {
+            withFrameNanos { }
+            if (itemChanged && doneCount > 0) {
+                val target = snapshotFlow(scrollTarget).filterNotNull().first()
+                if (!dragging) scrollState.animateScrollTo(target)
+            }
+            val hasRecordedProgress = doneCount > 0 || current.completedSets.isNotEmpty()
+            val hasNewIncompleteSet = setChanged && firstIncomplete != null
+            if (!dragging && hasNewIncompleteSet && hasRecordedProgress) {
+                setRequester.bringIntoView()
+            }
+        }
     }
 }

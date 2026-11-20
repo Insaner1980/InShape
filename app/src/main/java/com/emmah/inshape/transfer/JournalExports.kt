@@ -1,5 +1,10 @@
 package com.emmah.inshape.transfer
 
+import com.emmah.inshape.feature.library.categoryLabel
+import com.emmah.inshape.feature.library.exerciseDisplayName
+import com.emmah.inshape.R
+import android.content.Context
+import com.emmah.inshape.feature.workout.itemSummary
 import com.emmah.inshape.data.Exercise
 import com.emmah.inshape.data.JournalSnapshot
 import java.io.FilterOutputStream
@@ -11,7 +16,7 @@ data class ExportSelection(val workoutIds: Set<String>, val includeNotes: Boolea
 object JournalExports {
     // Keep the exported table schemas together; this is a flat format declaration.
     @Suppress("LongMethod")
-    fun csv(data: JournalSnapshot, selection: ExportSelection, output: OutputStream) {
+    fun csv(context: Context, data: JournalSnapshot, selection: ExportSelection, output: OutputStream) {
         val workouts = selectedWorkouts(data, selection)
         val ids = workouts.map { it.row.id }.toSet()
         val items = workouts.flatMap { it.items }.filter { it.hasPerformedWork }
@@ -45,68 +50,64 @@ object JournalExports {
             table(
                 "workouts.csv",
                 listOf(
-                    "workout_id",
-                    "journal_date",
-                    "title",
-                    "start_utc",
-                    "end_utc",
-                    "zone_id",
-                    "duration_seconds",
-                    "effort",
-                    "session_note"
+                    context.getString(R.string.csv_workout_id),
+                    context.getString(R.string.csv_journal_date),
+                    context.getString(R.string.csv_title),
+                    context.getString(R.string.csv_start_utc),
+                    context.getString(R.string.csv_end_utc),
+                    context.getString(R.string.csv_zone_id),
+                    context.getString(R.string.csv_duration_seconds),
+                    context.getString(R.string.csv_effort),
+                    context.getString(R.string.csv_session_note)
                 ),
                 workouts.asSequence().map { workout ->
                     val row = workout.row
                     listOf(
                         row.id, row.journalDate, row.title, row.start, row.end, row.zoneId, row.durationSeconds,
-                        if (selection.includeCheckIns) {
-                            workout.checkIns.find {
-                                it.phase == "AFTER"
-                            }?.effort
-                        } else {
-                            null
-                        },
-                        if (selection.includeNotes) row.note else null
+                        workout.checkIns.takeIf { selection.includeCheckIns }?.find { it.phase == "AFTER" }?.effort,
+                        row.note.takeIf { selection.includeNotes }
                     )
                 }
             )
             table(
                 "exercises.csv",
                 listOf(
-                    "session_item_id",
-                    "workout_id",
-                    "exercise_id",
-                    "equipment_id",
-                    "name_snapshot",
-                    "category",
-                    "measurement_basis",
-                    "disposition",
-                    "completion_kind",
-                    "performed_duration_seconds",
-                    "exercise_note",
-                    "discomfort"
+                    context.getString(R.string.csv_session_item_id),
+                    context.getString(R.string.csv_workout_id),
+                    context.getString(R.string.csv_exercise_id),
+                    context.getString(R.string.csv_equipment_id),
+                    context.getString(R.string.csv_name_snapshot),
+                    context.getString(R.string.csv_category),
+                    context.getString(R.string.csv_measurement_basis),
+                    context.getString(R.string.csv_disposition),
+                    context.getString(R.string.csv_completion_kind),
+                    context.getString(R.string.csv_performed_duration_seconds),
+                    context.getString(R.string.csv_exercise_note),
+                    context.getString(R.string.csv_discomfort),
+                    context.getString(R.string.csv_set_summary)
                 ),
                 items.asSequence().map { item ->
                     val row = item.row
                     listOf(
-                        row.id, row.workoutId, row.exerciseId, row.equipmentId, row.name, row.category, row.basis, row.disposition,
+                        row.id, row.workoutId, row.exerciseId, row.equipmentId, row.name.exerciseDisplayName(context), row.category.categoryLabel(context), row.basis, row.disposition,
                         if (item.completedSets.isEmpty()) "COMPLETION_ONLY" else "SETS",
                         row.durationSeconds,
-                        if (selection.includeNotes) row.note else null,
-                        row.discomfort
+                        row.note.takeIf { selection.includeNotes },
+                        row.discomfort,
+                        itemSummary(context, item)
                     )
                 }
             )
             table(
                 "sets.csv",
                 listOf(
-                    "set_id",
-                    "session_item_id",
-                    "set_order",
-                    "completed_at",
-                    "load_value",
-                    "load_unit",
-                    "reps"
+                    context.getString(R.string.csv_set_id),
+                    context.getString(R.string.csv_session_item_id),
+                    context.getString(R.string.csv_set_order),
+                    context.getString(R.string.csv_completed_at),
+                    context.getString(R.string.csv_load_value),
+                    context.getString(R.string.csv_load_unit),
+                    context.getString(R.string.csv_reps)
                 ),
                 items.asSequence().flatMap { item ->
                     item.completedSets.asSequence().map { set ->
@@ -116,13 +117,7 @@ object JournalExports {
                             set.position + 1,
                             set.completedAt,
                             set.load,
-                            if (set.load !=
-                                null
-                            ) {
-                                item.row.basis
-                            } else {
-                                null
-                            },
+                            item.row.basis.takeIf { set.load != null },
                             set.reps
                         )
                     }
@@ -130,7 +125,7 @@ object JournalExports {
             )
             table(
                 "check_ins.csv",
-                listOf("check_in_id", "workout_id", "phase", "observed_at", "zone_id", "energy", "effort", "feelings", "note"),
+                listOf(context.getString(R.string.csv_check_in_id), context.getString(R.string.csv_workout_id), context.getString(R.string.csv_phase), context.getString(R.string.csv_observed_at), context.getString(R.string.csv_zone_id), context.getString(R.string.csv_energy), context.getString(R.string.csv_effort), context.getString(R.string.csv_feelings), context.getString(R.string.csv_note)),
                 checkIns.asSequence().map { check ->
                     listOf(
                         check.id,
@@ -141,13 +136,13 @@ object JournalExports {
                         check.energy,
                         check.effort,
                         check.feelings,
-                        if (selection.includeNotes) check.note else null
+                        check.note.takeIf { selection.includeNotes }
                     )
                 }
             )
             table(
                 "body_observations.csv",
-                listOf("check_in_id", "region_id", "pain", "stiffness", "note"),
+                listOf(context.getString(R.string.csv_check_in_id), context.getString(R.string.csv_region_id), context.getString(R.string.csv_pain), context.getString(R.string.csv_stiffness), context.getString(R.string.csv_note)),
                 data.observations.asSequence().filter {
                     it.checkInId in
                         checkIds
@@ -157,25 +152,17 @@ object JournalExports {
                         it.region,
                         it.pain,
                         it.stiffness,
-                        if (selection.includeNotes) it.note else null
+                        it.note.takeIf { selection.includeNotes }
                     )
                 }
             )
             zip.putNextEntry(ZipEntry("README.txt"))
             zip.write(
-                (
-                    "InShape CSV export\nUTF-8, comma-separated, every field quoted, doubled internal quotes, " +
-                        "CRLF row endings. Quoted fields can contain newlines.\n" +
-                        "Dates use ISO 8601. Times marked UTC include their offset. Decimal loads use a dot. Empty " +
-                        "fields mean not recorded or excluded, not zero. Stable IDs link tables.\n" +
-                        "Only selected completed records are exported. Exercise rows contain performed work, " +
-                        "including partial exercises. Sets contain completed sets only. COMPLETION_ONLY does not " +
-                        "imply a set.\n" +
-                        "To prevent spreadsheet formulas, text whose first non-space character is =, +, - or @, or " +
-                        "which starts with a tab or line break, is prefixed with one apostrophe. Remove that " +
-                        "prefix to recover such text. The full backup preserves exact original text.\n" +
-                        "Notes included: ${selection.includeNotes}. Check-ins included: ${selection.includeCheckIns}.\n"
-                    ).toByteArray(Charsets.UTF_8)
+                context.getString(
+                    R.string.export_csv_readme,
+                    context.getString(if (selection.includeNotes) R.string.export_included else R.string.export_excluded),
+                    context.getString(if (selection.includeCheckIns) R.string.export_included else R.string.export_excluded)
+                ).toByteArray(Charsets.UTF_8)
             )
             zip.closeEntry()
         }

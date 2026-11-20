@@ -10,6 +10,23 @@ import androidx.compose.ui.graphics.vector.PathParser
 internal const val BODY_WIDTH = 240f
 internal const val BODY_HEIGHT = 392f
 
+private const val SHOULDER_PATH =
+    "M88 78 Q80 78 73 84 Q65 92 64 105 Q70 108 76 105 Q83 102 87 94 Z"
+private const val UPPER_ARM_PATH =
+    "M64 105 Q69 108 76 105 Q74 119 66 140 Q62 143 56 140 Q58 119 64 105Z"
+private const val ELBOW_PATH =
+    "M56 140 Q61 143 66 140 L64 152 Q60 155 54 151Z"
+private const val HIP_PATH =
+    "M84 168 Q102 170 120 178 L120 194 Q114 194 110 199 Q98 193 80 194 Q79 181 84 168Z"
+private const val THIGH_PATH =
+    "M80 194 Q98 193 110 199 Q113 220 108 249 Q106 263 105 275 Q98 279 89 275 Q84 260 80 237 Q76 214 80 194Z"
+private const val KNEE_PATH =
+    "M89 275 Q98 279 105 275 Q108 285 105 295 Q98 299 91 295 Q88 286 89 275Z"
+private const val CALF_SHIN_PATH =
+    "M91 295 Q98 299 105 295 Q109 307 106 322 Q103 338 102 353 Q98 356 93 353 Q94 339 90 324 Q86 306 91 295Z"
+private const val ANKLE_FOOT_PATH =
+    "M93 353 Q98 356 102 353 L103 366 Q105 371 104 375 Q101 379 95 379 L83 379 Q79 378 81 374 L89 365 Q92 361 93 353Z"
+
 internal class BodyPath(
     val id: String?,
     val geometry: androidx.compose.ui.graphics.Path,
@@ -31,8 +48,10 @@ private fun bodyPath(id: String?, fill: Color?, data: String, detailInk: Color? 
         )
     }
     val bounds = RectF().also { path.computeBounds(it, true) }
-    val hitArea = id?.let {
+    val hitArea = if (id != null || fill != null) {
         Region().apply { setPath(path, Region(0, 0, BODY_WIDTH.toInt(), BODY_HEIGHT.toInt())) }
+    } else {
+        null
     }
     return BodyPath(id, geometry, fill, detailInk, bounds, hitArea)
 }
@@ -43,17 +62,17 @@ internal val frontBodyArtwork by lazy {
         bodyPath(
             "right_shoulder",
             Color(0xFFDCE1CD),
-            "M88 78 Q80 78 73 84 Q65 92 64 105 Q70 108 76 105 Q83 102 87 94 Z"
+            SHOULDER_PATH
         ),
         bodyPath(
             "right_upper_arm",
             Color(0xFFE9ECDF),
-            "M64 105 Q69 108 76 105 Q74 119 66 140 Q62 143 56 140 Q58 119 64 105Z"
+            UPPER_ARM_PATH
         ),
         bodyPath(
             "right_elbow",
             Color(0xFFDCE2D2),
-            "M56 140 Q61 143 66 140 L64 152 Q60 155 54 151Z"
+            ELBOW_PATH
         ),
         bodyPath(
             "right_forearm_wrist",
@@ -64,44 +83,44 @@ internal val frontBodyArtwork by lazy {
         bodyPath(
             "right_hip",
             Color(0xFFE0E5D6),
-            "M84 168 Q102 170 120 178 L120 194 Q114 194 110 199 Q98 193 80 194 Q79 181 84 168Z"
+            HIP_PATH
         ),
         bodyPath(
             "right_thigh",
             Color(0xFFE9ECDE),
-            "M80 194 Q98 193 110 199 Q113 220 108 249 Q106 263 105 275 Q98 279 89 275 Q84 260 80 237 Q76 214 80 194Z"
+            THIGH_PATH
         ),
         bodyPath(
             "right_knee",
             Color(0xFFF0F1E7),
-            "M89 275 Q98 279 105 275 Q108 285 105 295 Q98 299 91 295 Q88 286 89 275Z"
+            KNEE_PATH
         ),
         bodyPath(
             "right_calf_shin",
             Color(0xFFE3E8D8),
-            "M91 295 Q98 299 105 295 Q109 307 106 322 Q103 338 102 353 Q98 356 93 353 Q94 339 90 324 Q86 306 91 295Z"
+            CALF_SHIN_PATH
         ),
         bodyPath(
             "right_ankle_foot",
             Color(0xFFE9ECDF),
-            "M93 353 Q98 356 102 353 L103 366 Q105 371 104 375 Q101 379 95 379 L83 379 Q79 378 81 374 L89 365 Q92 361 93 353Z"
+            ANKLE_FOOT_PATH
         ),
         bodyPath(
             "left_shoulder",
             Color(0xFFDCE1CD),
-            "M88 78 Q80 78 73 84 Q65 92 64 105 Q70 108 76 105 Q83 102 87 94 Z",
+            SHOULDER_PATH,
             mirrored = true
         ),
         bodyPath(
             "left_upper_arm",
             Color(0xFFE9ECDF),
-            "M64 105 Q69 108 76 105 Q74 119 66 140 Q62 143 56 140 Q58 119 64 105Z",
+            UPPER_ARM_PATH,
             mirrored = true
         ),
         bodyPath(
             "left_elbow",
             Color(0xFFDCE2D2),
-            "M56 140 Q61 143 66 140 L64 152 Q60 155 54 151Z",
+            ELBOW_PATH,
             mirrored = true
         ),
         bodyPath(
@@ -114,31 +133,31 @@ internal val frontBodyArtwork by lazy {
         bodyPath(
             "left_hip",
             Color(0xFFE0E5D6),
-            "M84 168 Q102 170 120 178 L120 194 Q114 194 110 199 Q98 193 80 194 Q79 181 84 168Z",
+            HIP_PATH,
             mirrored = true
         ),
         bodyPath(
             "left_thigh",
             Color(0xFFE9ECDE),
-            "M80 194 Q98 193 110 199 Q113 220 108 249 Q106 263 105 275 Q98 279 89 275 Q84 260 80 237 Q76 214 80 194Z",
+            THIGH_PATH,
             mirrored = true
         ),
         bodyPath(
             "left_knee",
             Color(0xFFF0F1E7),
-            "M89 275 Q98 279 105 275 Q108 285 105 295 Q98 299 91 295 Q88 286 89 275Z",
+            KNEE_PATH,
             mirrored = true
         ),
         bodyPath(
             "left_calf_shin",
             Color(0xFFE3E8D8),
-            "M91 295 Q98 299 105 295 Q109 307 106 322 Q103 338 102 353 Q98 356 93 353 Q94 339 90 324 Q86 306 91 295Z",
+            CALF_SHIN_PATH,
             mirrored = true
         ),
         bodyPath(
             "left_ankle_foot",
             Color(0xFFE9ECDF),
-            "M93 353 Q98 356 102 353 L103 366 Q105 371 104 375 Q101 379 95 379 L83 379 Q79 378 81 374 L89 365 Q92 361 93 353Z",
+            ANKLE_FOOT_PATH,
             mirrored = true
         ),
         bodyPath(
@@ -181,17 +200,17 @@ internal val backBodyArtwork by lazy {
         bodyPath(
             "left_shoulder",
             Color(0xFFDCE1CD),
-            "M88 78 Q80 78 73 84 Q65 92 64 105 Q70 108 76 105 Q83 102 87 94 Z"
+            SHOULDER_PATH
         ),
         bodyPath(
             "left_upper_arm",
             Color(0xFFE9ECDF),
-            "M64 105 Q69 108 76 105 Q74 119 66 140 Q62 143 56 140 Q58 119 64 105Z"
+            UPPER_ARM_PATH
         ),
         bodyPath(
             "left_elbow",
             Color(0xFFDCE2D2),
-            "M56 140 Q61 143 66 140 L64 152 Q60 155 54 151Z"
+            ELBOW_PATH
         ),
         bodyPath(
             "left_forearm_wrist",
@@ -202,44 +221,44 @@ internal val backBodyArtwork by lazy {
         bodyPath(
             "left_hip",
             Color(0xFFE0E5D6),
-            "M84 168 Q102 170 120 178 L120 194 Q114 194 110 199 Q98 193 80 194 Q79 181 84 168Z"
+            HIP_PATH
         ),
         bodyPath(
             "left_thigh",
             Color(0xFFE9ECDE),
-            "M80 194 Q98 193 110 199 Q113 220 108 249 Q106 263 105 275 Q98 279 89 275 Q84 260 80 237 Q76 214 80 194Z"
+            THIGH_PATH
         ),
         bodyPath(
             "left_knee",
             Color(0xFFF0F1E7),
-            "M89 275 Q98 279 105 275 Q108 285 105 295 Q98 299 91 295 Q88 286 89 275Z"
+            KNEE_PATH
         ),
         bodyPath(
             "left_calf_shin",
             Color(0xFFE3E8D8),
-            "M91 295 Q98 299 105 295 Q109 307 106 322 Q103 338 102 353 Q98 356 93 353 Q94 339 90 324 Q86 306 91 295Z"
+            CALF_SHIN_PATH
         ),
         bodyPath(
             "left_ankle_foot",
             Color(0xFFE9ECDF),
-            "M93 353 Q98 356 102 353 L103 366 Q105 371 104 375 Q101 379 95 379 L83 379 Q79 378 81 374 L89 365 Q92 361 93 353Z"
+            ANKLE_FOOT_PATH
         ),
         bodyPath(
             "right_shoulder",
             Color(0xFFDCE1CD),
-            "M88 78 Q80 78 73 84 Q65 92 64 105 Q70 108 76 105 Q83 102 87 94 Z",
+            SHOULDER_PATH,
             mirrored = true
         ),
         bodyPath(
             "right_upper_arm",
             Color(0xFFE9ECDF),
-            "M64 105 Q69 108 76 105 Q74 119 66 140 Q62 143 56 140 Q58 119 64 105Z",
+            UPPER_ARM_PATH,
             mirrored = true
         ),
         bodyPath(
             "right_elbow",
             Color(0xFFDCE2D2),
-            "M56 140 Q61 143 66 140 L64 152 Q60 155 54 151Z",
+            ELBOW_PATH,
             mirrored = true
         ),
         bodyPath(
@@ -252,31 +271,31 @@ internal val backBodyArtwork by lazy {
         bodyPath(
             "right_hip",
             Color(0xFFE0E5D6),
-            "M84 168 Q102 170 120 178 L120 194 Q114 194 110 199 Q98 193 80 194 Q79 181 84 168Z",
+            HIP_PATH,
             mirrored = true
         ),
         bodyPath(
             "right_thigh",
             Color(0xFFE9ECDE),
-            "M80 194 Q98 193 110 199 Q113 220 108 249 Q106 263 105 275 Q98 279 89 275 Q84 260 80 237 Q76 214 80 194Z",
+            THIGH_PATH,
             mirrored = true
         ),
         bodyPath(
             "right_knee",
             Color(0xFFF0F1E7),
-            "M89 275 Q98 279 105 275 Q108 285 105 295 Q98 299 91 295 Q88 286 89 275Z",
+            KNEE_PATH,
             mirrored = true
         ),
         bodyPath(
             "right_calf_shin",
             Color(0xFFE3E8D8),
-            "M91 295 Q98 299 105 295 Q109 307 106 322 Q103 338 102 353 Q98 356 93 353 Q94 339 90 324 Q86 306 91 295Z",
+            CALF_SHIN_PATH,
             mirrored = true
         ),
         bodyPath(
             "right_ankle_foot",
             Color(0xFFE9ECDF),
-            "M93 353 Q98 356 102 353 L103 366 Q105 371 104 375 Q101 379 95 379 L83 379 Q79 378 81 374 L89 365 Q92 361 93 353Z",
+            ANKLE_FOOT_PATH,
             mirrored = true
         ),
         bodyPath(

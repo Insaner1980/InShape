@@ -2,6 +2,57 @@
   "schemaVersion": 1,
   "exceptions": [
     {
+      "id": "inshape-past-workout-submission-identity",
+      "tool": "mobsfscan",
+      "rule": "android_kotlin_hardcoded",
+      "scope": "app/src/main/java/com/emmah/inshape/feature/history/HistoryScreen.kt",
+      "reason": "This fixed local submission ID prevents duplicate creation of a past workout while the save is pending.",
+      "owner": "InShape maintainers",
+      "added": "2026-11-19",
+      "expires": "2027-11-19",
+      "tracking": "Android check: verified local submission and draft identifiers in current source",
+      "sourcePath": "app/src/main/java/com/emmah/inshape/feature/history/HistoryScreen.kt",
+      "selector": "val pastKey = \"create-past-workout\"",
+      "findingPath": "app/src/main/java/com/emmah/inshape/feature/history/HistoryScreen.kt",
+      "findingSelectors": [
+        "key = \"create-past-workout\""
+      ]
+    },
+    {
+      "id": "inshape-workout-note-submission-identity",
+      "tool": "mobsfscan",
+      "rule": "android_kotlin_hardcoded",
+      "scope": "app/src/main/java/com/emmah/inshape/feature/history/HistoryScreen.kt",
+      "reason": "This local submission ID is derived from the workout ID and tracks the note save in the view model.",
+      "owner": "InShape maintainers",
+      "added": "2026-11-19",
+      "expires": "2027-11-19",
+      "tracking": "Android check: verified local submission and draft identifiers in current source",
+      "sourcePath": "app/src/main/java/com/emmah/inshape/feature/history/HistoryScreen.kt",
+      "selector": "val noteKey = \"workout-note:$id\"",
+      "findingPath": "app/src/main/java/com/emmah/inshape/feature/history/HistoryScreen.kt",
+      "findingSelectors": [
+        "key = \"workout-note:$id\""
+      ]
+    },
+    {
+      "id": "inshape-duration-draft-identity",
+      "tool": "mobsfscan",
+      "rule": "android_kotlin_hardcoded",
+      "scope": "app/src/main/java/com/emmah/inshape/feature/workout/WorkoutScreen.kt",
+      "reason": "This local ID uses the current workout item ID to associate its duration draft with the completion operation.",
+      "owner": "InShape maintainers",
+      "added": "2026-11-19",
+      "expires": "2027-11-19",
+      "tracking": "Android check: verified local submission and draft identifiers in current source",
+      "sourcePath": "app/src/main/java/com/emmah/inshape/feature/workout/WorkoutScreen.kt",
+      "selector": "val durationKey = \"duration:${current?.row?.id}\"",
+      "findingPath": "app/src/main/java/com/emmah/inshape/feature/workout/WorkoutScreen.kt",
+      "findingSelectors": [
+        "key = \"duration:${current?.row?.id}\""
+      ]
+    },
+    {
       "id": "inshape-music-header-lazy-item-identity",
       "tool": "mobsfscan",
       "rule": "android_kotlin_hardcoded",

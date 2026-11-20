@@ -1,5 +1,6 @@
 package com.emmah.inshape.feature.music
 
+import com.emmah.inshape.R
 import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
@@ -14,7 +15,9 @@ import androidx.room.withTransaction
 import java.io.IOException
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -23,6 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -35,9 +39,14 @@ data class MusicCatalog(
     val accessLost: Boolean = false
 )
 
-class MusicStore(context: Context, name: String, private val scope: CoroutineScope) {
+class MusicStore(
+    private val context: Context,
+    name: String,
+    private val scope: CoroutineScope,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+) {
     private val resolver = context.contentResolver
-    private val database = Room.databaseBuilder(context, MusicDatabase::class.java, name).build()
+    private val database = Room.databaseBuilder(context, MusicDatabase::class.java, name).addMigrations(musicMigration1To2).build()
     private val dao = database.music()
     private val playlists = database.playlists()
     private val accessCheck = MutableStateFlow(0)
@@ -78,14 +87,13 @@ class MusicStore(context: Context, name: String, private val scope: CoroutineSco
     private fun hasGrant(tree: Uri): Boolean = resolver.persistedUriPermissions.any { it.uri == tree && it.isReadPermission }
 
     fun checkAccess() {
-        accessCheck.value++
+        accessCheck.update { it + 1 }
     }
 
+    @Synchronized
     fun scan(tree: Uri? = null) {
-        if (scanState.value) return
-        scanState.value = true
-        scanMessage.value = null
-        scanJob = scope.launch {
+        if (scanJob != null) return
+        val job = scope.launch(start = CoroutineStart.LAZY) {
             var selected: Uri? = null
             try {
                 selected = tree ?: dao.source()?.tree?.toUri() ?: return@launch
@@ -98,19 +106,30 @@ class MusicStore(context: Context, name: String, private val scope: CoroutineSco
                 selected?.toString()?.let { uri ->
                     if (dao.source()?.tree == uri) unreachableSource = uri
                 }
-                scanMessage.value = "Music folder unavailable. Choose the folder again or try Refresh."
-            } finally {
-                scanState.value = false
-                checkAccess()
+                scanMessage.value = context.getString(R.string.music_folder_unavailable)
             }
         }
+        scanJob = job
+        scanMessage.value = null
+        scanState.value = true
+        job.invokeOnCompletion {
+            synchronized(this) {
+                if (scanJob === job) {
+                    checkAccess()
+                    scanJob = null
+                    scanState.value = false
+                }
+            }
+        }
+        job.start()
     }
 
+    @Synchronized
     fun cancelScan() {
         scanJob?.cancel()
     }
 
-    private suspend fun scanFolder(tree: Uri) = withContext(Dispatchers.IO) {
+    private suspend fun scanFolder(tree: Uri) = withContext(ioDispatcher) {
         require(tree.scheme == ContentResolver.SCHEME_CONTENT && DocumentsContract.isTreeUri(tree))
         val alreadyGranted = hasGrant(tree)
         if (!alreadyGranted) resolver.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -118,8 +137,9 @@ class MusicStore(context: Context, name: String, private val scope: CoroutineSco
             val tracks = readTree(tree)
             check(hasGrant(tree)) { "Music folder permission was revoked" }
             database.withTransaction {
+                val previous = dao.tracks().groupBy { it.tree to it.uri }
                 dao.markUnavailable()
-                dao.saveTracks(tracks)
+                dao.saveTracks(tracks.map { track -> identifyScannedTrack(track, previous[track.tree to track.uri].orEmpty()) })
                 dao.saveSource(MusicSource(tree = tree.toString()))
             }
         } finally {
@@ -150,16 +170,40 @@ class MusicStore(context: Context, name: String, private val scope: CoroutineSco
                 if (stableId !in tracks) {
                     val partial = Build.VERSION.SDK_INT >= 29 && flags and Document.FLAG_PARTIAL != 0
                     val local = !partial && flags and Document.FLAG_VIRTUAL_DOCUMENT == 0
-                    tracks[stableId] = readTrack(tree, uri, stableId, name, local)
+                    val track = readTrack(tree, uri, stableId, name, local)
+                    tracks[stableId] = if (track.available) {
+                        val fingerprint = audioFingerprint(uri)
+                        track.copy(available = fingerprint != null, contentFingerprint = fingerprint)
+                    } else {
+                        track
+                    }
                 }
             }
         }
         return tracks.values.toList()
     }
 
+    private suspend fun audioFingerprint(uri: Uri): String? = try {
+        resolver.openInputStream(uri)?.use { stream ->
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                currentCoroutineContext().ensureActive()
+                val count = stream.read(buffer)
+                if (count < 0) break
+                digest.update(buffer, 0, count)
+            }
+            digest.digest().toHexString()
+        }
+    } catch (_: IOException) {
+        null
+    } catch (_: SecurityException) {
+        null
+    }
+
     private fun readTrack(tree: Uri, uri: Uri, id: String, name: String, local: Boolean): MusicTrack {
         val filename = name.substringBeforeLast('.').ifBlank { name }
-        val fallback = MusicTrack(id, tree.toString(), uri.toString(), filename, "Unknown artist", null, local)
+        val fallback = MusicTrack(id, tree.toString(), uri.toString(), filename, context.getString(R.string.unknown_artist), null, local)
         if (!local) return fallback
         return try {
             resolver.openFileDescriptor(uri, "r")?.use { descriptor ->
@@ -234,11 +278,12 @@ class MusicStore(context: Context, name: String, private val scope: CoroutineSco
         }
     }
 
-    suspend fun create(name: String, selections: List<String>) = database.withTransaction {
+    suspend fun create(name: String, selections: List<String>): String = database.withTransaction {
         require(name.isNotBlank())
         val id = UUID.randomUUID().toString()
         playlists.savePlaylist(MusicPlaylist(id, name.trim()))
         insertMemberships(id, selections)
+        id
     }
 
     suspend fun rename(id: String, name: String) = database.withTransaction {
@@ -263,9 +308,83 @@ class MusicStore(context: Context, name: String, private val scope: CoroutineSco
 
     suspend fun delete(id: String) = playlists.deletePlaylist(id)
 
+    internal suspend fun setEnergy(id: String, energy: String?) {
+        require(energy == null || energy in playlistEnergyLabels)
+        dao.setEnergy(id, energy)
+    }
+
+    internal suspend fun heardInWorkout(workoutId: String): Set<String>? = database.withTransaction {
+        val events = dao.listening(workoutId)
+        if (events.isEmpty()) return@withTransaction null
+        val duration = dao.tracks().associate { it.id to it.durationMs }
+        events.groupBy { it.trackId }.filter { (track, intervals) ->
+            val threshold = minOf(duration[track]?.takeIf { it > 0 } ?: 10_000L, 10_000L)
+            intervals.sumOf { it.playedMs } >= threshold
+        }.keys
+    }
+
+    internal fun recordListening(event: ListeningEvent) {
+        if (event.playedMs <= 0) return
+        scope.launch {
+            try {
+                database.withTransaction {
+                    if ((dao.listeningEvent(event.id)?.playedMs ?: 0L) < event.playedMs) dao.saveListening(event)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Playback remains independent of listening history.
+            }
+        }
+    }
+
+    internal suspend fun confirmPlaylist(
+        commandId: String,
+        tree: String?,
+        previous: SavedPlaylist?,
+        name: String,
+        tracks: List<MusicTrack>
+    ): String = database.withTransaction {
+        val payload = listOf(tree, previous?.id, previous?.name, name, tracks.joinToString { it.id }).joinToString("|")
+        val digest = com.emmah.inshape.feature.assistant.fingerprint(payload)
+        playlists.receipt(commandId)?.let {
+            require(it.digest == digest) { "This playlist was already saved from a different review." }
+            return@withTransaction it.playlistId
+        }
+        require(name.isNotBlank() && tracks.isNotEmpty() && tracks.map { it.id }.distinct().size == tracks.size)
+        val current = readCatalog()
+        require(current.source?.tree == tree && tree != null && current.songs.containsAll(tracks) && tracks.all { it.available }) {
+            "The music folder or selected tracks changed. Review again."
+        }
+        val id = if (previous == null) {
+            create(name, tracks.map { it.id })
+        } else {
+            require(current.playlists.find { it.id == previous.id } == previous) { "The playlist changed. Review again." }
+            rename(previous.id, name)
+            saveOrder(previous.id, tracks.map { it.id })
+            previous.id
+        }
+        playlists.saveReceipt(PlaylistReceipt(commandId, digest, id))
+        id
+    }
+
     fun close() = database.close()
 
     private companion object {
         val audioExtensions = setOf("mp3", "m4a", "aac", "flac", "wav", "ogg", "oga", "opus")
     }
+}
+
+internal fun identifyScannedTrack(scanned: MusicTrack, previous: List<MusicTrack>): MusicTrack {
+    val fingerprint = scanned.contentFingerprint
+    if (fingerprint == null) {
+        val last = previous.firstOrNull { it.available } ?: previous.firstOrNull()
+        return last?.copy(available = false) ?: scanned
+    }
+    val matching = previous.find { it.contentFingerprint == fingerprint }
+        ?: previous.singleOrNull()?.takeIf { it.contentFingerprint == null }
+    if (matching != null) return scanned.copy(id = matching.id, energy = matching.energy)
+    if (previous.isEmpty()) return scanned
+    val id = UUID.nameUUIDFromBytes("${scanned.tree}\n${scanned.uri}\n$fingerprint".encodeToByteArray()).toString()
+    return scanned.copy(id = id)
 }

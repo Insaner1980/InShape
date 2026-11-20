@@ -13,7 +13,6 @@ import com.emmah.inshape.data.newId
 import com.emmah.inshape.health.AndroidHealthGateway
 import com.emmah.inshape.health.HealthCapability
 import com.emmah.inshape.health.HealthContext
-import com.emmah.inshape.health.HealthValue
 import com.emmah.inshape.health.SharedWorkout
 import java.time.Instant
 import java.time.ZoneId
@@ -95,7 +94,7 @@ class HealthProviderTest {
             )
             val strength = client.readRecord(ExerciseSessionRecord::class, first).record
             assertEquals(ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING, strength.exerciseType)
-            assertEquals("Strength training", strength.title)
+            assertEquals(ui(R.string.health_strength_training), strength.title)
             assertEquals(start.atZone(zone).offset, strength.startZoneOffset)
             val correctedEnd = end.plusSeconds(10)
             val second = gateway.upsert(
@@ -111,7 +110,7 @@ class HealthProviderTest {
             assertEquals(first, second)
             val mobility = client.readRecord(ExerciseSessionRecord::class, second).record
             assertEquals(ExerciseSessionRecord.EXERCISE_TYPE_STRETCHING, mobility.exerciseType)
-            assertEquals("Mobility", mobility.title)
+            assertEquals(ui(R.string.category_mobility), mobility.title)
             assertEquals(correctedEnd.toEpochMilli(), mobility.endTime.toEpochMilli())
             assertEquals(correctedEnd.atZone(zone).offset, mobility.endZoneOffset)
             assertEquals(2L, gateway.existingVersion(workout, clientId))
@@ -141,18 +140,11 @@ class HealthProviderTest {
         assertTrue(gateway.grants().containsAll(permissions))
 
         val stepsOnly = gateway.readContext(Preferences(readSteps = true), midnight)
-        assertEquals(HealthContext(steps = HealthValue("No data yet", "2100-06-10, local midnight to 00:00")), stepsOnly)
+        assertEquals(HealthContext(), stepsOnly)
         val allReads = gateway.readContext(
             Preferences(readSteps = true, readSleep = true, readHeartRate = true),
             noon
         )
-        assertEquals(
-            HealthContext(
-                steps = HealthValue("No data yet", "2100-06-10, local midnight to 12:00"),
-                sleep = HealthValue("No data yet", "2100-06-09T18:00 to 2100-06-10T12:00"),
-                heart = HealthValue("No recent data", "Last 24 hours")
-            ),
-            allReads
-        )
+        assertEquals(HealthContext(), allReads)
     }
 }

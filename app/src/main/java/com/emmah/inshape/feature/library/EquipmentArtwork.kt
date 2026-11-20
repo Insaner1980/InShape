@@ -35,6 +35,7 @@ private val catalog = buildMap {
         R.drawable.art_exercises_seated_row,
         Strength,
         "Seated row",
+        "Vaakasoutu laitteessa",
         "Seated cable row",
         "Low cable row",
         "Alatalja",
@@ -44,6 +45,7 @@ private val catalog = buildMap {
         R.drawable.art_exercises_chest_press,
         Strength,
         "Chest press",
+        "Rintapunnerruslaite",
         "Seated chest press",
         "Rintaprässi"
     )
@@ -70,6 +72,7 @@ private val catalog = buildMap {
         "Upright bike",
         "Stationary bike",
         "Warm-up bike",
+        "Lämmittelypyörä",
         "Pystykuntopyörä",
         "Kuntopyörä"
     )
@@ -357,6 +360,7 @@ private val catalog = buildMap {
         R.drawable.art_exercises_stretch_mat,
         Mobility,
         "Hip flexor stretch",
+        "Lonkan koukistajan venytys",
         "Stretch mat",
         "Lonkankoukistajan venytys",
         "Venyttelymatto"

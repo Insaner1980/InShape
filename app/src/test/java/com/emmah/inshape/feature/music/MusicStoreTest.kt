@@ -1,9 +1,12 @@
 package com.emmah.inshape.feature.music
 
+import com.emmah.inshape.R
 import android.content.Intent
 import android.os.Bundle
 import android.provider.DocumentsContract
 import androidx.room.Room
+import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -26,6 +29,37 @@ import org.robolectric.fakes.BaseCursor
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class MusicStoreTest {
+    @Test
+    fun cancellingBeforeDispatchReleasesTheScan() {
+        val context = RuntimeEnvironment.getApplication()
+        val databaseName = "music-scan-cancellation-test.db"
+        val tasks = ArrayDeque<Runnable>()
+        val dispatcher = object : CoroutineDispatcher() {
+            override fun dispatch(context: CoroutineContext, block: Runnable) {
+                tasks.addLast(block)
+            }
+        }
+        val job = Job()
+        val store = MusicStore(context, databaseName, CoroutineScope(job + dispatcher))
+        fun runDispatchedTasks() {
+            while (tasks.isNotEmpty()) tasks.removeFirst().run()
+        }
+        try {
+            repeat(2) {
+                store.scan()
+                assertTrue(store.scanning.value)
+                store.cancelScan()
+                runDispatchedTasks()
+                assertFalse(store.scanning.value)
+            }
+        } finally {
+            job.cancel()
+            runDispatchedTasks()
+            store.close()
+            context.deleteDatabase(databaseName)
+        }
+    }
+
     @Test
     fun incompleteFolderListingCanBeRefreshedWhileReadGrantRemains() = runBlocking {
         val context = RuntimeEnvironment.getApplication()
@@ -55,7 +89,7 @@ class MusicStoreTest {
                 store.scan()
                 val incomplete = store.catalog.first { it.songs.singleOrNull()?.available == false }
                 assertFalse("Refresh must stay enabled while the read grant exists", incomplete.accessLost)
-                assertTrue(store.message.value.orEmpty().contains("try Refresh"))
+                assertEquals(context.getString(R.string.music_folder_unavailable), store.message.value)
                 assertEquals(listOf(track), store.resolve(listOf(track.id)))
 
                 shadowOf(resolver).setCursor(children, FolderCursor(loading = false))

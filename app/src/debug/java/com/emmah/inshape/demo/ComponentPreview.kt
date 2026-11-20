@@ -1,7 +1,10 @@
 package com.emmah.inshape.demo
 
+import androidx.compose.ui.res.stringResource
+import com.emmah.inshape.R
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.Surface
 import androidx.compose.material3.TextField
@@ -37,6 +40,8 @@ import com.emmah.inshape.ui.components.TextField
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.ThemeMode
 
+private const val LAT_PULLDOWN = "Ylätalja"
+
 @Preview(widthDp = 390, heightDp = 1000)
 @Preview(widthDp = 320, heightDp = 1000, fontScale = 2f)
 @Composable
@@ -55,47 +60,49 @@ private fun DarkComponents() {
 fun ComponentPreview(mode: ThemeMode, modifier: Modifier = Modifier) {
     InShapeTheme(mode) {
         Surface(modifier) {
-            Page(bottomBar = { PrimaryButton("Save", {}, Modifier.fillMaxWidth()) }) {
-                ScreenHeader("Components", trailing = {
-                    IconCircleButton(Icons.Outlined.Add, "Add", {})
+            Page(bottomBar = { PrimaryButton(stringResource(R.string.save), {}, Modifier.fillMaxWidth()) }) {
+                ScreenHeader("Komponentit", trailing = {
+                    IconCircleButton(Icons.Outlined.Add, "Lisää", {})
                 })
-                SectionHeader("Section", action = "See all", onAction = {})
-                GroupLabel("Group")
+                SectionHeader("Osio", trailing = {
+                    TextAction("Näytä kaikki", {}, icon = Icons.AutoMirrored.Outlined.List)
+                })
+                GroupLabel("Ryhmä")
                 InShapeCard(color = InShapeTheme.colors.ink) {
-                    PrimaryButton("Start workout", {}, icon = Icons.Outlined.Add, inverted = true)
+                    PrimaryButton(stringResource(R.string.start_workout), {}, icon = Icons.Outlined.Add, inverted = true)
                 }
                 ListCard {
                     item {
-                        ListRow("Workout", subtitle = "Recorded today", onClick = {})
+                        ListRow("Treeni", subtitle = "Kirjattu tänään", onClick = {})
                     }
                     item {
-                        ListRow("Lat pulldown", leading = {
-                            InitialsTile("Lat pulldown")
-                        }, trailing = { Pill("Done", tone = PillTone.Accent) })
+                        ListRow(LAT_PULLDOWN, leading = {
+                            InitialsTile(LAT_PULLDOWN)
+                        }, trailing = { Pill(stringResource(R.string.done), tone = PillTone.Accent) })
                     }
                 }
                 ActionRow {
-                    PrimaryButton("Primary", {})
-                    OutlineButton("Secondary", {})
-                    OutlineButton("Outline", {})
-                    TextAction("Action", {})
+                    PrimaryButton("Ensisijainen", {})
+                    OutlineButton("Toissijainen", {})
+                    OutlineButton("Reunus", {})
+                    TextAction("Toiminto", {}, icon = Icons.Outlined.Add)
                 }
                 ActionRow {
-                    Pill("Neutral")
-                    Pill("Accent", tone = PillTone.Accent)
-                    FilterPill("Filter", true, {})
+                    Pill("Neutraali")
+                    Pill("Korostus", tone = PillTone.Accent)
+                    FilterPill("Suodatin", true, {})
                 }
-                SegmentedControl(listOf("System", "Light", "Dark"), 0, {})
-                SelectField("Exercise", "Lat pulldown", listOf("Lat pulldown"), {})
-                SelectField("Exercise", "Lat pulldown", listOf("Lat pulldown"), {}, inline = true)
-                TextField("", "Note", {})
+                SegmentedControl(listOf("Järjestelmä", "Vaalea", "Tumma"), 0, {})
+                SelectField(stringResource(R.string.exercise), LAT_PULLDOWN, listOf(LAT_PULLDOWN), {})
+                SelectField(stringResource(R.string.exercise), LAT_PULLDOWN, listOf(LAT_PULLDOWN), {}, inline = true)
+                TextField("", stringResource(R.string.note), {})
                 NumberField("27.5", {}, "kg", decimal = true)
-                NumberField("10", {}, "Reps", compact = true)
-                SearchField("", {}, "Search exercises")
-                InShapeSwitch(true, {}, "Reminder")
-                Stepper("3", {}, {}, true, "Decrease", "Increase")
-                ProgressSegments(ProgressState.entries, "1 of 3 done")
-                EmptyState("No workouts", "Start when you are ready", action = "Create routine", onAction = {})
+                NumberField("10", {}, stringResource(R.string.reps), compact = true)
+                SearchField("", {}, stringResource(R.string.search_exercises))
+                InShapeSwitch(true, {}, "Muistutus")
+                Stepper("3", {}, {}, true, "Vähennä", "Lisää")
+                ProgressSegments(ProgressState.entries, "1/3 tehty")
+                EmptyState("Ei treenejä", "Aloita, kun olet valmis", action = stringResource(R.string.create_routine), onAction = {})
             }
         }
     }

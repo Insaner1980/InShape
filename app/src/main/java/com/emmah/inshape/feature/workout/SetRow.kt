@@ -101,12 +101,13 @@ fun SetRow(
     highlighted: Boolean = false,
     onRemove: () -> Unit = {}
 ) {
-    var load by rememberSaveable(set.id, set.suggestedLoad) { mutableStateOf(set.rawLoad) }
-    var reps by rememberSaveable(set.id) { mutableStateOf(set.rawReps) }
+    val complete = set.completedAt != null
+    // Reopening a completed set starts from the saved values, including assistant changes.
+    var load by rememberSaveable(set.id, set.suggestedLoad, complete) { mutableStateOf(set.rawLoad) }
+    var reps by rememberSaveable(set.id, complete) { mutableStateOf(set.rawReps) }
     var editing by remember { mutableStateOf(false) }
     var correctionSession by remember { mutableIntStateOf(0) }
     var menu by remember { mutableStateOf(false) }
-    val complete = set.completedAt != null
     val unit = stringResource(MeasurementBasis.fromKey(basis).columnLabel)
     val colors = InShapeTheme.colors
 
@@ -265,8 +266,6 @@ fun SetRow(
                     val submittedSession = correctionSession
                     vm.write {
                         correctCompletedSet(set.id, submittedLoad, submittedReps, submittedRir)
-                        load = submittedLoad
-                        reps = submittedReps
                         val sameDialog = editing && correctionSession == submittedSession
                         if (sameDialog && correctionLoad == submittedLoad && correctionReps == submittedReps && correctionRir == submittedRir) {
                             editing = false

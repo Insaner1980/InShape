@@ -225,7 +225,7 @@ private suspend fun JournalRepository.applyReviewedSets(item: WorkoutItem, propo
             row.id
         }
         val saved = dao.sets().first { it.id == id }
-        dao.put(saved.copy(rir = value.rir, perSide = value.perSide))
+        dao.put(saved.copy(rir = value.rir, perSide = value.perSide ?: saved.perSide))
         id
     }
 }

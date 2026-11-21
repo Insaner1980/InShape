@@ -4,6 +4,7 @@ import com.emmah.inshape.testContext
 import com.emmah.inshape.data.AssistantDraft
 import com.emmah.inshape.data.Exercise
 import com.emmah.inshape.data.JournalRepository
+import com.emmah.inshape.data.PlannedReps
 import com.emmah.inshape.data.StartSource
 import com.emmah.inshape.data.createTestDatabase
 import com.emmah.inshape.data.newId
@@ -19,6 +20,32 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class WorkoutReviewPersistenceTest {
+    @Test fun assistantLogInheritsPlannedSideUnlessExplicitlyOverridden() = runBlocking {
+        val db = createTestDatabase()
+        try {
+            val repo = JournalRepository(db, Clock.systemUTC(), testContext())
+            val exercise = Exercise(name = "Fixture split squat")
+            repo.saveExercise(exercise)
+            val workoutId = repo.startWorkout(StartSource.Empty)
+            val itemId = repo.addExercise(workoutId, exercise.id)
+            val ids = List(2) { repo.addSet(itemId) }
+            val dao = db.journal()
+            dao.sets().filter { it.id in ids }.forEach { set ->
+                dao.put(set.copy(plannedReps = PlannedReps(8, 12, perSide = true)))
+            }
+            val command = AssistantDraft("fixture", newId(), "Fixture")
+            dao.put(command)
+            val proposed = listOf(ReviewedSet("20", "10"), ReviewedSet("20", "10", perSide = false))
+            val revision = requireNotNull(repo.snapshot().active).row.revision
+            val review = WorkoutReviewDraft(revision, workoutId, itemId, null, WorkoutReview("log", proposed))
+
+            assertEquals(ids, repo.confirmWorkoutReview(command, review))
+            assertEquals(listOf(true, false), repo.snapshot().active!!.items.single().completedSets.map { it.perSide })
+        } finally {
+            db.close()
+        }
+    }
+
     @Test fun staleReviewWritesNothingAndRepeatedConfirmationReturnsTheSameSets() = runBlocking {
         val db = createTestDatabase()
         try {

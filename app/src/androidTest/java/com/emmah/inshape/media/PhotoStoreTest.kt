@@ -1,5 +1,7 @@
 package com.emmah.inshape.media
 
+import com.emmah.inshape.R
+import com.emmah.inshape.quantity
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
@@ -78,7 +80,7 @@ class PhotoStoreTest {
         }
     }
 
-    @Test fun retryingASelectedBatchKeepsEachPhotoOnce() = runBlocking {
+    @Test fun invalidPhotoDoesNotBlockASelectedBatchAndRetryKeepsEachPhotoOnce() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "photo-retry-${newId()}"
         val container = AppContainer(context, databaseName = "$name.db")
@@ -90,19 +92,23 @@ class PhotoStoreTest {
             val exercise = Exercise(name = "Machine")
             container.repository.saveExercise(exercise)
             val first = File(directory, "first.png")
+            val invalid = File(directory, "invalid.txt").apply { writeText("not an image") }
             val second = File(directory, "second.png")
             val bitmap = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888)
             first.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
             bitmap.recycle()
 
-            vm.importExercisePhotos(exercise.id, listOf(Uri.fromFile(first), Uri.fromFile(second)))
+            vm.importExercisePhotos(exercise.id, listOf(Uri.fromFile(first), Uri.fromFile(invalid), Uri.fromFile(second)))
             val failure = withTimeout(5_000) { vm.saveState.filterIsInstance<SaveState.Failed>().first() }
             assertTrue(failure.retryable)
             val importedFirst = container.database.journal().photos().single()
 
             first.copyTo(second)
             vm.retry()
-            withTimeout(5_000) { vm.saveState.first { it == SaveState.Saved } }
+            val rejected = withTimeout(5_000) {
+                vm.saveState.filterIsInstance<SaveState.Failed>().first { !it.retryable }
+            }
+            assertEquals(quantity(R.plurals.photo_import_failed, 1), rejected.message)
             val photos = container.database.journal().photos()
             assertEquals(listOf(0, 1), photos.map { it.position })
             assertEquals(importedFirst, photos.first())

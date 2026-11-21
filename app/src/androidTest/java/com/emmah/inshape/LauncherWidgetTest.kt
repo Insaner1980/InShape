@@ -40,7 +40,7 @@ class LauncherWidgetTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val repository = (context.applicationContext as InShapeApplication).container.repository
         val before = repository.snapshot().workouts
-        val expectedAction = if (repository.snapshot().active == null) "Start" else "Resume workout"
+        val expectedAction = ui(if (repository.snapshot().active == null) R.string.start_workout else R.string.resume_workout)
         val intent = Intent(context, MainActivity::class.java)
             .setAction(MainActivity.START_OR_RESUME)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -93,9 +93,9 @@ class LauncherWidgetTest {
 
     private fun clickWidgetAction(requireActive: Boolean = false): Boolean {
         val clicked = if (requireActive) {
-            clickPlatformText("In progress")
+            clickPlatformText(ui(R.string.workout_in_progress))
         } else {
-            clickPlatformText("Start", "In progress", "Start workout", "Resume workout")
+            clickPlatformText(ui(R.string.start), ui(R.string.workout_in_progress), ui(R.string.start_workout), ui(R.string.resume_workout))
         }
         if (clicked) return true
         swipeLauncherPage()
@@ -146,11 +146,11 @@ class LauncherWidgetTest {
         )
         compose.waitUntil(30_000) {
             compose.onAllNodesWithContentDescription(
-                "Settings"
+                ui(R.string.settings)
             ).fetchSemanticsNodes().isNotEmpty()
         }
         if (manager.getAppWidgetIds(component).isEmpty()) {
-            compose.onNodeWithContentDescription("Settings").performClick()
+            compose.onNodeWithContentDescription(ui(R.string.settings)).performClick()
             compose.onNodeWithText("Home screen widget").performScrollTo().performClick()
             waitFor(30_000) {
                 clickPlatformText(
@@ -169,29 +169,25 @@ class LauncherWidgetTest {
                 ).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             )
         }
-        home()
-        waitFor { clickWidgetAction() }
-        // Advance Compose's test clock so the widget intent's LaunchedEffect runs.
-        compose.waitUntil(30_000) { runBlocking { repository.snapshot().active != null } }
-        val first =
-            repository
-                .snapshot()
-                .active!!
-                .row.id
-        home()
-        waitFor { clickWidgetAction(requireActive = true) }
-        compose.waitUntil(30_000) {
-            automation.rootInActiveWindow?.packageName ==
-                context.packageName
+        val before = repository.snapshot()
+        assumeTrue("Widget start requires no active workout", before.active == null)
+        val existingWorkoutIds = before.workouts.map { it.id }.toSet()
+        var startedWorkoutId: String? = null
+        try {
+            home()
+            waitFor { clickWidgetAction() }
+            // Advance Compose's test clock so the widget intent's LaunchedEffect runs.
+            compose.waitUntil(30_000) { runBlocking { repository.snapshot().active != null } }
+            val first = checkNotNull(repository.snapshot().active).row.id
+            startedWorkoutId = first
+            home()
+            waitFor { clickWidgetAction(requireActive = true) }
+            compose.waitUntil(30_000) { automation.rootInActiveWindow?.packageName == context.packageName }
+            compose.waitForIdle()
+            assertEquals(first, repository.snapshot().active?.row?.id)
+        } finally {
+            val created = startedWorkoutId ?: repository.snapshot().active?.row?.id
+            if (created != null && created !in existingWorkoutIds) repository.deleteWorkout(created)
         }
-        compose.waitForIdle()
-        assertEquals(
-            first,
-            repository
-                .snapshot()
-                .active!!
-                .row.id
-        )
-        repository.deleteWorkout(first)
     }
 }

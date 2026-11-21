@@ -1,11 +1,15 @@
 package com.emmah.inshape.feature.library
 
+import com.emmah.inshape.ui
+import org.robolectric.RobolectricTestRunner
+import org.junit.runner.RunWith
 import com.emmah.inshape.R
 import com.emmah.inshape.data.Exercise
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
+@RunWith(RobolectricTestRunner::class)
 class EquipmentArtworkTest {
     @Test fun catalogReachesEveryIllustration() {
         val aliases = mapOf(
@@ -72,6 +76,15 @@ class EquipmentArtworkTest {
             "Band pulldown, home" to R.drawable.art_exercises_band_pulldown
         )
         cases.forEach { (name, id) -> assertEquals(name, id, equipmentArtwork("", name)?.drawable) }
+        val finnish = listOf(
+            R.string.exercise_warm_up_bike, R.string.exercise_leg_press, R.string.exercise_seated_row,
+            R.string.exercise_chest_press, R.string.exercise_lat_pulldown, R.string.exercise_leg_curl,
+            R.string.exercise_hip_flexor_stretch, R.string.exercise_shoulder_mobility,
+            R.string.exercise_assisted_pull_up, R.string.exercise_band_pulldown
+        )
+        finnish.zip(cases.values).forEach { (text, drawable) ->
+            assertEquals(drawable, equipmentArtwork("", ui(text))?.drawable)
+        }
     }
 
     @Test fun equipmentNamePrecedesExerciseAndMatchingUsesWholeNormalizedNames() {

@@ -6,40 +6,41 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
-import com.emmah.inshape.InShapeApplication
+import androidx.core.content.edit
 import com.emmah.inshape.MainActivity
 import com.emmah.inshape.R
 import com.emmah.inshape.data.Preferences
-import com.emmah.inshape.feature.workout.ActiveWorkoutNotifier
-import com.emmah.inshape.feature.workout.activeNotice
 import java.time.DayOfWeek
 import java.time.LocalTime
 import java.time.ZonedDateTime
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
+import java.util.UUID
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 class ReminderScheduler(private val context: Context) {
-    suspend fun reconcile(deliver: Boolean = false, readPreferences: suspend () -> Preferences) = schedulingLock.withLock {
+    suspend fun reconcile(
+        occurrence: String? = null,
+        reschedule: Boolean = false,
+        now: ZonedDateTime? = null,
+        readPreferences: suspend () -> Preferences
+    ) = schedulingLock.withLock {
         val settings = readPreferences()
-        if (deliver) deliver(settings)
-        apply(settings)
+        apply(settings, now ?: ZonedDateTime.now(), occurrence, reschedule)
     }
+
     private val notifications = context.getSystemService(NotificationManager::class.java)
     private val alarms = context.getSystemService(AlarmManager::class.java)
+    private val scheduled = context.getSharedPreferences("workout_reminder_schedule", Context.MODE_PRIVATE)
     init {
         notifications.createNotificationChannel(
             NotificationChannel(
                 CHANNEL,
-                "Workout reminders",
+                context.getString(R.string.workout_reminders),
                 NotificationManager.IMPORTANCE_DEFAULT
             )
         )
@@ -52,40 +53,73 @@ class ReminderScheduler(private val context: Context) {
                 context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
                 PackageManager.PERMISSION_GRANTED
             )
-    private fun alarmIntent() = PendingIntent.getBroadcast(
+    private fun alarmIntent(occurrence: String?, flags: Int) = PendingIntent.getBroadcast(
         context,
         41,
-        Intent(context, ReminderReceiver::class.java),
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        Intent(context, ReminderReceiver::class.java).apply {
+            if (occurrence != null) data = Uri.fromParts("inshape-reminder", occurrence, null)
+        },
+        flags or PendingIntent.FLAG_IMMUTABLE
     )
+
+    private fun cancelScheduledAlarm() {
+        // A null occurrence matches the alarm used by earlier versions.
+        alarmIntent(scheduled.getString(OCCURRENCE, null), PendingIntent.FLAG_NO_CREATE)?.let {
+            alarms.cancel(it)
+            it.cancel()
+        }
+        scheduled.edit(commit = true) { clear() }
+    }
+
     fun cancel() {
-        alarms.cancel(alarmIntent())
+        cancelScheduledAlarm()
         notifications.cancel(41)
     }
-    fun apply(settings: Preferences, now: ZonedDateTime = ZonedDateTime.now()) {
-        alarms.cancel(alarmIntent())
-        if (!settings.remindersEnabled || settings.remindersHeld ||
-            !allowed()
-        ) {
-            notifications.cancel(41)
+
+    fun apply(settings: Preferences, now: ZonedDateTime = ZonedDateTime.now()) = apply(settings, now, null, false)
+
+    private fun apply(settings: Preferences, now: ZonedDateTime, delivered: String?, reschedule: Boolean) {
+        if (!settings.hasReminderSchedule() || !allowed()) {
+            cancel()
             return
         }
-        val next =
-            nextReminder(
-                settings.reminderDays.map(DayOfWeek::of).toSet(),
-                LocalTime.parse(settings.reminderTime),
-                now
-            )
-                ?: return
+        val days = settings.reminderDays.map(DayOfWeek::of).toSortedSet()
+        val time = LocalTime.parse(settings.reminderTime)
+        val schedule = "${days.joinToString()},$time,${now.zone.id}"
+        val occurrence = scheduled.getString(OCCURRENCE, null)
+        if (!reschedule && occurrence != null && scheduled.getString(SCHEDULE, null) == schedule) {
+            if (delivered != occurrence) {
+                if (alarmIntent(occurrence, PendingIntent.FLAG_NO_CREATE) == null) {
+                    // Recreate the same occurrence if Android has discarded its intent.
+                    setAlarm(occurrence, scheduled.getLong(TRIGGER, now.toInstant().toEpochMilli()))
+                }
+                return
+            }
+            deliver(settings)
+        }
+        cancelScheduledAlarm()
+        val next = if (allowed()) nextReminder(days, time, now) else null
+        val trigger = next?.toInstant()?.toEpochMilli() ?: return
+        val nextOccurrence = UUID.randomUUID().toString()
+        setAlarm(nextOccurrence, trigger)
+        scheduled.edit(commit = true) {
+            putString(OCCURRENCE, nextOccurrence)
+            putString(SCHEDULE, schedule)
+            putLong(TRIGGER, trigger)
+        }
+    }
+
+    private fun setAlarm(occurrence: String, trigger: Long) {
         alarms.setAndAllowWhileIdle(
             AlarmManager.RTC_WAKEUP,
-            next.toInstant().toEpochMilli(),
-            alarmIntent()
+            trigger,
+            checkNotNull(alarmIntent(occurrence, PendingIntent.FLAG_UPDATE_CURRENT))
         )
     }
+    private fun Preferences.hasReminderSchedule(): Boolean = remindersEnabled && !remindersHeld && reminderDays.isNotEmpty()
+
     fun deliver(settings: Preferences) {
-        val configured = settings.remindersEnabled && !settings.remindersHeld && settings.reminderDays.isNotEmpty()
-        if (!configured || !allowed()) {
+        if (!settings.hasReminderSchedule() || !allowed()) {
             return
         }
         val open = PendingIntent.getActivity(
@@ -100,8 +134,8 @@ class ReminderScheduler(private val context: Context) {
                 41,
                 Notification.Builder(context, CHANNEL).setSmallIcon(R.drawable.ic_launcher)
                     .setContentTitle(
-                        "A little time for yourself"
-                    ).setContentText("Open InShape when you are ready for a workout.")
+                        context.getString(R.string.reminder_title)
+                    ).setContentText(context.getString(R.string.reminder_text))
                     .setContentIntent(open).setAutoCancel(true).build()
             )
         } catch (_: SecurityException) {
@@ -110,49 +144,9 @@ class ReminderScheduler(private val context: Context) {
     }
     companion object {
         private val schedulingLock = Mutex()
+        private const val OCCURRENCE = "occurrence"
+        private const val SCHEDULE = "schedule"
+        private const val TRIGGER = "trigger"
         const val CHANNEL = "workout_reminders"
-    }
-}
-
-class ReminderReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        val pending = goAsync()
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                ReminderScheduler(context).reconcile(deliver = true) {
-                    (context.applicationContext as InShapeApplication).container.repository.snapshot().preferences
-                }
-            } finally {
-                pending.finish()
-            }
-        }
-    }
-}
-
-class ScheduleChangeReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        when (intent.action) {
-            Intent.ACTION_BOOT_COMPLETED,
-            Intent.ACTION_TIME_CHANGED,
-            Intent.ACTION_TIMEZONE_CHANGED,
-            Intent.ACTION_MY_PACKAGE_REPLACED -> Unit
-
-            else -> return
-        }
-        com.emmah.inshape.widget.WidgetUpdater.enqueue(context)
-        val pending = goAsync()
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val container = (context.applicationContext as InShapeApplication).container
-                if (container.integrationsEnabled) ActiveWorkoutNotifier(context).reconcile(container.repository.snapshot().activeNotice())
-                ReminderScheduler(
-                    context
-                ).reconcile {
-                    (context.applicationContext as InShapeApplication).container.repository.snapshot().preferences
-                }
-            } finally {
-                pending.finish()
-            }
-        }
     }
 }

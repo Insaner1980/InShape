@@ -1,6 +1,10 @@
 package com.emmah.inshape.ui.components
 
-import android.text.format.DateFormat
+import com.emmah.inshape.ui.theme.longDate
+import java.util.Locale
+import com.emmah.inshape.ui.theme.finnishLocale
+import androidx.compose.ui.res.stringResource
+import com.emmah.inshape.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -14,6 +18,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerFormatter
@@ -48,13 +54,14 @@ import androidx.compose.ui.window.DialogProperties
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
-import com.emmah.inshape.ui.theme.displayDate
+import com.emmah.inshape.ui.theme.monthTitle
+import com.emmah.inshape.ui.theme.shortDate
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.OffsetTime
+import java.time.YearMonth
 import java.time.ZoneOffset
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,7 +77,7 @@ fun RecordedTimePicker(
     val time = runCatching { LocalTime.parse(initial.take(5)) }.getOrDefault(LocalTime.NOON)
     val width = LocalWindowInfo.current.containerDpSize.width
     val compact = width < Dimens.pickerWidth || LocalDensity.current.fontScale > 1.3f
-    val uses24Hours = DateFormat.is24HourFormat(LocalContext.current)
+    val uses24Hours = true
     val state = rememberTimePickerState(time.hour, time.minute, uses24Hours)
     val chosenTime = LocalTime.of(state.hour, state.minute)
     val overlapOffsets = validOffsetsAt(chosenTime).takeIf { it.size > 1 }.orEmpty()
@@ -80,7 +87,7 @@ fun RecordedTimePicker(
     }
     val confirm: @Composable () -> Unit = {
         DialogAction(
-            "Done",
+            stringResource(R.string.done),
             {
                 val local = chosenTime.toString()
                 val offset = selectedOffset
@@ -99,7 +106,7 @@ fun RecordedTimePicker(
                 TimePicker(state)
             }
             if (overlapOffsets.isNotEmpty()) {
-                Text("This time occurred twice. Choose its UTC offset.", Modifier.padding(top = Dimens.itemGap))
+                Text(stringResource(R.string.time_occurred_twice), Modifier.padding(top = Dimens.itemGap))
                 Column(Modifier.selectableGroup()) {
                     overlapOffsets.forEach { offset ->
                         val selected = selectedOffset == offset
@@ -130,17 +137,25 @@ private fun String.pickerDate(): LocalDate? = runCatching { LocalDate.parse(this
 @Composable
 private fun calendarDateFormatter(): DatePickerFormatter {
     val compact = LocalWindowInfo.current.containerDpSize.width < Dimens.pickerWidth && LocalDensity.current.fontScale >= 1.3f
-    return DatePickerDefaults.dateFormatter(
-        yearSelectionSkeleton = if (compact) "yMMM" else DatePickerDefaults.YearMonthSkeleton
-    )
+    return remember(compact) {
+        val defaults = DatePickerDefaults.dateFormatter(yearSelectionSkeleton = "yMMM")
+        object : DatePickerFormatter by defaults {
+            override fun formatMonthYear(monthMillis: Long?, locale: Locale): String? =
+                if (compact) defaults.formatMonthYear(monthMillis, locale)
+                else monthMillis?.let { YearMonth.from(it.pickerDay()).monthTitle() }
+
+            override fun formatDate(dateMillis: Long?, locale: Locale, forContentDescription: Boolean): String? =
+                dateMillis?.pickerDay()?.let { if (forContentDescription) it.longDate() else it.shortDate() }
+        }
+    }
 }
 
 @Composable
 private fun DateHeading(title: String, days: List<LocalDate>) {
     Column(Modifier.padding(horizontal = Dimens.screenPadding, vertical = Dimens.itemGap)) {
-        Text(title, style = MaterialTheme.typography.labelMedium)
+        Text(title, style = MaterialTheme.typography.labelSmall)
         if (days.isNotEmpty()) {
-            Text(days.joinToString(" to ") { it.displayDate("EEE d MMM yyyy") }, style = MaterialTheme.typography.titleMedium)
+            Text(days.joinToString("–") { it.shortDate() }, style = MaterialTheme.typography.titleMedium)
         }
     }
 }
@@ -154,17 +169,17 @@ fun RecordedDatePicker(
     onDate: (String) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    confirm: String = "Done"
+    confirm: String = stringResource(R.string.done)
 ) {
     val date = initial.pickerDate() ?: fallback.pickerDate() ?: LocalDate.now()
     val state = rememberSaveable(
         date,
         saver = listSaver<DatePickerState, Long?>(
             save = { listOf(it.selectedDateMillis, it.displayedMonthMillis) },
-            restore = { DatePickerState(Locale.UK, initialSelectedDateMillis = it[0], initialDisplayedMonthMillis = it[1]) }
+            restore = { DatePickerState(finnishLocale, initialSelectedDateMillis = it[0], initialDisplayedMonthMillis = it[1]) }
         )
     ) {
-        DatePickerState(Locale.UK, initialSelectedDateMillis = date.pickerMillis())
+        DatePickerState(finnishLocale, initialSelectedDateMillis = date.pickerMillis())
     }
     PickerDialog(onDismiss, modifier = modifier, confirm = {
         DialogAction(
@@ -192,7 +207,8 @@ fun RecordedDateRangePicker(
     today: LocalDate,
     onRange: (LocalDate, LocalDate) -> Unit,
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onAllWorkouts: (() -> Unit)? = null
 ) {
     val from = start.pickerDate()
     val to = end.pickerDate()
@@ -204,7 +220,7 @@ fun RecordedDateRangePicker(
             save = { listOf(it.selectedStartDateMillis, it.selectedEndDateMillis, it.displayedMonthMillis) },
             restore = {
                 DateRangePickerState(
-                    Locale.UK,
+                    finnishLocale,
                     initialSelectedStartDateMillis = it[0],
                     initialSelectedEndDateMillis = it[1],
                     initialDisplayedMonthMillis = it[2]
@@ -212,18 +228,19 @@ fun RecordedDateRangePicker(
             }
         )
     ) {
+        val initialStart = from ?: today
         DateRangePickerState(
-            Locale.UK,
-            initialSelectedStartDateMillis = (from ?: today).pickerMillis(),
-            initialSelectedEndDateMillis = to?.pickerMillis(),
-            initialDisplayedMonthMillis = (from ?: today).pickerMillis()
+            finnishLocale,
+            initialSelectedStartDateMillis = initialStart.pickerMillis(),
+            initialSelectedEndDateMillis = to?.takeUnless { it.isBefore(initialStart) }?.pickerMillis(),
+            initialDisplayedMonthMillis = initialStart.pickerMillis()
         )
     }
     val selectedStart = state.selectedStartDateMillis?.pickerDay()
     val selectedEnd = state.selectedEndDateMillis?.pickerDay()
     PickerDialog(onDismiss, modifier = modifier, fullHeight = true, confirm = {
         DialogAction(
-            "Apply",
+            stringResource(R.string.apply),
             { if (selectedStart != null && selectedEnd != null) onRange(selectedStart, selectedEnd) },
             enabled = selectedStart != null && selectedEnd != null
         )
@@ -232,7 +249,17 @@ fun RecordedDateRangePicker(
             state,
             Modifier.weight(1f),
             dateFormatter = calendarDateFormatter(),
-            title = { DateHeading("Select period", listOfNotNull(selectedStart, selectedEnd)) },
+            title = {
+                Column {
+                    DateHeading(stringResource(R.string.select_period), listOfNotNull(selectedStart, selectedEnd))
+                    if (onAllWorkouts != null && from != null && to != null) {
+                        TextAction(
+                            stringResource(R.string.all_workouts), onAllWorkouts, Modifier.padding(horizontal = Dimens.screenPadding),
+                            icon = Icons.Outlined.CalendarMonth
+                        )
+                    }
+                }
+            },
             headline = null,
             showModeToggle = false
         )
@@ -265,7 +292,7 @@ private fun PickerDialog(
                     horizontalArrangement = Arrangement.spacedBy(Dimens.itemGap, Alignment.End),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    DialogAction("Cancel", onDismiss)
+                    DialogAction(stringResource(R.string.cancel), onDismiss)
                     confirm()
                 }
             }

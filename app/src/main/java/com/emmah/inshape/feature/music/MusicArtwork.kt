@@ -37,6 +37,7 @@ import com.emmah.inshape.R
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeTheme
 import java.io.IOException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -80,17 +81,21 @@ internal fun playlistCover(playlist: SavedPlaylist): MusicCover {
 }
 
 @Composable
-private fun resolvedCover(uris: List<String>, fallback: MusicCover.Bundled): MusicCover {
+internal fun resolvedCover(
+    uris: List<String>,
+    fallback: MusicCover.Bundled,
+    ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+): MusicCover {
     if (uris.isEmpty()) return fallback
     val context = LocalContext.current.applicationContext
     val revision by generation.collectAsState()
-    return key(uris, fallback, context, revision) {
+    return key(uris, fallback, context, revision, ioDispatcher) {
         val artwork by produceState<MusicCover>(MusicCover.Loading) {
-            value = withContext(Dispatchers.IO) {
+            value = withContext(ioDispatcher) {
                 uris.firstNotNullOfOrNull { uri ->
                     decoders.withPermit {
                         val cacheKey = ArtKey(uri, revision)
-                        val cached = artCache.get(cacheKey)
+                        val cached = artCache[cacheKey]
                         if (cached != null) {
                             cached.cover
                         } else {
@@ -107,7 +112,7 @@ private fun resolvedCover(uris: List<String>, fallback: MusicCover.Bundled): Mus
 }
 
 @Composable
-internal fun MusicArtwork(uri: String?, size: Dp, modifier: Modifier = Modifier, whenMissing: (@Composable () -> Unit)? = null) {
+internal fun MusicArtwork(uri: String?, size: Dp, modifier: Modifier = Modifier) {
     val packageName = LocalContext.current.packageName
     val bundled = remember(uri, packageName) {
         val resource = uri?.toUri()
@@ -119,18 +124,14 @@ internal fun MusicArtwork(uri: String?, size: Dp, modifier: Modifier = Modifier,
         }
     }
     val cover = bundled ?: resolvedCover(listOfNotNull(uri), grooves)
-    if (whenMissing != null && (cover == grooves || cover == MusicCover.Loading)) {
-        whenMissing()
-    } else {
-        MusicArtwork(cover, size, modifier)
-    }
+    MusicArtwork(cover, size, modifier)
 }
 
 @Composable
 internal fun MusicArtwork(cover: MusicCover, size: Dp, modifier: Modifier = Modifier) {
     val tile = modifier.size(size).clip(RoundedCornerShape(Dimens.innerSmall))
     when (cover) {
-        MusicCover.Loading -> Box(tile.background(InShapeTheme.colors.surfaceStrong), contentAlignment = Alignment.Center) {
+        MusicCover.Loading -> Box(tile.background(InShapeTheme.colors.surface), contentAlignment = Alignment.Center) {
             Icon(Icons.Filled.MusicNote, null, Modifier.size(Dimens.icon), tint = InShapeTheme.colors.textSecondary)
         }
 

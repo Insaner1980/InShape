@@ -1,10 +1,10 @@
 package com.emmah.inshape.feature.music
 
+import com.emmah.inshape.ui.theme.Dimens
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -21,79 +21,33 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onVisibilityChanged
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.emmah.inshape.ui.theme.InShapeTheme
 import kotlin.math.PI
-import kotlin.math.abs
-import kotlin.math.ceil
 import kotlin.math.cos
-import kotlin.math.sin
 import kotlinx.coroutines.flow.collectLatest
 
 private const val PREVIEW_PHASE = 0.7f
 private val FullTurn = (2 * PI).toFloat()
-private val BarPeaks = intArrayOf(14, 22, 30, 24, 16)
-
-@Composable
-internal fun PlaybackRibbon(playing: Boolean, modifier: Modifier = Modifier) {
-    val paths = remember { List(9) { Path() } }
-    PlaybackCanvas(playing, 3_600, modifier.fillMaxWidth().height(152.dp)) { color, phase, amplitude ->
-        val strokeWidth = 1.dp.toPx()
-        val startX = strokeWidth / 2f
-        val endX = size.width - startX
-        val centerY = center.y
-        if (amplitude == 0f) {
-            drawLine(color.copy(alpha = 0.45f), Offset(startX, centerY), Offset(endX, centerY), strokeWidth, StrokeCap.Round)
-            return@PlaybackCanvas
-        }
-
-        val steps = ceil(size.width / 3.dp.toPx()).toInt()
-        val excursion = 36.dp.toPx() * amplitude
-        paths.forEach { path ->
-            path.rewind()
-            path.moveTo(startX, centerY)
-        }
-        for (step in 1 until steps) {
-            val x = step.toFloat() / steps
-            val radians = PI.toFloat() * x
-            val envelope = sin(radians) * (0.82f + 0.18f * cos(2f * radians - 0.6f))
-            val carrierPhase = 3f * radians - phase
-            val spread = 0.42f * sin(2f * radians + phase)
-            val pixelX = startX + (endX - startX) * x
-            paths.forEachIndexed { index, path ->
-                val strand = index * 0.25f - 1f
-                val carrier = 0.55f * sin(carrierPhase + 0.70f * strand)
-                path.lineTo(pixelX, centerY + excursion * envelope * (carrier + strand * spread))
-            }
-        }
-        val stroke = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-        paths.forEachIndexed { index, path ->
-            path.lineTo(endX, centerY)
-            val opacity = 0.85f - 0.4f * abs(index * 0.25f - 1f)
-            drawPath(path, color.copy(alpha = opacity), style = stroke)
-        }
-    }
-}
 
 @Composable
 internal fun PlaybackBars(playing: Boolean, modifier: Modifier = Modifier) {
-    PlaybackCanvas(playing, 1_600, modifier.size(56.dp)) { color, phase, amplitude ->
-        val barWidth = 4.dp.toPx()
-        val stride = 7.dp.toPx()
-        val startX = (size.width - 32.dp.toPx()) / 2f
-        val baseline = 40.dp.toPx()
-        BarPeaks.forEachIndexed { index, peak ->
+    val restingColor = InShapeTheme.colors.textTertiary
+    PlaybackCanvas(playing, 1_600, modifier.size(Dimens.button)) { color, phase, amplitude ->
+        val scale = size.minDimension / Dimens.button.toPx()
+        val barWidth = Dimens.innerTiny.toPx() * scale
+        val stride = Dimens.playbackBarStride.toPx() * scale
+        val startX = (size.width - Dimens.iconLarge.toPx() * scale) / 2f
+        val baseline = Dimens.playbackBarBaseline.toPx() * scale
+        Dimens.playbackBarHeights.forEachIndexed { index, peak ->
             val motion = 0.5f + 0.5f * cos(phase - PREVIEW_PHASE + (index - 2) * 0.8f)
-            val height = barWidth + amplitude * (peak.dp.toPx() - barWidth) * motion
+            val fullHeight = peak.toPx() * scale - barWidth
+            val height = barWidth + fullHeight * (.55f * (1 - amplitude) + amplitude * motion)
             drawRoundRect(
-                color,
+                lerp(restingColor, color, amplitude),
                 topLeft = Offset(startX + index * stride, baseline - height),
                 size = Size(barWidth, height),
                 cornerRadius = CornerRadius(barWidth / 2f)

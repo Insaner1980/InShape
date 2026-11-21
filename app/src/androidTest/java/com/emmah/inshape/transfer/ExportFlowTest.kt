@@ -1,5 +1,8 @@
 package com.emmah.inshape.transfer
 
+import com.emmah.inshape.R
+import com.emmah.inshape.ui
+import com.emmah.inshape.testContext
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
@@ -19,6 +22,7 @@ import com.emmah.inshape.data.WorkoutEntity
 import com.emmah.inshape.data.WorkoutTiming
 import com.emmah.inshape.data.newId
 import java.io.File
+import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -40,13 +44,14 @@ class ExportFlowTest {
             journalDate = "2026-11-13",
             start = timestamp,
             end = "2026-11-13T10:42:15Z",
-            zoneId = "UTC",
+            zoneId = ZoneId.systemDefault().id,
             durationSeconds = 2535,
             note = "WorkoutMemo",
             createdAt = timestamp,
             modifiedAt = timestamp
         )
-        val recovery = workout.copy(id = newId(), title = "Recovery day", end = null, durationSeconds = null, note = "")
+        val otherZone = if (workout.zoneId == "UTC") "Europe/Helsinki" else "UTC"
+        val recovery = workout.copy(id = newId(), title = "Recovery day", zoneId = otherZone, note = "")
         val exercise = SessionItem(
             workoutId = workout.id,
             exerciseId = "exercise",
@@ -90,28 +95,27 @@ class ExportFlowTest {
         )
         val ids = setOf(workout.id, recovery.id)
         val privateNotes = listOf("WorkoutMemo", "ExerciseMemo", "CheckInMemo", "ObservationMemo")
-        val checkInDetails = listOf("EnergyMemo", "before check-in", "after check-in")
+        val checkInDetails = listOf("EnergyMemo", ui(R.string.before_workout), ui(R.string.after_workout))
         val context = ApplicationProvider.getApplicationContext<Context>()
         val file = File.createTempFile("journal-export-", ".pdf", context.cacheDir)
         try {
             fun verify(selection: ExportSelection, included: List<String>, excluded: List<String>) {
-                file.outputStream().use { PdfExporter.write(data, selection, it) }
+                file.outputStream().use { PdfExporter.write(testContext(), data, selection, it) }
                 PdfRenderer(ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)).use { renderer ->
-                    val queries = included + excluded
-                    val found = buildSet {
-                        repeat(renderer.pageCount) { index ->
-                            renderer.openPage(index).use { page ->
-                                addAll(queries.filter { page.searchText(it).isNotEmpty() })
-                            }
+                    val text = (0 until renderer.pageCount).joinToString("") { index ->
+                        renderer.openPage(index).use { page ->
+                            page.textContents.joinToString("") { it.text }
                         }
-                    }
+                    }.filterNot(Char::isWhitespace)
+                    val found = (included + excluded).filter { text.contains(it.filterNot(Char::isWhitespace)) }.toSet()
                     assertEquals(included.toSet(), found)
                 }
             }
             verify(
                 ExportSelection(ids, includeNotes = true, includeCheckIns = true),
-                privateNotes + checkInDetails + listOf("42 min 15 s", "22.5 kg", "Note-only entry", "reps not recorded"),
-                listOf("Unselected session")
+                privateNotes + checkInDetails + listOf("42 min", ui(R.string.weight_value, "22,5"), ui(R.string.note_only_workout), ui(R.string.export_no_reps),
+                    ui(R.string.export_workout_count, 2), ui(R.string.export_page, 1), ui(R.string.export_workout_note), "($otherZone)"),
+                listOf("Unselected session", ui(R.string.duration_not_recorded), "(${workout.zoneId})", "Muistiinpanot mukana", "Vointi mukana")
             )
             verify(ExportSelection(ids, includeCheckIns = true), checkInDetails, privateNotes)
             verify(ExportSelection(ids), listOf("Strength training", "Recovery day"), privateNotes + checkInDetails)
@@ -124,29 +128,38 @@ class ExportFlowTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val name = "export-test-${newId()}.db"
         val container = AppContainer(context, databaseName = name)
-        val evidence = File(context.filesDir, "verification").apply { mkdirs() }
+        val captureLabel = androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("captureLabel")
+        val directory = if (captureLabel == null) "verification" else {
+            require(captureLabel.matches(Regex("[a-zA-Z0-9-]+")))
+            "verification/reference/$captureLabel"
+        }
+        val evidence = File(context.filesDir, directory).apply { mkdirs() }
         var pdf: PreparedExport? = null
         var csv: PreparedExport? = null
         try {
             container.storageReady.await()
             val exercise =
                 Exercise(
-                    name = "Näyttö with a very long exercise name that must wrap in the exported report"
+                    name = "Ylätalja leveällä otteella ja rauhallisella palautuksella"
                 )
             container.repository.saveExercise(exercise)
-            val id = container.repository.createPastWorkout("2026-11-13", "Long Unicode report")
+            val id = container.repository.createPastWorkout("2026-11-13", "Koko vartalon treeni")
             val item = container.repository.addExercise(id, exercise.id)
             container.repository.markItemDone(item, 300)
             container.repository.saveWorkoutNote(
                 id,
                 (1..90).joinToString("\n") {
-                    "Paragraph $it: Ää Öö, commas, quotes \"like this\" and a long line that should wrap " +
-                        "without clipping or losing its last word."
+                    "Merkintä $it: Lämmittely sujui hyvin ja liikkeet tuntuivat hallituilta. " +
+                        "Seuraavalla kerralla pidän saman tahdin ja tarkistan liikeradan."
                 }
             )
             container.repository.finishWorkout(
                 id,
-                WorkoutTiming(acknowledged = true, clearTimes = true)
+                WorkoutTiming(
+                    start = "2026-11-13T08:42:50Z",
+                    end = "2026-11-13T09:15:10Z",
+                    acknowledged = true
+                )
             )
             val selection =
                 ExportSelection(setOf(id), includeNotes = true, includeCheckIns = true)
@@ -175,8 +188,10 @@ class ExportFlowTest {
                     bitmap.recycle()
                 }
             }
-            container.exports.save(pdf, Uri.fromFile(File(evidence, "sample-export.pdf")))
-            container.exports.save(csv, Uri.fromFile(File(evidence, "sample-export.zip")))
+            if (captureLabel == null) {
+                container.exports.save(pdf, Uri.fromFile(File(evidence, "sample-export.pdf")))
+                container.exports.save(csv, Uri.fromFile(File(evidence, "sample-export.zip")))
+            }
             container.exports.release(csv)
             assertThrows(IllegalStateException::class.java) { container.exports.sharedUri(csv) }
             assertFalse(csv.shared)

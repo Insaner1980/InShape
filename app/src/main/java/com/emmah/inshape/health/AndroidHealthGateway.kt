@@ -1,5 +1,8 @@
 package com.emmah.inshape.health
 
+import com.emmah.inshape.ui.requireUi
+import com.emmah.inshape.R
+import kotlinx.coroutines.CancellationException
 import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
@@ -19,14 +22,14 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
-enum class HealthCapability(val label: String, val permission: String) {
+enum class HealthCapability(val label: Int, val permission: String) {
     SHARE(
-        "Share completed workouts",
+        R.string.health_share,
         HealthPermission.getWritePermission(ExerciseSessionRecord::class)
     ),
-    STEPS("Steps today", HealthPermission.getReadPermission(StepsRecord::class)),
-    SLEEP("Sleep last night", HealthPermission.getReadPermission(SleepSessionRecord::class)),
-    HEART("Latest recorded heart rate", HealthPermission.getReadPermission(HeartRateRecord::class));
+    STEPS(R.string.steps_today, HealthPermission.getReadPermission(StepsRecord::class)),
+    SLEEP(R.string.sleep_last_night, HealthPermission.getReadPermission(SleepSessionRecord::class)),
+    HEART(R.string.health_latest_heart, HealthPermission.getReadPermission(HeartRateRecord::class));
 
     fun enabled(p: Preferences) = when (this) {
         SHARE -> p.shareWorkouts
@@ -42,12 +45,11 @@ enum class HealthCapability(val label: String, val permission: String) {
     }
 }
 
-data class HealthValue(val text: String, val period: String, val sources: List<String> = emptyList(), val error: String? = null)
 data class HeartSample(val beats: Long, val time: Instant, val source: String)
 data class HealthContext(
-    val steps: HealthValue? = null,
-    val sleep: HealthValue? = null,
-    val heart: HealthValue? = null,
+    val steps: Long? = null,
+    val sleepSeconds: Long? = null,
+    val heart: HeartSample? = null,
     val heartSources: List<String> = emptyList()
 )
 data class HealthWindows(val dayStart: Instant, val sleepStart: Instant, val sleepEnd: Instant, val heartStart: Instant)
@@ -95,7 +97,7 @@ class AndroidHealthGateway(private val context: Context) : HealthGateway {
                     } else {
                         ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING
                     },
-                    title = if (record.mobility) "Mobility" else "Strength training",
+                    title = context.getString(if (record.mobility) R.string.category_mobility else R.string.health_strength_training),
                     metadata = Metadata.manualEntry(
                         clientRecordId = record.clientId,
                         clientRecordVersion = record.version
@@ -112,12 +114,8 @@ class AndroidHealthGateway(private val context: Context) : HealthGateway {
         )
     }
     override suspend fun existingVersion(workout: WorkoutEntity, clientId: String): Long {
-        require(HealthPermission.getReadPermission(ExerciseSessionRecord::class) in grants()) {
-            "Allow exercise-read access to reconcile this selected workout. It remains on hold."
-        }
-        check(android.os.Build.VERSION.SDK_INT >= 34) {
-            "This provider limits historical reads. Reconcile restored workouts on Android 14 or later; this record remains on hold."
-        }
+        requireUi(HealthPermission.getReadPermission(ExerciseSessionRecord::class) in grants(), R.string.health_read_access)
+        requireUi(android.os.Build.VERSION.SDK_INT >= 34, R.string.health_historical_reads)
         // Timing may have been corrected since the backup. Search only our own origin and match the stable client identity.
         var token: String? = null
         var version = 0L
@@ -140,79 +138,30 @@ class AndroidHealthGateway(private val context: Context) : HealthGateway {
         return version
     }
     suspend fun readContext(preferences: Preferences, now: ZonedDateTime): HealthContext {
+        if (availability() != HealthConnectClient.SDK_AVAILABLE) return HealthContext()
+        val api = client()
         val granted = grants()
         val windows = healthWindows(now)
-        val api = if (availability() == HealthConnectClient.SDK_AVAILABLE) client() else null
-        val stepsPeriod = "${now.toLocalDate()}, local midnight to ${now.toLocalTime().withSecond(
-            0
-        ).withNano(0)}"
-        val steps = value(preferences, api, granted, HealthCapability.STEPS, stepsPeriod) {
-            if (windows.dayStart == now.toInstant()) {
-                HealthValue("No data yet", stepsPeriod)
-            } else {
-                val result = api!!.aggregate(
-                    AggregateRequest(
-                        setOf(StepsRecord.COUNT_TOTAL),
-                        TimeRangeFilter.between(windows.dayStart, now.toInstant())
-                    )
+        val steps = value(preferences, granted, HealthCapability.STEPS) {
+            if (windows.dayStart == now.toInstant()) null else api.aggregate(
+                AggregateRequest(
+                    setOf(StepsRecord.COUNT_TOTAL),
+                    TimeRangeFilter.between(windows.dayStart, now.toInstant())
                 )
-                HealthValue(
-                    result[StepsRecord.COUNT_TOTAL]?.let {
-                        "$it steps"
-                    } ?: "No data yet",
-                    stepsPeriod,
-                    result.dataOrigins.map { it.packageName }.sorted()
-                )
-            }
+            )[StepsRecord.COUNT_TOTAL]
         }
-        val sleepPeriod = "${windows.sleepStart.atZone(
-            now.zone
-        ).toLocalDateTime()} to ${windows.sleepEnd.atZone(now.zone).toLocalDateTime()}"
-        val sleep = value(preferences, api, granted, HealthCapability.SLEEP, sleepPeriod) {
-            val result = api!!.aggregate(
+        val sleep = value(preferences, granted, HealthCapability.SLEEP) {
+            api.aggregate(
                 AggregateRequest(
                     setOf(SleepSessionRecord.SLEEP_DURATION_TOTAL),
                     TimeRangeFilter.between(windows.sleepStart, windows.sleepEnd)
                 )
-            )
-            HealthValue(
-                result[SleepSessionRecord.SLEEP_DURATION_TOTAL]?.let {
-                    "${it.toHours()} h ${it.toMinutes() % 60} min recorded"
-                }
-                    ?: "No data yet",
-                sleepPeriod,
-                result.dataOrigins.map {
-                    it.packageName
-                }.sorted()
-            )
+            )[SleepSessionRecord.SLEEP_DURATION_TOTAL]?.seconds
         }
-        var sources = emptyList<String>()
-        val heart = value(preferences, api, granted, HealthCapability.HEART, "Last 24 hours") {
-            val latest = latestHeartSamples(api!!, windows.heartStart, now.toInstant())
-            sources = latest.keys.sorted()
-            val sample = selectHeart(latest.values.toList(), preferences.heartRateSource)
-            if (sample ==
-                null
-            ) {
-                HealthValue(
-                    if (sources.size > 1 &&
-                        preferences.heartRateSource == null
-                    ) {
-                        "Choose a source in Settings"
-                    } else {
-                        "No recent data"
-                    },
-                    "Last 24 hours"
-                )
-            } else {
-                HealthValue(
-                    "${sample.beats} bpm",
-                    "Recorded ${sample.time.atZone(now.zone).toLocalDateTime()}",
-                    listOf(sample.source)
-                )
-            }
-        }
-        return HealthContext(steps, sleep, heart, sources)
+        val samples = value(preferences, granted, HealthCapability.HEART) {
+            latestHeartSamples(api, windows.heartStart, now.toInstant())
+        }.orEmpty()
+        return HealthContext(steps, sleep, selectHeart(samples.values.toList(), preferences.heartRateSource), samples.keys.sorted())
     }
 
     private suspend fun latestHeartSamples(api: HealthConnectClient, start: Instant, end: Instant): Map<String, HeartSample> {
@@ -233,38 +182,19 @@ class AndroidHealthGateway(private val context: Context) : HealthGateway {
         return latest
     }
 
-    private suspend fun value(
+    private suspend fun <T> value(
         preferences: Preferences,
-        api: HealthConnectClient?,
         granted: Set<String>,
         capability: HealthCapability,
-        period: String,
-        read: suspend () -> HealthValue
-    ): HealthValue? {
-        if (!capability.enabled(preferences)) return null
-        if (api == null ||
-            capability.permission !in granted
-        ) {
-            return HealthValue(
-                "Access not available",
-                period,
-                error = "Allow this capability in Settings to read it."
-            )
-        }
+        read: suspend () -> T?
+    ): T? {
+        if (!capability.enabled(preferences) || capability.permission !in granted) return null
         return try {
             read()
-        } catch (
-            cancelled: kotlinx.coroutines.CancellationException
-        ) {
+        } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (
-            _: Exception
-        ) {
-            HealthValue(
-                "Could not read data",
-                period,
-                error = "Open Health Connect settings and try again."
-            )
+        } catch (_: Exception) {
+            null
         }
     }
 

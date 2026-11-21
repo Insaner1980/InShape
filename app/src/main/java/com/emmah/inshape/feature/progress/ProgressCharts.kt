@@ -1,23 +1,21 @@
 package com.emmah.inshape.feature.progress
 
+import com.emmah.inshape.ui.theme.decimalDisplay
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -30,149 +28,101 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import com.emmah.inshape.R
+import com.emmah.inshape.data.MeasurementBasis
 import com.emmah.inshape.data.weekStart
-import com.emmah.inshape.feature.checkin.BodyLevel
-import com.emmah.inshape.feature.checkin.bodyLevelOf
 import com.emmah.inshape.ui.components.DisclosureRow
 import com.emmah.inshape.ui.components.KeyValueRow
 import com.emmah.inshape.ui.components.ResponsiveRow
 import com.emmah.inshape.ui.theme.Dimens
-import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.InShapeType
-import com.emmah.inshape.ui.theme.displayDate
+import com.emmah.inshape.ui.theme.axisDate
+import com.emmah.inshape.ui.theme.formatDuration
 import java.time.LocalDate
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.roundToInt
 
 // Slot content: siblings use the caller's layout and spacing, so there is no single modifier root.
 @Suppress("ModifierMissing", "ktlint:compose:modifier-missing-check")
 @Composable
-fun ColumnScope.ExerciseChart(points: List<MetricPoint>, unit: String) {
+fun ColumnScope.ExerciseChart(points: List<MetricPoint>, basis: MeasurementBasis) {
     val colors = InShapeTheme.colors
-    var selected by remember(points) { mutableIntStateOf(points.indexOfLast { it.value != null }) }
     var showData by remember { mutableStateOf(false) }
     val values = points.mapNotNull { it.value?.toFloat() }
     if (values.isEmpty()) {
-        Text("No recorded values for this comparison.", style = MaterialTheme.typography.bodySmall)
-        return
-    }
-    val low = max(0f, floor(values.min() / 5f) * 5 - 5)
-    val high = max(low + 5, ceil(values.max() / 5f) * 5)
-    Row {
-        Column(
-            Modifier.height(Dimens.chartExercise),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            listOf(high, (high + low) / 2, low).forEach {
-                Text(
-                    it.toInt().toString(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.textSecondary
-                )
-            }
-        }
-        Canvas(
-            Modifier.weight(1f).height(Dimens.chartExercise).padding(Dimens.innerSmall).semantics {
-                contentDescription =
-                    "Exercise history, $unit. Use Data values for all recorded points."
-            }.pointerInput(points) {
-                detectTapGestures { tap ->
-                    selected =
-                        if (points.size ==
-                            1
-                        ) {
-                            0
-                        } else {
-                            (tap.x / size.width * points.lastIndex).roundToInt().coerceIn(
-                                points.indices
-                            )
-                        }
+        Text(stringResource(R.string.no_comparison_data), style = MaterialTheme.typography.bodySmall)
+    } else {
+        // Duration points are stored in seconds. The midpoint is at least one minute from the endpoints.
+        val timed = basis == MeasurementBasis.Time
+        val step = if (timed) 120f else 5f
+        val low = max(0f, floor(values.min() / step) * step - step)
+        val high = max(low + step, ceil(values.max() / step) * step)
+        val lastRecorded = points.indexOfLast { it.value != null }
+        Row {
+            Column(Modifier.height(Dimens.chartExercise), verticalArrangement = Arrangement.SpaceBetween) {
+                listOf(high, (high + low) / 2, low).forEach { tick ->
+                    Text(
+                        if (timed) formatDuration(tick.toLong()) else tick.toString().removeSuffix(".0").decimalDisplay(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textSecondary
+                    )
                 }
             }
-        ) {
-            fun x(index: Int) = if (points.size ==
-                1
-            ) {
-                size.width / 2
-            } else {
-                index.toFloat() / points.lastIndex * size.width
-            }
-            fun y(value: Float) = size.height - (value - low) / (high - low) * size.height
-            drawChartGrid(colors.divider)
-            points.forEachIndexed { i, point ->
-                point.value?.let { value ->
-                    if (i > 0 &&
-                        points[i - 1].value != null
-                    ) {
+            val chartDescription = stringResource(R.string.exercise_chart_description, stringResource(basis.unitLabel))
+            Canvas(Modifier.weight(1f).height(Dimens.chartExercise).padding(Dimens.innerSmall).semantics {
+                contentDescription = chartDescription
+            }) {
+                fun x(index: Int) = if (points.size == 1) size.width / 2 else index.toFloat() / points.lastIndex * size.width
+                fun y(value: Float) = size.height - (value - low) / (high - low) * size.height
+                drawChartGrid(colors.divider)
+                points.forEachIndexed { index, point ->
+                    val value = point.value?.toFloat() ?: return@forEachIndexed
+                    val previous = points.getOrNull(index - 1)?.value?.toFloat()
+                    if (previous != null) {
                         drawLine(
                             colors.ink,
-                            Offset(
-                                x(i - 1),
-                                y(
-                                    points[
-                                        i -
-                                            1
-                                    ].value!!.toFloat()
-                                )
-                            ),
-                            Offset(x(i), y(value.toFloat())),
+                            Offset(x(index - 1), y(previous)),
+                            Offset(x(index), y(value)),
                             Dimens.chartLine.toPx(),
                             cap = StrokeCap.Round
                         )
                     }
-                    val isolated = points.getOrNull(i - 1)?.value == null && points.getOrNull(i + 1)?.value == null
-                    if (i == selected || i == points.indexOfLast { it.value != null } || isolated) {
-                        drawCircle(
-                            colors.ink,
-                            Dimens.chartDot.toPx(),
-                            Offset(x(i), y(value.toFloat()))
-                        )
+                    if (index == lastRecorded || (previous == null && points.getOrNull(index + 1)?.value == null)) {
+                        drawCircle(colors.ink, Dimens.chartDot.toPx(), Offset(x(index), y(value)))
                     }
                 }
             }
         }
+        ResponsiveRow {
+            Text(
+                points.first().date.axisDate(),
+                Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textSecondary
+            )
+            if (points.first().date != points.last().date) {
+                Text(points.last().date.axisDate(), style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+            }
+        }
     }
-    ResponsiveRow {
-        Text(
-            points.first().date.displayDate(),
-            Modifier.weight(1f),
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.textSecondary
-        )
-        Text(
-            points.last().date.displayDate(),
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.textSecondary
-        )
-    }
-    points.getOrNull(selected)?.let {
-        Text(
-            "${it.date.displayDate()}: ${it.value?.stripTrailingZeros()?.toPlainString()?.let { value ->
-                "$value $unit"
-            } ?: "Not recorded"}",
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.textSecondary
-        )
-    }
-    DisclosureRow("Data values", showData, { showData = !showData })
-    if (showData) {
-        points.forEachIndexed { index, point ->
-            val value = point.value?.stripTrailingZeros()?.toPlainString()?.let { "$it $unit" } ?: "Not recorded"
-            KeyValueRow(point.date.displayDate(), value, numeric = true, onClick = { selected = index })
+    if (points.isNotEmpty()) {
+        DisclosureRow(stringResource(R.string.values), showData, { showData = !showData })
+        if (showData) {
+            points.forEach { point ->
+                KeyValueRow(
+                    point.date.axisDate(),
+                    point.value?.let { basis.progressValue(LocalContext.current, it) } ?: stringResource(R.string.not_recorded),
+                    numeric = true,
+                    modifier = Modifier.semantics(mergeDescendants = true) {}
+                )
+            }
         }
     }
 }
@@ -183,19 +133,20 @@ fun ColumnScope.AttendanceChart(weeks: List<WeekCount>, goal: Int?, today: Local
     val maximum = maxOf(1, weeks.maxOfOrNull { it.count } ?: 0, goal ?: 0)
     if (goal != null) {
         Text(
-            "Goal $goal",
+            stringResource(R.string.chart_goal, goal),
             Modifier.fillMaxWidth(),
             style = InShapeType.nav,
             color = colors.textSecondary,
             textAlign = TextAlign.End
         )
     }
+    val chartDescription = stringResource(R.string.weekly_counts_description)
     Canvas(
         modifier.fillMaxWidth().height(
             Dimens.chartAttendance
         ).padding(top = Dimens.innerTiny).semantics {
             contentDescription =
-                "Weekly workout counts. The current week is incomplete. Use Weekly counts for all values."
+                chartDescription
         }
     ) {
         val slot = size.width / weeks.size.coerceAtLeast(1)
@@ -203,7 +154,7 @@ fun ColumnScope.AttendanceChart(weeks: List<WeekCount>, goal: Int?, today: Local
         if (goal != null) {
             val y = size.height - size.height * goal / maximum
             drawLine(
-                colors.surfaceStrong,
+                colors.divider,
                 Offset(0f, y),
                 Offset(size.width, y),
                 Dimens.chartOutline.toPx(),
@@ -242,7 +193,7 @@ fun ColumnScope.AttendanceChart(weeks: List<WeekCount>, goal: Int?, today: Local
                     if (week.count == 0 ||
                         (goal != null && week.count < goal)
                     ) {
-                        colors.inactiveMark
+                        colors.divider
                     } else {
                         colors.ink
                     },
@@ -256,127 +207,22 @@ fun ColumnScope.AttendanceChart(weeks: List<WeekCount>, goal: Int?, today: Local
     if (weeks.isNotEmpty()) {
         ResponsiveRow {
             Text(
-                weeks.first().week.displayDate("d MMMM"),
+                weeks.first().week.axisDate(),
                 Modifier.weight(1f),
                 style = InShapeType.nav,
                 color = colors.textSecondary
             )
-            Text("This week, in progress", style = InShapeType.nav, color = colors.textSecondary)
+            Text(stringResource(R.string.this_week), style = InShapeType.nav, color = colors.textSecondary)
         }
     }
     var details by remember { mutableStateOf(false) }
-    DisclosureRow("Weekly counts", details, { details = !details })
+    DisclosureRow(stringResource(R.string.weekly_counts), details, { details = !details })
     if (details) {
         weeks.forEach {
             KeyValueRow(
-                "Week of ${it.week.displayDate()}",
+                stringResource(R.string.week_of_date, it.week.axisDate()),
                 pluralStringResource(R.plurals.workout_count, it.count, it.count),
                 modifier = Modifier.semantics(mergeDescendants = true) {}
-            )
-        }
-    }
-}
-
-@Composable
-fun ObservationChart(points: List<ObservationPoint>, modifier: Modifier = Modifier) {
-    val colors = InShapeTheme.colors
-    val labelStyle = MaterialTheme.typography.labelSmall.copy(color = colors.textSecondary)
-    val measurer = rememberTextMeasurer()
-    val labels = BodyLevel.entries.associateWith { measurer.measure(it.label, style = labelStyle) }
-    val series = listOf(points.map { bodyLevelOf(it.pain) }, points.map { bodyLevelOf(it.stiffness) })
-    val lastLevels = series.mapNotNull { values ->
-        values.filterNotNull().distinct().singleOrNull()?.let { it to values.indexOfLast { level -> level != null } }
-    }.distinct()
-    val chartHeight = Dimens.chartObservation * maxOf(1f, LocalDensity.current.fontScale / 1.3f)
-    Canvas(
-        modifier.fillMaxWidth().height(chartHeight).semantics {
-            contentDescription =
-                "Pain, solid line. Stiffness, dashed line. Levels: none, mild, medium, strong. Use Values for all observations."
-        }
-    ) {
-        val labelWidth = labels.values.maxOf { it.size.width }.toFloat()
-        val labelHeight = labels.values.maxOf { it.size.height }.toFloat()
-        val startX = labelWidth + Dimens.innerSmall.toPx()
-        val endX = size.width - if (lastLevels.isEmpty()) Dimens.chartDot.toPx() else labelWidth + Dimens.innerSmall.toPx()
-        val chartWidth = (endX - startX).coerceAtLeast(0f)
-        fun x(index: Int) = startX + chartWidth * if (points.size <= 1) .5f else index.toFloat() / points.lastIndex
-        fun y(level: BodyLevel) = labelHeight / 2 +
-            (size.height - labelHeight) * (1 - level.stored.toFloat() / BodyLevel.Strong.stored)
-        labels.forEach { (level, text) ->
-            val y = y(level)
-            drawText(text, topLeft = Offset(0f, y - text.size.height / 2f))
-            drawLine(colors.divider, Offset(startX, y), Offset(endX, y), Dimens.line.toPx())
-        }
-        series.forEachIndexed { seriesIndex, values ->
-            val flat = values.filterNotNull().distinct().size <= 1
-            val last = values.indexOfLast { it != null }
-            val effect = if (seriesIndex == 1) {
-                PathEffect.dashPathEffect(floatArrayOf(Dimens.chartDash.toPx(), Dimens.chartGap.toPx()))
-            } else {
-                null
-            }
-            values.forEachIndexed { index, level ->
-                if (level != null) {
-                    val point = Offset(x(index), y(level))
-                    val previous = values.getOrNull(index - 1)
-                    if (!flat && previous != null) {
-                        drawLine(
-                            colors.ink,
-                            Offset(x(index - 1), y(previous)),
-                            point,
-                            Dimens.chartLine.toPx(),
-                            cap = StrokeCap.Round,
-                            pathEffect = effect
-                        )
-                    }
-                    val isolated = previous == null && values.getOrNull(index + 1) == null
-                    if (flat || index == last || isolated) {
-                        drawCircle(colors.ink, Dimens.chartDot.toPx(), point)
-                    }
-                }
-            }
-        }
-        lastLevels.groupBy { it.first }.forEach { (level, entries) ->
-            val text = labels.getValue(level)
-            val labelX = x(entries.maxOf { it.second }) + Dimens.innerSmall.toPx()
-            drawText(text, topLeft = Offset(labelX, y(level) - text.size.height / 2f))
-        }
-    }
-}
-
-@Composable
-fun ObservationLegend(label: String, value: Int?, stiffness: Boolean, modifier: Modifier = Modifier) {
-    val color = InShapeTheme.colors.ink
-    Surface(modifier, shape = InShapeShapes.pill, color = InShapeTheme.colors.surface) {
-        Row(
-            Modifier.padding(Dimens.innerSmall),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimens.innerSmall)
-        ) {
-            Canvas(Modifier.size(Dimens.inner, Dimens.innerSmall)) {
-                drawLine(
-                    color,
-                    Offset(
-                        0f,
-                        size.height / 2
-                    ),
-                    Offset(size.width, size.height / 2),
-                    Dimens.ring.toPx(),
-                    pathEffect = if (stiffness) {
-                        PathEffect.dashPathEffect(
-                            floatArrayOf(Dimens.innerTiny.toPx(), Dimens.chartLine.toPx())
-                        )
-                    } else {
-                        null
-                    }
-                )
-            }
-            Text(
-                "$label, ${value?.let {
-                    com.emmah.inshape.feature.checkin.bodyLevelOf(it)!!.label.lowercase()
-                } ?: "none"}",
-                style = MaterialTheme.typography.labelMedium,
-                color = InShapeTheme.colors.textSecondary
             )
         }
     }
@@ -405,22 +251,26 @@ fun ExerciseSparkline(points: List<MetricPoint>, modifier: Modifier = Modifier) 
     val values = points.mapNotNull { it.value?.toFloat() }
     val low = values.minOrNull() ?: return
     val span = values.max() - low
-    if (span == 0f) return
     val colors = InShapeTheme.colors
     Canvas(modifier.size(Dimens.sparklineWidth, Dimens.sparklineHeight)) {
+        val radius = Dimens.ring.toPx()
         fun point(index: Int, value: Float) = Offset(
-            if (points.size == 1) size.width / 2 else index * size.width / points.lastIndex,
-            size.height - Dimens.ring.toPx() - (value - low) / span * (size.height - 2 * Dimens.ring.toPx())
+            radius + index * (size.width - 2 * radius) / points.lastIndex,
+            if (span == 0f) size.height / 2 else size.height - radius - (value - low) / span * (size.height - 2 * radius)
         )
-        points.forEachIndexed { index, value ->
-            if (index > 0 && value.value != null && points[index - 1].value != null) {
+        points.forEachIndexed { index, metricPoint ->
+            val value = metricPoint.value?.toFloat() ?: return@forEachIndexed
+            val previous = points.getOrNull(index - 1)?.value?.toFloat()
+            if (previous != null) {
                 drawLine(
                     colors.ink,
-                    point(index - 1, points[index - 1].value!!.toFloat()),
-                    point(index, value.value.toFloat()),
-                    Dimens.ring.toPx(),
+                    point(index - 1, previous),
+                    point(index, value),
+                    radius,
                     StrokeCap.Round
                 )
+            } else if (points.getOrNull(index + 1)?.value == null) {
+                drawCircle(colors.ink, radius, point(index, value))
             }
         }
     }

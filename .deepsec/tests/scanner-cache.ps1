@@ -20,7 +20,7 @@ export default {
     $recordPath = Join-Path $scratch 'data/fixture/files/Test.kt.json'
     Set-Content -LiteralPath $source -Value 'package fixture'
     function Invoke-FixtureScan {
-        $process = Start-Process -FilePath (Get-Command node).Source -ArgumentList $cli, 'scan', '--project-id', 'fixture' `
+        $process = Start-Process -FilePath (Get-Command node).Source -ArgumentList ('"{0}"' -f $cli), 'scan', '--project-id', 'fixture' `
             -WorkingDirectory $scratch -WindowStyle Hidden -Wait -PassThru `
             -RedirectStandardOutput (Join-Path $scratch 'scan.log') -RedirectStandardError (Join-Path $scratch 'scan-error.log')
         if ($process.ExitCode -ne 0) { throw 'Fixture scan failed.' }

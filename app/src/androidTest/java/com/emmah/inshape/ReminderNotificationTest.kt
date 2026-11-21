@@ -4,7 +4,6 @@ import android.app.NotificationManager
 import android.content.Context
 import android.os.SystemClock
 import androidx.test.core.app.ApplicationProvider
-import androidx.test.platform.app.InstrumentationRegistry
 import com.emmah.inshape.data.Preferences
 import com.emmah.inshape.reminders.ReminderScheduler
 import org.junit.Assert.assertEquals
@@ -24,9 +23,17 @@ class ReminderNotificationTest {
             assertTrue("Test requires notification permission", scheduler.allowed())
             scheduler.deliver(settings)
             scheduler.apply(settings)
-            val notification = manager.activeNotifications.single { it.id == 41 }
+            val deliveryDeadline = SystemClock.uptimeMillis() + 5_000
+            while (manager.activeNotifications.none { it.id == 41 } &&
+                SystemClock.uptimeMillis() < deliveryDeadline
+            ) {
+                SystemClock.sleep(20)
+            }
+            val notification = checkNotNull(manager.activeNotifications.singleOrNull { it.id == 41 }) {
+                "Notification 41 was not delivered within five seconds."
+            }
             assertEquals(
-                "A little time for yourself",
+                ui(R.string.reminder_title),
                 notification.notification.extras.getString("android.title")
             )
             assertNotNull(notification.notification.contentIntent)

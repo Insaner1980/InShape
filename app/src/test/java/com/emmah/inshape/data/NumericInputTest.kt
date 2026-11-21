@@ -2,10 +2,20 @@ package com.emmah.inshape.data
 
 import java.math.BigDecimal
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NumericInputTest {
+    @Test fun wholeMinutesConvertWithoutOverflow() {
+        val maximum = Long.MAX_VALUE / 60
+        assertEquals(60L, parseWholeMinutesToSeconds("1"))
+        assertEquals(maximum * 60, parseWholeMinutesToSeconds(maximum.toString()))
+        listOf("", "0", "-1", "1,5", " 1", (maximum + 1).toString()).forEach {
+            assertNull(parseWholeMinutesToSeconds(it))
+        }
+    }
+
     @Test fun acceptsDotCommaAndIntentionalZero() {
         assertEquals(
             BigDecimal("27.5"),

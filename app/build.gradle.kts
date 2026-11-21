@@ -14,7 +14,9 @@ plugins {
 }
 android {
     namespace = "com.emmah.inshape"
-    compileSdk { version = release(37) }
+    compileSdk {
+        version = release(37) { minorApiLevel = 1 }
+    }
     defaultConfig {
         applicationId = "com.emmah.inshape"
         minSdk = 26
@@ -22,6 +24,7 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders["inShapeLabel"] = "@string/app_name"
     }
     buildFeatures {
         compose = true
@@ -29,6 +32,10 @@ android {
     }
     buildTypes {
         debug {
+            if (providers.gradleProperty("assistantTestInstall").orNull == "true") {
+                applicationIdSuffix = ".assistanttest"
+                manifestPlaceholders["inShapeLabel"] = "InShape Assistant Test"
+            }
             enableUnitTestCoverage = true
             enableAndroidTestCoverage = providers.gradleProperty("sonarDeviceCoverage").orNull == "true"
         }
@@ -39,6 +46,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     testOptions { unitTests.isIncludeAndroidResources = true }
+    sourceSets {
+        getByName("testDebug").kotlin.srcDir("src/sharedTest/java")
+        getByName("androidTest").kotlin.srcDir("src/sharedTest/java")
+    }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
 }
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
@@ -52,6 +63,7 @@ ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 
 jacoco { toolVersion = "0.8.16" }
 tasks.withType<Test>().configureEach {
+    if (name == "testDebugUnitTest") systemProperty("robolectric.graphicsMode", "NATIVE")
     extensions.configure<JacocoTaskExtension> {
         isIncludeNoLocationClasses = true
         excludes = listOf("jdk.internal.*")
@@ -74,7 +86,7 @@ ktlint {
 detekt {
     buildUponDefaultConfig = true
     config.setFrom(rootProject.file("config/detekt.yml"))
-    source.setFrom("src/main/java", "src/debug/java", "src/test/java", "src/androidTest/java")
+    source.setFrom("src/main/java", "src/debug/java", "src/test/java", "src/androidTest/java", "src/sharedTest/java")
 }
 
 tasks.withType<Detekt>().configureEach {
@@ -123,8 +135,8 @@ dependencies {
         testImplementation("com.google.guava:guava:33.8.0-jre")
         add("ksp", "com.google.guava:guava:33.8.0-jre")
         androidTestImplementation("com.google.code.gson:gson:2.15.0")
-        add("ktlint", "ch.qos.logback:logback-classic:1.6.6")
-        add("ktlint", "ch.qos.logback:logback-core:1.6.6")
+        add("ktlint", "ch.qos.logback:logback-classic:1.6.8")
+        add("ktlint", "ch.qos.logback:logback-core:1.6.8")
         // Android Lint resolves a separate copy of the build-tool libraries.
         add("androidLintTool", "com.google.guava:guava:33.8.0-jre")
         add("androidLintTool", "org.apache.commons:commons-lang3:3.22.0")
@@ -147,6 +159,7 @@ dependencies {
     implementation(libs.room.ktx)
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.session)
+    implementation(libs.okhttp)
     ksp(libs.room.compiler)
     implementation(libs.serialization)
     implementation(libs.coroutines)
@@ -157,6 +170,10 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.work.testing)
     testImplementation(libs.test.core)
+    add("testDebugImplementation", platform(libs.compose.bom))
+    add("testDebugImplementation", libs.androidx.junit)
+    add("testDebugImplementation", libs.compose.test.junit)
+    add("testDebugImplementation", libs.espresso.core)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.test.runner)

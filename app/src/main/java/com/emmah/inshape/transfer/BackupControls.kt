@@ -23,7 +23,8 @@ import com.emmah.inshape.ui.components.ListCardScope
 import com.emmah.inshape.ui.components.ListRow
 import com.emmah.inshape.ui.components.LocalPageSnackbar
 import com.emmah.inshape.ui.theme.InShapeTheme
-import com.emmah.inshape.ui.theme.instantLabel
+import com.emmah.inshape.ui.theme.dateTime
+import java.time.Instant
 import java.time.ZoneId
 
 // Slot content: siblings use the caller's layout and spacing, so there is no single modifier root.
@@ -34,6 +35,7 @@ fun ColumnScope.BackupControls(vm: JournalViewModel, lastBackupAt: String?, addi
     val zone = ZoneId.systemDefault()
     val snackbar = LocalPageSnackbar.current
     val transfer = vm.transfers
+    val context = LocalContext.current
     val state by transfer.state.collectAsStateWithLifecycle()
     val save =
         rememberLauncherForActivityResult(
@@ -60,7 +62,7 @@ fun ColumnScope.BackupControls(vm: JournalViewModel, lastBackupAt: String?, addi
     LaunchedEffect(transfer, snackbar) {
         if (snackbar == null) return@LaunchedEffect
         transfer.state.collect { result ->
-            if (result.message == "Backup saved successfully." && transfer.consumeMessage(result)) {
+            if (result.message == context.getString(R.string.backup_saved) && transfer.consumeMessage(result)) {
                 snackbar.showSnackbar(result.message)
             }
         }
@@ -68,12 +70,12 @@ fun ColumnScope.BackupControls(vm: JournalViewModel, lastBackupAt: String?, addi
     ListCard {
         item {
             ListRow(
-                "Create full backup",
+                stringResource(R.string.create_backup),
                 titleStyle = MaterialTheme.typography.bodyLarge,
                 subtitle =
                     lastBackupAt?.let {
-                        "Last backup ${it.instantLabel(zone, uses24Hours)}"
-                    } ?: "No backup yet",
+                        stringResource(R.string.last_backup, dateTime(Instant.parse(it), zone, uses24Hours))
+                    } ?: stringResource(R.string.no_backup),
                 onClick = {
                     save.launch("InShape.inshape-backup")
                 },
@@ -81,14 +83,14 @@ fun ColumnScope.BackupControls(vm: JournalViewModel, lastBackupAt: String?, addi
             )
         }
         item {
-            ListRow("Restore backup", titleStyle = MaterialTheme.typography.bodyLarge, onClick = {
+            ListRow(stringResource(R.string.restore_backup), titleStyle = MaterialTheme.typography.bodyLarge, onClick = {
                 restore.launch(arrayOf("*/*"))
             }, enabled = !state.busy)
         }
         additionalRows()
     }
     if (state.busy) LinearProgressIndicator()
-    val alreadyReported = state.message == "Backup saved successfully." || state.message == "Export cancelled."
+    val alreadyReported = state.message == context.getString(R.string.backup_saved) || state.message == context.getString(R.string.export_cancelled)
     if (state.message.isNotBlank() && !alreadyReported && state.backup == null) {
         Text(
             state.message,
@@ -102,19 +104,15 @@ fun ColumnScope.BackupControls(vm: JournalViewModel, lastBackupAt: String?, addi
         val workouts = data.workouts.size
         val exercises = data.exercises.size
         val routines = data.routines.size
-        val photos = data.photos.size
-        val active = if (data.active == null) "" else stringResource(R.string.backup_unfinished_workout)
         ConfirmDialog(
-            "Replace the current journal?",
+            stringResource(R.string.replace_journal_question),
             stringResource(
                 R.string.backup_replace_message,
                 pluralStringResource(R.plurals.workout_count, workouts, workouts),
                 pluralStringResource(R.plurals.exercise_count, exercises, exercises),
-                pluralStringResource(R.plurals.routine_count, routines, routines),
-                pluralStringResource(R.plurals.photo_count, photos, photos),
-                active
+                pluralStringResource(R.plurals.routine_count, routines, routines)
             ),
-            "Replace journal",
+            stringResource(R.string.replace_journal),
             destructive = true,
             { transfer.restore(backup) },
             transfer::cancelRestore

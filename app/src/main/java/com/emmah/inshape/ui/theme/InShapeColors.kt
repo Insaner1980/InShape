@@ -17,20 +17,22 @@ data class InShapeColors(
     val ink: Color,
     val onInk: Color,
     val error: Color,
-    val scrim: Color
-) {
-    val inactiveMark: Color get() = if (isDark) surfaceStrong else Color(0xFFE0E0E0)
-}
+    val scrim: Color,
+    val fieldBorder: Color,
+    val markRing: Color
+)
 
 val LightColors = InShapeColors(
     false, Color(0xFFFFFFFF), Color(0xFFF4F4F4), Color(0xFFEBEBEB),
     Color(0xFFE3E3E3), Color(0xFF0B0B0B), Color(0xFF0B0B0B),
     Color(0xFF5E5E5E), Color(0xFF707070), Color(0xFF0B0B0B),
-    Color(0xFFFFFFFF), Color(0xFFB3261E), Color(0x520B0B0B)
+    Color(0xFFFFFFFF), Color(0xFFB3261E), Color(0x520B0B0B),
+    fieldBorder = Color(0xFFC8C8C8), markRing = Color(0xFF949494)
 )
 val DarkColors = InShapeColors(
     true, Color(0xFF0B0B0B), Color(0xFF1A1A1A), Color(0xFF242424),
     Color(0xFF2A2A2A), Color(0xFFF5F5F5), Color(0xFFF5F5F5),
     Color(0xFFA3A3A3), Color(0xFF858585), Color(0xFFF5F5F5),
-    Color(0xFF0B0B0B), Color(0xFFF2B8B5), Color(0x99000000)
+    Color(0xFF0B0B0B), Color(0xFFF2B8B5), Color(0x99000000),
+    fieldBorder = Color(0xFF3D3D3D), markRing = Color(0xFF6B6B6B)
 )

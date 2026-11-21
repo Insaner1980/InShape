@@ -1,16 +1,24 @@
 package com.emmah.inshape.data
 
-enum class MeasurementBasis(val key: String, val optionLabel: String, val columnLabel: String, val unitLabel: String) {
-    Weight("kg", "Weight (kg)", "kg", "kg"),
-    MachineLevel("level", "Machine level", "Level", "level"),
-    Bodyweight("bodyweight", "Bodyweight", "Reps only", "reps"),
-    Assistance("assistance_kg", "Assisted (kg of help)", "Assist kg", "kg assist"),
-    Time("duration", "Time", "Min", "min");
+import com.emmah.inshape.R
+import android.content.Context
+import androidx.annotation.StringRes
+import com.emmah.inshape.ui.theme.decimalDisplay
 
-    fun formatValue(value: String): String = when (this) {
-        MachineLevel -> "Level $value"
-        else -> "$value $unitLabel"
-    }
+enum class MeasurementBasis(
+    val key: String,
+    @StringRes val optionLabel: Int,
+    @StringRes val columnLabel: Int,
+    @StringRes val unitLabel: Int,
+    @StringRes private val valueFormat: Int
+) {
+    Weight("kg", R.string.load_kg, R.string.unit_kg, R.string.unit_kg, R.string.weight_value),
+    MachineLevel("level", R.string.machine_level, R.string.unit_level, R.string.unit_level, R.string.level_value),
+    Bodyweight("bodyweight", R.string.category_bodyweight, R.string.only_reps, R.string.reps, R.string.rep_value),
+    Assistance("assistance_kg", R.string.assisted_kg, R.string.assist_kg, R.string.assisted_kg, R.string.assistance_value),
+    Time("duration", R.string.time, R.string.unit_min, R.string.unit_min, R.string.minute_value);
+
+    fun formatValue(context: Context, value: String): String = context.getString(valueFormat, value.decimalDisplay())
 
     companion object {
         fun fromKey(key: String): MeasurementBasis = entries.find { it.key == key } ?: Weight

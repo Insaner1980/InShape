@@ -49,3 +49,13 @@ internal enum class ArtworkWash(private val middle: Float, private val light: Li
 
 @Composable
 internal fun BoxWithConstraintsScope.hasArtworkColumns(): Boolean = maxWidth >= 300.dp && LocalDensity.current.fontScale < 1.3f
+
+internal object BodyArtworkColors {
+    val lightHalo = Color(0xFFE6EBDB).copy(alpha = .55f)
+    val darkHalo = Color(0xFF53665B).copy(alpha = .32f)
+    val lightInk = Color(0xFF576057)
+    val darkInk = Color(0xFFA8B7AB)
+    val darkDetail = Color(0xFF83978B)
+    val darkFill = Color(0xFF34423D)
+    val darkFillLight = Color(0xFF405048)
+}

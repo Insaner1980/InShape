@@ -1,9 +1,10 @@
 package com.emmah.inshape.feature.workout
 
 import com.emmah.inshape.data.Workout
+import com.emmah.inshape.data.parseWholeMinutesToSeconds
 import com.emmah.inshape.data.parseWorkoutInstant
-import com.emmah.inshape.ui.theme.displayDate
-import com.emmah.inshape.ui.theme.elapsedSeconds
+import com.emmah.inshape.ui.theme.dateTime
+import com.emmah.inshape.ui.theme.displayedIntervalSeconds
 import com.emmah.inshape.ui.theme.workoutTime
 import java.time.Instant
 import java.time.ZoneId
@@ -47,7 +48,7 @@ fun finishDraft(payload: String?, now: Instant, note: String): FinishDraft {
     val draft = payload?.let { runCatching { Json.decodeFromString<FinishDraft>(it) }.getOrNull() }
         ?: return fresh
     val valid = runCatching { draft.also { it.validateTimestamps() } }.getOrElse {
-        fresh.copy(note = draft.note, unknownTimes = true, minutes = draft.minutes)
+        fresh.copy(note = draft.note, unknownTimes = true, minutes = draft.minutes, originalNote = draft.originalNote)
     }.withCurrentWorkoutNote(note)
     return if (valid.endMode == FinishDraft.EndMode.RefreshOnOpen) {
         valid.copy(end = fresh.end, endMode = FinishDraft.EndMode.Automatic)
@@ -58,17 +59,15 @@ fun finishDraft(payload: String?, now: Instant, note: String): FinishDraft {
 
 fun workoutTimeRange(start: Instant, end: Instant, zone: ZoneId, uses24Hours: Boolean = true): String {
     val crossesMidnight = start.atZone(zone).toLocalDate() != end.atZone(zone).toLocalDate()
-    fun label(time: Instant): String {
-        val date = if (crossesMidnight) time.atZone(zone).toLocalDate().displayDate("EEE") + " " else ""
-        return date + time.workoutTime(zone, uses24Hours)
-    }
-    return "${label(start)} to ${label(end)}"
+    fun label(time: Instant): String =
+        if (crossesMidnight) dateTime(time, zone, uses24Hours) else time.workoutTime(zone, uses24Hours)
+    return "${label(start)}–${label(end)}"
 }
 
 fun finishDuration(draft: FinishDraft, recordedStart: String?): Long? = if (draft.unknownTimes) {
-    draft.minutes.toLongOrNull()?.takeIf { it > 0 && it <= Long.MAX_VALUE / 60 }?.times(60)
+    parseWholeMinutesToSeconds(draft.minutes)
 } else {
-    (draft.fixedStart ?: recordedStart)?.let { elapsedSeconds(Instant.parse(it), Instant.parse(draft.end)) }
+    (draft.fixedStart ?: recordedStart)?.let { displayedIntervalSeconds(Instant.parse(it), Instant.parse(draft.end)).coerceAtLeast(0) }
 }
 
 fun nothingRecorded(workout: Workout, note: String): Boolean = !workout.hasPerformedWork && note.isBlank()

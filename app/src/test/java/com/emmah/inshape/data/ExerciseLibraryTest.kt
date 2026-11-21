@@ -1,5 +1,6 @@
 package com.emmah.inshape.data
 
+import com.emmah.inshape.testContext
 import java.time.Clock
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -22,7 +23,7 @@ class ExerciseLibraryTest {
     @Before fun setup() {
         db = createTestDatabase()
         repo =
-            JournalRepository(db, Clock.systemUTC())
+            JournalRepository(db, Clock.systemUTC(), testContext())
     }
 
     @After fun close() = db.close()

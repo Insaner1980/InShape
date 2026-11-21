@@ -23,12 +23,17 @@ import androidx.room.Upsert
         Preferences::class,
         EditorDraft::class,
         HealthShareState::class,
-        HealthOutbox::class
+        HealthOutbox::class,
+        ProgramEnrollment::class,
+        ProgramExerciseLink::class,
+        AssistantDraft::class,
+        AssistantReceipt::class,
+        AssistantMemory::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
-@TypeConverters(JournalConverters::class)
+@TypeConverters(JournalConverters::class, ProgramConverters::class)
 abstract class JournalDatabase : RoomDatabase() {
     abstract fun journal(): JournalDao
 }
@@ -37,6 +42,47 @@ abstract class JournalDatabase : RoomDatabase() {
 // Room exposes typed operations for each journal table through this generated DAO.
 @Suppress("TooManyFunctions")
 interface JournalDao {
+    @Query("SELECT * FROM AssistantDraft WHERE `key` = :key")
+    suspend fun assistantDraft(key: String): AssistantDraft?
+
+    @Query("SELECT * FROM AssistantReceipt WHERE id = :id")
+    suspend fun assistantReceipt(id: String): AssistantReceipt?
+
+    @Query("SELECT * FROM AssistantMemory")
+    suspend fun assistantMemories(): List<AssistantMemory>
+
+    @Upsert suspend fun put(value: AssistantDraft)
+    @Upsert suspend fun put(value: AssistantReceipt)
+    @Upsert suspend fun put(value: AssistantMemory)
+
+    @Query("DELETE FROM AssistantDraft WHERE `key` = :key AND id = :id")
+    suspend fun deleteAssistantDraft(key: String, id: String)
+
+    @Query("DELETE FROM AssistantMemory WHERE id = :id AND revision = :revision")
+    suspend fun deleteAssistantMemory(id: String, revision: Long)
+
+    @Query("DELETE FROM AssistantDraft")
+    suspend fun clearAssistantDrafts()
+
+    @Query("DELETE FROM AssistantReceipt")
+    suspend fun clearAssistantReceipts()
+
+    @Query("DELETE FROM AssistantMemory")
+    suspend fun clearAssistantMemories()
+    @Query("SELECT * FROM ProgramEnrollment WHERE slot = 1")
+    suspend fun programEnrollment(): ProgramEnrollment?
+
+    @Query("SELECT * FROM ProgramExerciseLink")
+    suspend fun programLinks(): List<ProgramExerciseLink>
+
+    @Upsert suspend fun put(value: ProgramEnrollment)
+    @Upsert suspend fun put(value: ProgramExerciseLink)
+
+    @Query("DELETE FROM ProgramEnrollment")
+    suspend fun clearProgramEnrollment()
+
+    @Query("DELETE FROM ProgramExerciseLink")
+    suspend fun clearProgramLinks()
     @Query("SELECT * FROM Exercise ORDER BY name COLLATE NOCASE")
     suspend fun exercises(): List<Exercise>
 
@@ -131,6 +177,9 @@ interface JournalDao {
 
     @Query("DELETE FROM HealthOutbox WHERE workoutId=:id")
     suspend fun deleteOutbox(id: String)
+
+    @Query("DELETE FROM HealthOutbox WHERE workoutId=:id AND operation='UPSERT'")
+    suspend fun cancelUpsert(id: String): Int
 
     @Query("DELETE FROM HealthOutbox WHERE operation='UPSERT'")
     suspend fun cancelUpserts()

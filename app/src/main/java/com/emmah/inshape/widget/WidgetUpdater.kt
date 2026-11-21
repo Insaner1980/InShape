@@ -94,10 +94,6 @@ object WidgetUpdater {
         }
     }
 
-    suspend fun requestPin(context: Context): Boolean = GlanceAppWidgetManager(context).requestPinGlanceAppWidget(
-        InShapeWidgetReceiver::class.java,
-        preview = InShapeWidget(previewOnly = true)
-    )
 }
 class WidgetRefreshWorker(context: Context, parameters: WorkerParameters) : CoroutineWorker(context, parameters) {
     override suspend fun doWork(): Result = try {

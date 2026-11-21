@@ -14,10 +14,13 @@ import java.util.UUID
 import kotlinx.serialization.json.Json
 
 internal fun validateBackupData(data: JournalSnapshot) {
+    validatePrograms(data)
     val exercises = ids(data.exercises.map { it.id })
     val routines = ids(data.routines.map { it.id })
     val workouts = ids(data.workouts.map { it.id })
-    val items = ids(data.items.map { it.id })
+    data.items.forEach { uuid(it.id) }
+    val itemWorkouts = data.items.associate { it.id to it.workoutId }
+    require(itemWorkouts.size == data.items.size) { "Duplicate record identity" }
     ids(data.sets.map { it.id })
     val checkIns = ids(data.checkIns.map { it.id })
     ids(data.photos.map { it.id })
@@ -28,14 +31,49 @@ internal fun validateBackupData(data: JournalSnapshot) {
     validatePhotos(data, exercises)
     validateRoutines(data)
     validateRoutineItems(data, routines, exercises)
-    validateWorkouts(data)
-    validateItems(data, workouts, exercises)
-    validateSets(data, items)
+    validateWorkouts(data, itemWorkouts)
+    validateItems(data, workouts, exercises, itemWorkouts)
+    validateSets(data, itemWorkouts.keys)
     validateCheckIns(data, workouts)
     validateObservations(data, checkIns)
     validatePreferences(data)
     validateDrafts(data)
     validateHealthState(data)
+}
+
+private fun validatePrograms(data: JournalSnapshot) {
+    val catalogKey = Regex("[a-z0-9_-]{1,128}")
+    data.programEnrollment?.let { enrollment ->
+        require(enrollment.slot == 1 && enrollment.catalogVersion > 0 && enrollment.programId.matches(catalogKey))
+        uuid(enrollment.id)
+        LocalDate.parse(enrollment.baselineDate)
+        require(enrollment.phaseWeek in 1..8 && enrollment.nextDayIndex >= 0)
+    }
+    require(data.programLinks.distinct().size == data.programLinks.size)
+    val exercises = data.exercises.map { it.id }.toSet()
+    data.programLinks.forEach { require(it.catalogExerciseId.matches(catalogKey) && it.exerciseId in exercises) }
+    ids(data.assistantMemories.map { it.id })
+    data.assistantMemories.forEach { memory ->
+        require(
+            memory.kind in setOf("preference", "reminder", "future") && memory.text.length in 1..1000 && memory.revision > 0 &&
+                if (memory.kind == "preference") memory.exerciseId == null else memory.exerciseId in exercises
+        )
+        memory.creationWorkoutId?.let(::uuid)
+        optionalInstant(memory.acknowledgedAt)
+    }
+    data.workouts.mapNotNull { it.program }.forEach { program ->
+        uuid(program.enrollmentId)
+        require(program.programId.matches(catalogKey) && program.catalogVersion > 0 && program.day.isNotBlank())
+        require(program.dayIndex in 0 until program.rotationSize && program.mode in setOf("STANDARD", "SHORT", "LIGHT"))
+    }
+    (data.items.mapNotNull { it.plan } + data.routineItems.mapNotNull { it.plan }).forEach { plan ->
+        require(plan.restSeconds == null || plan.restSeconds > 0)
+        plan.group?.let { require(it.key.isNotBlank() && it.type.isNotBlank() && it.rounds > 0) }
+    }
+    data.sets.forEach { set ->
+        require(set.rir == null || set.completedAt != null && set.rir in 0..20)
+        require(set.perSide == null || set.completedAt != null)
+    }
 }
 
 private fun uuid(value: String) {
@@ -103,7 +141,7 @@ private fun validateRoutineItems(data: JournalSnapshot, routines: Set<String>, e
     }
 }
 
-private fun validateWorkouts(data: JournalSnapshot) {
+private fun validateWorkouts(data: JournalSnapshot, itemWorkouts: Map<String, String>) {
     data.workouts.forEach { workout ->
         LocalDate.parse(workout.journalDate)
         ZoneId.of(workout.zoneId)
@@ -125,15 +163,12 @@ private fun validateWorkouts(data: JournalSnapshot) {
         )
         require(!workout.timingConfirmed || (workout.start != null && workout.end != null))
         require(workout.revision > 0)
-        require(
-            workout.currentItemId == null ||
-                data.items.any { it.id == workout.currentItemId && it.workoutId == workout.id }
-        )
+        require(workout.currentItemId == null || itemWorkouts[workout.currentItemId] == workout.id)
         require(workout.durationSource in setOf("UNKNOWN", "MANUAL", "INTERVAL"))
     }
 }
 
-private fun validateItems(data: JournalSnapshot, workouts: Set<String>, exercises: Set<String>) {
+private fun validateItems(data: JournalSnapshot, workouts: Set<String>, exercises: Set<String>, itemWorkouts: Map<String, String>) {
     data.items.forEach { item ->
         require(item.workoutId in workouts && item.exerciseId in exercises && item.position >= 0)
         uuid(item.equipmentId)
@@ -146,10 +181,7 @@ private fun validateItems(data: JournalSnapshot, workouts: Set<String>, exercise
         require(item.mode in setOf("SETS", "DURATION", "QUICK"))
         require(
             item.alternativeOf == null ||
-                data.items.any {
-                    it.id == item.alternativeOf && it.workoutId == item.workoutId &&
-                        it.id != item.id
-                }
+                (item.alternativeOf != item.id && itemWorkouts[item.alternativeOf] == item.workoutId)
         )
     }
 }

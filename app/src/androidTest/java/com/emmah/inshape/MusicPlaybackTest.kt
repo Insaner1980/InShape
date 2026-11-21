@@ -6,14 +6,18 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.espresso.Espresso.pressBack
 import androidx.test.platform.app.InstrumentationRegistry
 import com.emmah.inshape.feature.music.MusicRepeat
 import com.emmah.inshape.feature.music.SessionPlayback
@@ -113,20 +117,21 @@ class MusicPlaybackTest {
     }
 
     @Test
-    fun playlistEditorSavesSelectionReorderAndRename() {
+    fun playlistEditorCreatesAndAutosavesReorderAndRename() {
         requireFixture()
         val store = container.music
         val (first, second, third) = runBlocking {
             withTimeout(20_000) { store.catalog.first { it.songs.size == 7 } }.songs.filter { it.available }.take(3)
         }
         val name = "Editor verification"
+        val initialName = "$name draft"
         val renamed = "Renamed editor verification"
         fun options(action: String) {
-            compose.onNodeWithContentDescription("Playlist options").performClick()
+            compose.onNodeWithContentDescription(ui(R.string.playlist_options)).performClick()
             compose.clickText(action)
         }
-        fun filterSongs(current: String, query: String) {
-            compose.onNode(hasText(current) and hasSetTextAction()).performTextReplacement(query)
+        fun filterSongs(query: String) {
+            compose.onNode(hasContentDescription(ui(R.string.search_songs)) and hasSetTextAction()).performTextReplacement(query)
         }
         fun selectSong(title: String) {
             val checkbox = SemanticsMatcher.keyIsDefined(SemanticsProperties.ToggleableState)
@@ -140,50 +145,57 @@ class MusicPlaybackTest {
             }
         }
         try {
-            compose.clickText("Music")
-            compose.clickText("New playlist")
-            compose.onNodeWithText("Save").assertIsNotEnabled()
-            compose.onNodeWithText("Playlist name").performTextReplacement(name)
-            filterSongs("Find songs", "No matching fixture")
-            compose.onNodeWithText("No songs to add").assertIsDisplayed()
-            filterSongs("No matching fixture", first.title)
+            compose.onNodeWithContentDescription(ui(R.string.music)).performClick()
+            compose.onNodeWithContentDescription(ui(R.string.new_playlist)).performClick()
+            compose.onNodeWithText(ui(R.string.new_playlist)).performClick()
+            compose.onNodeWithText(ui(R.string.create_playlist)).assertIsNotEnabled()
+            compose.onNodeWithText(ui(R.string.playlist_name)).performTextReplacement(initialName)
+            filterSongs("No matching fixture")
+            compose.onNodeWithText(ui(R.string.no_songs_to_add)).assertIsDisplayed()
+            filterSongs(first.title)
             selectSong(first.title)
-            filterSongs(first.title, second.title)
+            filterSongs(second.title)
             selectSong(second.title)
-            compose.clickText("Save")
+            compose.clickText(ui(R.string.create_playlist))
+            playlistHas(initialName, listOf(first.id, second.id))
+            compose.waitUntil(20_000) { compose.onAllNodes(hasText(ui(R.string.edit_playlist))).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText(ui(R.string.save)).assertDoesNotExist()
+            compose.onNodeWithText(ui(R.string.playlist_name)).performTextReplacement(name)
+            compose.onNode(hasContentDescription(ui(R.string.back)) and hasAnyAncestor(isDialog())).performClick()
             playlistHas(name, listOf(first.id, second.id))
 
             compose.clickText(name)
             options("Add songs")
-            compose.onNodeWithText("Save").assertIsNotEnabled()
-            filterSongs("Find songs", third.title)
+            compose.onNodeWithText(ui(R.string.add_songs_count, quantity(R.plurals.song_count, 0))).assertIsNotEnabled()
+            filterSongs(third.title)
             selectSong(third.title)
-            compose.clickText("Save")
+            compose.clickText("Add 1 song")
             playlistHas(name, listOf(first.id, second.id, third.id))
 
             options("Edit playlist")
-            compose.onNodeWithContentDescription("Options for ${third.title}").performClick()
-            compose.clickText("Move up")
-            compose.onNodeWithContentDescription("Options for ${first.title}").performClick()
-            compose.clickText("Remove from playlist")
-            compose.clickText("Save")
+            compose.onNodeWithContentDescription(ui(R.string.named_options, third.title)).performClick()
+            compose.clickText(ui(R.string.move_up))
+            compose.onNodeWithContentDescription(ui(R.string.named_options, first.title)).performClick()
+            compose.clickText(ui(R.string.remove_from_playlist))
+            pressBack()
             playlistHas(name, listOf(third.id, second.id))
 
             options("Rename")
-            compose.onNodeWithText("Playlist name").performTextReplacement(renamed)
-            compose.clickText("Save")
+            compose.onNodeWithText(ui(R.string.save)).assertDoesNotExist()
+            compose.onNodeWithText(ui(R.string.playlist_name)).performTextReplacement(renamed)
+            compose.clickText(ui(R.string.close))
             playlistHas(renamed, listOf(third.id, second.id))
             options("Delete playlist")
-            compose.clickText("Cancel")
+            compose.clickText(ui(R.string.cancel))
             compose.onNodeWithText(renamed).assertExists()
             options("Delete playlist")
-            compose.clickText("Delete playlist")
+            compose.clickText(ui(R.string.delete_playlist))
             runBlocking {
                 withTimeout(20_000) { store.catalog.first { catalog -> catalog.playlists.none { it.name == renamed } } }
             }
         } finally {
             runBlocking {
-                store.catalog.value.playlists.filter { it.name == name || it.name == renamed }.forEach { store.delete(it.id) }
+                store.catalog.value.playlists.filter { it.name in setOf(initialName, name, renamed) }.forEach { store.delete(it.id) }
             }
         }
     }

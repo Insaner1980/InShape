@@ -9,6 +9,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.text.format.DateFormat
@@ -46,20 +47,27 @@ fun activeWorkoutNotification(context: Context, notice: ActiveNotice?): Notifica
     val delete = PendingIntent.getBroadcast(
         context,
         63,
-        Intent(context, ActiveWorkoutDismissReceiver::class.java).putExtra("workout_id", notice.id),
+        Intent(context, ActiveWorkoutDismissReceiver::class.java)
+            .setData(Uri.Builder().scheme("inshape").authority("dismiss-workout").appendPath(notice.id).build())
+            .putExtra("workout_id", notice.id),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
-    val builder = Notification.Builder(context, ActiveWorkoutNotifier.CHANNEL)
+    fun timerBuilder() = Notification.Builder(context, ActiveWorkoutNotifier.CHANNEL)
         .setSmallIcon(R.drawable.ic_stat_workout)
-        .setContentTitle(notice.title.ifBlank { "Workout" })
-        .setContentText("Started ${Instant.ofEpochMilli(whenMillis).workoutTime(notice.zone, DateFormat.is24HourFormat(context))}")
         .setWhen(whenMillis).setShowWhen(true).setUsesChronometer(true)
         .setOngoing(true).setOnlyAlertOnce(true)
         .setCategory(if (Build.VERSION.SDK_INT >= 31) Notification.CATEGORY_WORKOUT else Notification.CATEGORY_PROGRESS)
-        .setVisibility(Notification.VISIBILITY_PUBLIC).setLocalOnly(false)
+    val publicVersion = timerBuilder()
+        .setContentTitle(context.getString(R.string.workout_in_progress))
+        .setVisibility(Notification.VISIBILITY_PUBLIC)
+        .build()
+    val builder = timerBuilder()
+        .setContentTitle(notice.title.ifBlank { context.getString(R.string.workout) })
+        .setContentText(context.getString(R.string.started_at, Instant.ofEpochMilli(whenMillis).workoutTime(notice.zone, DateFormat.is24HourFormat(context))))
+        .setVisibility(Notification.VISIBILITY_PRIVATE).setPublicVersion(publicVersion).setLocalOnly(false)
         .setContentIntent(content).setDeleteIntent(delete)
-        .addAction(Notification.Action.Builder(null, "Open", content).build())
-        .addAction(Notification.Action.Builder(null, "Finish", open(MainActivity.OPEN_FINISH, 62)).build())
+        .addAction(Notification.Action.Builder(null, context.getString(R.string.open), content).build())
+        .addAction(Notification.Action.Builder(null, context.getString(R.string.finish), open(MainActivity.OPEN_FINISH, 62)).build())
     if (Build.VERSION.SDK_INT >= 36) {
         // The platform setter arrived in 36.1; the extra also supports Android 16.0.
         builder.addExtras(Bundle().apply { putBoolean("android.requestPromotedOngoing", true) })
@@ -74,13 +82,13 @@ class ActiveWorkoutNotifier(private val context: Context) {
     fun reconcile(notice: ActiveNotice?) {
         synchronized(lock) {
             manager.createNotificationChannel(
-                NotificationChannel(CHANNEL, "Workout in progress", NotificationManager.IMPORTANCE_LOW).apply {
+                NotificationChannel(CHANNEL, context.getString(R.string.workout_in_progress), NotificationManager.IMPORTANCE_LOW).apply {
                     setShowBadge(false)
                 }
             )
-            if (notice != null && preferences.getString("active_workout_id", null) != notice.id) {
+            if (notice != null && preferences.getString(ACTIVE_WORKOUT, null) != notice.id) {
                 preferences.edit {
-                    putString("active_workout_id", notice.id)
+                    putString(ACTIVE_WORKOUT, notice.id)
                     remove(DISMISSED)
                 }
             }
@@ -104,6 +112,7 @@ class ActiveWorkoutNotifier(private val context: Context) {
         const val CHANNEL = "active_workout"
         const val ID = 60
         const val DISMISSED = "dismissed_workout_id"
+        internal const val ACTIVE_WORKOUT = "active_workout_id"
         internal val lock = Any()
     }
 }
@@ -112,7 +121,9 @@ class ActiveWorkoutDismissReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val id = intent.getStringExtra("workout_id") ?: return
         synchronized(ActiveWorkoutNotifier.lock) {
-            context.getSharedPreferences("ui_settings", Context.MODE_PRIVATE).edit {
+            val preferences = context.getSharedPreferences("ui_settings", Context.MODE_PRIVATE)
+            if (preferences.getString(ActiveWorkoutNotifier.ACTIVE_WORKOUT, null) != id) return
+            preferences.edit {
                 putString(ActiveWorkoutNotifier.DISMISSED, id)
             }
             context.getSystemService(NotificationManager::class.java).cancel(ActiveWorkoutNotifier.ID)

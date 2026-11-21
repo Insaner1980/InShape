@@ -1,5 +1,7 @@
 package com.emmah.inshape.feature.settings
 
+import com.emmah.inshape.ui.theme.finnishLocale
+import androidx.compose.ui.res.stringResource
 import android.Manifest
 import android.content.Intent
 import android.os.Build
@@ -11,6 +13,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,8 +27,6 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.NotificationsActive
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
@@ -34,7 +35,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -45,19 +45,17 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.emmah.inshape.JournalViewModel
 import com.emmah.inshape.R
 import com.emmah.inshape.data.JournalSnapshot
-import com.emmah.inshape.data.newId
+import com.emmah.inshape.data.Preferences
 import com.emmah.inshape.health.HealthPrivacyActivity
 import com.emmah.inshape.health.HealthSettings
 import com.emmah.inshape.reminders.ReminderScheduler
 import com.emmah.inshape.transfer.BackupControls
-import com.emmah.inshape.ui.components.DialogAction
 import com.emmah.inshape.ui.components.InShapeSwitch
 import com.emmah.inshape.ui.components.KeyValueRow
 import com.emmah.inshape.ui.components.ListCard
@@ -66,8 +64,6 @@ import com.emmah.inshape.ui.components.OutlineButton
 import com.emmah.inshape.ui.components.Page
 import com.emmah.inshape.ui.components.SectionHeader
 import com.emmah.inshape.ui.components.Stepper
-import com.emmah.inshape.ui.components.TextAction
-import com.emmah.inshape.ui.components.TextField
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
@@ -75,25 +71,23 @@ import com.emmah.inshape.ui.theme.InShapeType
 import com.emmah.inshape.ui.theme.ThemeMode
 import com.emmah.inshape.ui.theme.hasArtworkColumns
 import com.emmah.inshape.ui.theme.workoutTime
-import com.emmah.inshape.widget.WidgetUpdater
 import java.time.DayOfWeek
 import java.time.LocalTime
 import java.time.format.TextStyle
-import java.util.Locale
 import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifier = Modifier, onExport: () -> Unit = {}) {
-    var name by rememberSaveable { mutableStateOf(data.preferences.name) }
-    var nameEditSession by rememberSaveable { mutableStateOf<String?>(null) }
+fun SettingsScreen(
+    data: JournalSnapshot,
+    vm: JournalViewModel,
+    modifier: Modifier = Modifier,
+    onAssistant: (() -> Unit)? = null,
+    onExport: () -> Unit = {}
+) {
     val context = LocalContext.current
-    val colors = InShapeTheme.colors
-    val scope = rememberCoroutineScope()
     val preferences = data.preferences
     val scheduler = remember(context) { ReminderScheduler(context) }
     var notificationsAllowed by remember { mutableStateOf(scheduler.allowed()) }
-    var hasWidget by remember { mutableStateOf(WidgetUpdater.hasWidgets(context)) }
-    var widgetMessage by rememberSaveable { mutableStateOf("") }
     var editReminderTime by rememberSaveable { mutableStateOf(false) }
     val mode by vm.container.themeSettings.mode.collectAsStateWithLifecycle()
     val permission =
@@ -104,42 +98,19 @@ fun SettingsScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifi
         }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         notificationsAllowed = scheduler.allowed()
-        hasWidget =
-            WidgetUpdater.hasWidgets(context)
-    }
-    val days = preferences.reminderDays.sorted().map {
-        DayOfWeek.of(it).getDisplayName(TextStyle.SHORT, Locale.ENGLISH)
-    }
-    val reminderStatus = when {
-        !preferences.remindersEnabled -> null
-
-        !notificationsAllowed -> "Notifications blocked in Android"
-
-        days.isEmpty() -> "Choose at least one day"
-
-        else -> (
-            if (days.size >
-                1
-            ) {
-                days.dropLast(1).joinToString(", ") + " and " + days.last()
-            } else {
-                days.single()
-            }
-            ) +
-            " at ${LocalTime.parse(preferences.reminderTime).workoutTime(DateFormat.is24HourFormat(context))}"
     }
     Page(modifier) {
-        SectionHeader("Profile")
+        if (onAssistant != null) ListCard {
+            item { ListRow(stringResource(R.string.assistant), subtitle = stringResource(R.string.assistant_connection), onClick = onAssistant) }
+        }
+        SectionHeader(stringResource(R.string.goals_and_reminders))
         ListCard {
             item {
-                KeyValueRow("Name", preferences.name.ifBlank { "Add name" }, onClick = {
-                    name = preferences.name
-                    nameEditSession = newId()
-                })
-            }
-            item {
-                ListRow("Weekly goal", titleStyle = MaterialTheme.typography.bodyLarge, subtitle = "Workouts per week", trailing = {
-                    Stepper(preferences.weeklyGoal?.toString() ?: "Off", {
+                ListRow(
+                    stringResource(R.string.weekly_goal),
+                    subtitle = if (preferences.weeklyGoal == null) stringResource(R.string.no_weekly_goal) else stringResource(R.string.workouts_per_week),
+                    trailing = {
+                    Stepper((preferences.weeklyGoal ?: 0).toString(), {
                         vm.write {
                             val value = snapshot().preferences
                             updatePreferences(
@@ -157,181 +128,170 @@ fun SettingsScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifi
                             updatePreferences(
                                 value.copy(
                                     weeklyGoal =
-                                        value.weeklyGoal?.let { Math.addExact(it, 1) } ?: 3
+                                        Math.addExact(value.weeklyGoal ?: 0, 1)
                                 )
                             )
                         }
-                    }, preferences.weeklyGoal != null, "Decrease weekly goal", "Increase weekly goal")
+                    }, preferences.weeklyGoal != null, stringResource(R.string.decrease_goal), stringResource(R.string.increase_goal))
                 })
             }
         }
-        SectionHeader("Reminders")
-        ListCard {
-            item {
-                val held = preferences.remindersHeld
-                val subtitle = if (held) "Paused after restoring a backup" else reminderStatus
-                fun setReminders(enabled: Boolean) {
-                    vm.write {
-                        updatePreferences(
-                            snapshot().preferences.copy(
-                                remindersEnabled = enabled,
-                                remindersHeld = false
-                            )
-                        )
-                    }
-                    if (enabled && Build.VERSION.SDK_INT >= 33 &&
-                        !notificationsAllowed
-                    ) {
-                        permission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    }
-                }
-                ListRow(
-                    "Workout reminders",
-                    subtitle = subtitle,
-                    trailing = { InShapeSwitch(preferences.remindersEnabled && !held, ::setReminders, "Enable workout reminders") },
-                    details = if (held) {
-                        (
-                            {
-                                TextAction("Turn on again", { setReminders(true) }, icon = Icons.Outlined.NotificationsActive)
-                            }
-                            )
-                    } else {
-                        null
-                    }
-                )
-            }
-            if (preferences.remindersEnabled) {
-                item {
-                    Column(
-                        Modifier.padding(vertical = Dimens.innerSmall),
-                        verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)
-                    ) {
-                        Row(Modifier.fillMaxWidth()) {
-                            DayOfWeek.entries.forEach { day ->
-                                val fullName = day.getDisplayName(TextStyle.FULL, Locale.ENGLISH)
-                                val checked = day.value in preferences.reminderDays
-                                androidx.compose.foundation.layout.Box(
-                                    Modifier.weight(1f).heightIn(min = Dimens.touch)
-                                        .semantics { contentDescription = fullName }
-                                        .toggleable(checked, role = Role.Checkbox) {
-                                            vm.write {
-                                                val value = snapshot().preferences
-                                                val days = if (day.value in value.reminderDays) {
-                                                    value.reminderDays - day.value
-                                                } else {
-                                                    (value.reminderDays + day.value).sorted()
-                                                }
-                                                updatePreferences(value.copy(reminderDays = days, remindersHeld = false))
-                                            }
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Surface(
-                                        Modifier.size(Dimens.reminderDay),
-                                        shape = InShapeShapes.pill,
-                                        color = if (checked) colors.ink else colors.background,
-                                        border = BorderStroke(Dimens.line, if (checked) colors.ink else colors.textSecondary)
-                                    ) {
-                                        androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
-                                            Text(
-                                                day.getDisplayName(TextStyle.NARROW, Locale.ENGLISH),
-                                                style = InShapeType.navSelected,
-                                                color = if (checked) colors.onInk else colors.text
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        KeyValueRow(
-                            "Time",
-                            LocalTime.parse(preferences.reminderTime).workoutTime(DateFormat.is24HourFormat(context)),
-                            numeric = true,
-                            onClick = { editReminderTime = true }
-                        )
-                        if (!notificationsAllowed) {
-                            OutlineButton("Notification settings", {
-                                context.startActivity(
-                                    Intent(
-                                        Settings.ACTION_APP_NOTIFICATION_SETTINGS
-                                    ).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                                )
-                            })
-                        }
-                    }
-                }
-            }
-        }
+        SettingsReminderCard(
+            preferences,
+            vm,
+            notificationsAllowed,
+            { permission.launch(Manifest.permission.POST_NOTIFICATIONS) },
+            { editReminderTime = true }
+        )
         HealthSettings(data, vm)
-        SectionHeader("Appearance")
+        SectionHeader(stringResource(R.string.appearance))
         Column(verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)) {
             ThemePreviews(mode, vm.container.themeSettings::set)
         }
-        SectionHeader("Your data")
+        SectionHeader(stringResource(R.string.your_data))
         BackupControls(vm, preferences.lastBackupAt) {
             item {
                 ListRow(
-                    "Export CSV or PDF",
+                    stringResource(R.string.export),
                     titleStyle = MaterialTheme.typography.bodyLarge,
                     onClick = onExport
                 )
             }
-            item {
-                ListRow(
-                    "Home screen widget",
-                    titleStyle = MaterialTheme.typography.bodyLarge,
-                    subtitle = if (hasWidget) "Placed" else "Not placed yet",
-                    onClick = {
-                        scope.launch {
-                            widgetMessage = if (WidgetUpdater.requestPin(context)) {
-                                "Confirm placement in your launcher. InShape checks placement when you return."
-                            } else {
-                                "Touch and hold an empty area of your home screen, choose Widgets, then InShape."
-                            }
-                        }
-                    }
-                )
-            }
         }
-        if (widgetMessage.isNotEmpty()) {
-            Text(
-                widgetMessage,
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.textSecondary
-            )
-        }
-        SectionHeader("Privacy")
+        SectionHeader(stringResource(R.string.privacy))
         ListCard {
             item {
-                ListRow("Privacy and permissions", onClick = {
+                ListRow(stringResource(R.string.privacy_and_permissions), onClick = {
                     context.startActivity(Intent(context, HealthPrivacyActivity::class.java))
                 })
             }
         }
     }
-    val session = nameEditSession
-    if (session != null) {
-        AlertDialog(
-            onDismissRequest = { nameEditSession = null },
-            title = { Text("Name") },
-            text = { TextField(name, "Name", { name = it }, singleLine = true) },
-            confirmButton = {
-                DialogAction("Save", {
-                    val value = name
-                    vm.write {
-                        updatePreferences(snapshot().preferences.copy(name = value))
-                        if (nameEditSession == session && name == value) nameEditSession = null
-                    }
-                })
-            },
-            dismissButton = { DialogAction("Cancel", { nameEditSession = null }) }
-        )
-    }
     if (editReminderTime) {
-        com.emmah.inshape.ui.components.RecordedTimePicker("Reminder time", preferences.reminderTime, { time ->
-            vm.write { updatePreferences(snapshot().preferences.copy(reminderTime = time, remindersHeld = false)) }
+        com.emmah.inshape.ui.components.RecordedTimePicker(stringResource(R.string.reminder_time), preferences.reminderTime, { time ->
+            vm.write { updatePreferences(snapshot().preferences.copy(reminderTime = time)) }
             editReminderTime = false
         }, { editReminderTime = false })
+    }
+}
+
+@Composable
+private fun SettingsReminderCard(
+    preferences: Preferences,
+    vm: JournalViewModel,
+    notificationsAllowed: Boolean,
+    requestPermission: () -> Unit,
+    onEditTime: () -> Unit
+) {
+    val context = LocalContext.current
+    val days = preferences.reminderDays.sorted().map {
+        DayOfWeek.of(it).getDisplayName(TextStyle.SHORT, finnishLocale)
+    }
+    val reminderStatus = when {
+        !preferences.remindersEnabled -> null
+
+        !notificationsAllowed -> stringResource(R.string.notifications_blocked)
+
+        days.isEmpty() -> stringResource(R.string.choose_at_least_one_day)
+
+        else -> {
+            val labels = if (days.size == 1) days.single()
+            else stringResource(R.string.day_join, days.dropLast(1).joinToString(", "), days.last())
+            stringResource(R.string.format_rest_days, labels, LocalTime.parse(preferences.reminderTime).workoutTime(true))
+        }
+    }
+    ListCard {
+        item {
+            val held = preferences.remindersHeld
+            val subtitle = reminderStatus.takeUnless { held }
+            fun setReminders(enabled: Boolean) {
+                vm.write {
+                    updatePreferences(
+                        snapshot().preferences.copy(
+                            remindersEnabled = enabled,
+                            remindersHeld = false
+                        )
+                    )
+                }
+                if (enabled && Build.VERSION.SDK_INT >= 33 &&
+                    !notificationsAllowed
+                ) {
+                    requestPermission()
+                }
+            }
+            ListRow(
+                stringResource(R.string.workout_reminders),
+                subtitle = subtitle,
+                trailing = { InShapeSwitch(preferences.remindersEnabled && !held, ::setReminders, stringResource(R.string.enable_workout_reminders)) }
+            )
+        }
+        if (preferences.remindersEnabled && !preferences.remindersHeld) {
+            item {
+                Column(
+                    Modifier.padding(vertical = Dimens.innerSmall),
+                    verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)
+                ) {
+                    ReminderDays(preferences, vm)
+                    KeyValueRow(
+                        stringResource(R.string.time),
+                        LocalTime.parse(preferences.reminderTime).workoutTime(DateFormat.is24HourFormat(context)),
+                        numeric = true,
+                        onClick = onEditTime
+                    )
+                    if (!notificationsAllowed) {
+                        OutlineButton(stringResource(R.string.notification_settings), {
+                            context.startActivity(
+                                Intent(
+                                    Settings.ACTION_APP_NOTIFICATION_SETTINGS
+                                ).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                            )
+                        })
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReminderDays(preferences: Preferences, vm: JournalViewModel) {
+    val colors = InShapeTheme.colors
+    Row(Modifier.fillMaxWidth()) {
+        DayOfWeek.entries.forEach { day ->
+            val fullName = day.getDisplayName(TextStyle.FULL, finnishLocale)
+            val checked = day.value in preferences.reminderDays
+            Box(
+                Modifier.weight(1f).heightIn(min = Dimens.touch)
+                    .semantics { contentDescription = fullName }
+                    .toggleable(checked, role = Role.Checkbox) {
+                        vm.write {
+                            val value = snapshot().preferences
+                            val days = if (day.value in value.reminderDays) {
+                                value.reminderDays - day.value
+                            } else {
+                                (value.reminderDays + day.value).sorted()
+                            }
+                            updatePreferences(value.copy(reminderDays = days))
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    Modifier.size(Dimens.reminderDay),
+                    shape = InShapeShapes.pill,
+                    color = if (checked) colors.ink else colors.background,
+                    border = BorderStroke(Dimens.line, if (checked) colors.ink else colors.textSecondary)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            day.getDisplayName(TextStyle.SHORT, finnishLocale),
+                            style = InShapeType.navSelected,
+                            color = if (checked) colors.onInk else colors.text
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -345,38 +305,44 @@ private fun ThemePreviews(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
     )
     fun Modifier.themeOption(mode: ThemeMode): Modifier {
         val isSelected = selected == mode
-        return then(if (isSelected) Modifier.border(2.dp, colors.ink, InShapeShapes.field) else Modifier)
+        return then(if (isSelected) Modifier.border(Dimens.ring, colors.ink, InShapeShapes.field) else Modifier)
             .selectable(isSelected, role = Role.RadioButton, onClick = { onSelect(mode) })
     }
     BoxWithConstraints(Modifier.fillMaxWidth().selectableGroup()) {
         if (hasArtworkColumns()) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.innerSmall)) {
                 choices.forEach { (mode, artwork) ->
                     Column(
-                        Modifier.weight(1f).themeOption(mode).padding(4.dp),
+                        Modifier.weight(1f).themeOption(mode).padding(Dimens.innerTiny),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalArrangement = Arrangement.spacedBy(Dimens.innerTiny)
                     ) {
-                        Image(painterResource(artwork), null, Modifier.widthIn(max = 112.dp).fillMaxWidth().aspectRatio(160f / 124f))
-                        Text(mode.name)
+                        Image(painterResource(artwork), null, Modifier.widthIn(max = Dimens.themePreviewWidth).fillMaxWidth().aspectRatio(160f / 124f))
+                        Text(stringResource(mode.label()))
                     }
                 }
             }
         } else {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)) {
                 choices.forEach { (mode, artwork) ->
                     val isSelected = selected == mode
                     Row(
-                        Modifier.fillMaxWidth().heightIn(min = Dimens.touch).themeOption(mode).padding(horizontal = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        Modifier.fillMaxWidth().heightIn(min = Dimens.touch).themeOption(mode).padding(horizontal = Dimens.innerSmall),
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.itemGap),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Image(painterResource(artwork), null, Modifier.size(48.dp))
-                        Text(mode.name, Modifier.weight(1f))
+                        Image(painterResource(artwork), null, Modifier.size(Dimens.touch))
+                        Text(stringResource(mode.label()), Modifier.weight(1f))
                         RadioButton(isSelected, onClick = null)
                     }
                 }
             }
         }
     }
+}
+
+internal fun ThemeMode.label() = when (this) {
+    ThemeMode.System -> R.string.settings_theme_system
+    ThemeMode.Light -> R.string.settings_theme_light
+    ThemeMode.Dark -> R.string.settings_theme_dark
 }

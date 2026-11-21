@@ -8,6 +8,9 @@ import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import androidx.glance.color.ColorProvider
+import androidx.glance.text.FontWeight as WidgetFontWeight
+import androidx.glance.text.TextStyle as WidgetTextStyle
 import com.emmah.inshape.R
 
 val Inter = FontFamily(
@@ -24,25 +27,51 @@ private fun style(size: Int, height: Int, weight: FontWeight = FontWeight.Normal
     letterSpacing = spacing.em
 )
 
+private val compactHero = style(40, 44, FontWeight.Medium, -.03f).copy(fontFeatureSettings = "tnum")
+private val pageTitle = style(28, 34, FontWeight.SemiBold, -.02f)
+private val sectionTitle = style(20, 26, FontWeight.SemiBold, -.01f)
+private val numericTitle = sectionTitle.copy(fontFeatureSettings = "tnum")
+private val body = style(16, 22)
+private val emphasizedBody = body.copy(fontWeight = FontWeight.SemiBold)
+private val secondaryBody = style(13, 18)
+private val caption = secondaryBody.copy(fontWeight = FontWeight.Medium)
+
 val AppTypography = Typography(
     displayLarge = style(56, 60, FontWeight.Medium, -.03f).copy(fontFeatureSettings = "tnum"),
-    displayMedium = style(40, 44, FontWeight.Medium, -.03f),
-    displaySmall = style(40, 44, FontWeight.Medium, -.03f).copy(fontFeatureSettings = "tnum"),
-    headlineLarge = style(28, 34, FontWeight.SemiBold, -.02f),
-    headlineMedium = style(28, 34, FontWeight.SemiBold, -.02f),
-    headlineSmall = style(20, 26, FontWeight.SemiBold, -.01f),
-    titleLarge = style(20, 26, FontWeight.SemiBold, -.01f),
-    titleMedium = style(16, 22, FontWeight.SemiBold),
-    titleSmall = style(16, 22, FontWeight.SemiBold),
-    bodyLarge = style(15, 22), bodyMedium = style(13, 18), bodySmall = style(13, 18),
-    labelLarge = style(15, 20, FontWeight.SemiBold),
-    labelMedium = style(14, 20, FontWeight.Medium),
-    labelSmall = style(12, 16, FontWeight.Medium, .01f)
+    displayMedium = compactHero,
+    displaySmall = compactHero,
+    headlineLarge = pageTitle,
+    headlineMedium = pageTitle,
+    headlineSmall = sectionTitle,
+    titleLarge = sectionTitle,
+    titleMedium = emphasizedBody,
+    titleSmall = emphasizedBody,
+    bodyLarge = body,
+    bodyMedium = secondaryBody,
+    bodySmall = secondaryBody,
+    labelLarge = emphasizedBody,
+    labelMedium = caption,
+    labelSmall = caption
 )
 
 object InShapeType {
-    val setValue = style(18, 24, FontWeight.SemiBold).copy(fontFeatureSettings = "tnum")
-    val numeric = AppTypography.bodyLarge.copy(fontFeatureSettings = "tnum")
+    val todayTitle = style(27, 34, FontWeight.SemiBold, -.02f)
+    val workoutClock = numericTitle
+    val workoutClockCompact = caption.copy(fontFeatureSettings = "tnum")
+    val setValue = numericTitle
+    val numeric = body.copy(fontFeatureSettings = "tnum")
     val nav = style(12, 16)
-    val navSelected = style(12, 16, FontWeight.SemiBold)
+    val navSelected = nav.copy(fontWeight = FontWeight.SemiBold)
+}
+
+internal object WidgetTypography {
+    val title = WidgetTextStyle(
+        color = ColorProvider(LightColors.text, DarkColors.text),
+        fontSize = AppTypography.titleMedium.fontSize,
+        fontWeight = WidgetFontWeight.Medium
+    )
+    val label = WidgetTextStyle(
+        color = ColorProvider(LightColors.textSecondary, DarkColors.textSecondary),
+        fontSize = AppTypography.labelSmall.fontSize
+    )
 }

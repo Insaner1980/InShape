@@ -5,6 +5,7 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
@@ -28,7 +29,6 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
@@ -46,6 +46,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import com.emmah.inshape.R
 import com.emmah.inshape.ui.theme.Dimens
@@ -82,7 +84,7 @@ fun InShapeCard(
     val card = modifier.fillMaxWidth()
     val colors = InShapeTheme.colors
     val shape = if (inset) InShapeShapes.field else InShapeShapes.card
-    val border = if (inset || color == colors.ink) null else BorderStroke(Dimens.line, borderColor)
+    val border = if (inset || wash != null || color == colors.ink) null else BorderStroke(Dimens.line, borderColor)
     val background = if (inset) colors.surface else color
     if (onClick == null) {
         Surface(card, shape = shape, border = border, color = background, contentColor = colors.text, content = body)
@@ -125,17 +127,17 @@ fun Page(
                     Snackbar(entry, containerColor = colors.ink, contentColor = colors.onInk, actionColor = colors.onInk)
                 }
             }
-            if (bottomBar != null) BottomActionBar(scrollState.canScrollForward, bottomBar)
+            if (bottomBar != null) BottomActionBar(bottomBar)
         }
     }
 }
 
 @Composable
-internal fun BottomActionBar(scrolledContent: Boolean, content: @Composable () -> Unit) {
+internal fun BottomActionBar(content: @Composable () -> Unit) {
     val colors = InShapeTheme.colors
     Surface(color = colors.background) {
         Column {
-            HorizontalDivider(color = if (scrolledContent) colors.divider else colors.background, thickness = Dimens.line)
+            HorizontalDivider(color = colors.divider, thickness = Dimens.line)
             Box(
                 Modifier.fillMaxWidth().navigationBarsPadding().padding(
                     start = Dimens.screenPadding,
@@ -156,23 +158,22 @@ fun PushedHeader(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     title: String = "",
-    endInset: Boolean = false,
+    trailingText: Boolean = false,
+    titleContent: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
     val colors = InShapeTheme.colors
     TopAppBar(
-        title = { if (title.isNotEmpty()) Text(title, style = MaterialTheme.typography.titleLarge) },
+        title = titleContent ?: { if (title.isNotEmpty()) Text(title, style = MaterialTheme.typography.titleLarge) },
         modifier = modifier,
         navigationIcon = {
-            IconButton(onBack, Modifier.size(Dimens.touch)) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back))
-            }
+            HeaderIconButton(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back), onBack)
         },
         actions = {
             actions()
-            if (endInset) Spacer(Modifier.width(Dimens.headerActionEnd))
+            if (trailingText) Spacer(Modifier.width(Dimens.headerActionEnd))
         },
-        expandedHeight = if (LocalDensity.current.fontScale >= 1.3f && title.isNotEmpty()) Dimens.topBarLarge else Dimens.rowMinTwoLine,
+        expandedHeight = if (LocalDensity.current.fontScale >= 1.3f && (title.isNotEmpty() || titleContent != null)) Dimens.topBarLarge else Dimens.rowMinTwoLine,
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = colors.background,
             scrolledContainerColor = colors.background,
@@ -182,20 +183,35 @@ fun PushedHeader(
 }
 
 @Composable
-fun KeyValueRow(label: String, value: String, modifier: Modifier = Modifier, numeric: Boolean = false, onClick: (() -> Unit)? = null) {
-    ListRow(
-        label,
-        modifier,
-        titleStyle = MaterialTheme.typography.bodyLarge,
-        trailing = {
-            Text(
-                value,
-                style = if (numeric) InShapeType.numeric else MaterialTheme.typography.bodyLarge,
-                color = if (onClick == null) InShapeTheme.colors.textSecondary else InShapeTheme.colors.text
-            )
-        },
-        onClick = onClick
-    )
+fun KeyValueRow(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    numeric: Boolean = false,
+    enabled: Boolean = true,
+    onClick: (() -> Unit)? = null
+) {
+    BoxWithConstraints(modifier) {
+        val valueModifier = if (LocalDensity.current.fontScale >= 1.3f) {
+            Modifier
+        } else {
+            Modifier.widthIn(max = maxWidth * 0.65f)
+        }
+        ListRow(
+            label,
+            titleStyle = MaterialTheme.typography.bodyLarge,
+            trailingValue = {
+                Text(
+                    value,
+                    valueModifier,
+                    style = if (numeric) InShapeType.numeric else MaterialTheme.typography.bodyLarge,
+                    color = if (onClick == null) InShapeTheme.colors.textSecondary else InShapeTheme.colors.text
+                )
+            },
+            onClick = onClick,
+            enabled = enabled
+        )
+    }
 }
 
 @Composable
@@ -216,23 +232,26 @@ fun ResponsiveRow(modifier: Modifier = Modifier, content: @Composable FlowRowSco
 }
 
 @Composable
-fun ScreenHeader(title: String, modifier: Modifier = Modifier, trailing: (@Composable () -> Unit)? = null) {
-    if (LocalDensity.current.fontScale >=
-        1.3f
+fun ScreenHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+    maxLines: Int = Int.MAX_VALUE,
+    titleStyle: TextStyle = MaterialTheme.typography.headlineLarge,
+    trailing: (@Composable () -> Unit)? = null
+) {
+    Row(
+        modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Dimens.innerSmall)
     ) {
-        Column(modifier, verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)) {
-            Text(title, style = MaterialTheme.typography.headlineMedium)
-            trailing?.invoke()
-        }
-    } else {
-        Row(
-            modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimens.innerSmall)
-        ) {
-            Text(title, Modifier.weight(1f), style = MaterialTheme.typography.headlineMedium)
-            trailing?.invoke()
-        }
+        Text(
+            title,
+            Modifier.weight(1f),
+            style = titleStyle,
+            maxLines = maxLines,
+            overflow = TextOverflow.Ellipsis
+        )
+        trailing?.invoke()
     }
 }
 
@@ -240,19 +259,15 @@ fun ScreenHeader(title: String, modifier: Modifier = Modifier, trailing: (@Compo
 fun SectionHeader(
     text: String,
     modifier: Modifier = Modifier,
-    action: String? = null,
-    onAction: (() -> Unit)? = null,
-    quiet: Boolean = false,
     trailing: (@Composable () -> Unit)? = null
 ) {
     ResponsiveRow(modifier.padding(top = Dimens.sectionGap - Dimens.itemGap)) {
         Text(
             text,
             Modifier.weight(1f).align(Alignment.CenterVertically),
-            style = if (quiet) MaterialTheme.typography.labelSmall else MaterialTheme.typography.titleMedium,
-            color = if (quiet) InShapeTheme.colors.textSecondary else InShapeTheme.colors.text
+            style = MaterialTheme.typography.titleLarge,
+            color = InShapeTheme.colors.text
         )
-        if (action != null && onAction != null) TextAction(action, onAction)
         trailing?.invoke()
     }
 }

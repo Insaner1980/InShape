@@ -29,8 +29,11 @@ class RoutineDurationDraftTest {
                 durationReviewed = true
             )
             val restored = Json.decodeFromString<RoutineItemDraft>(Json.encodeToString(draft))
+            assertEquals(seconds, restored.preservedFractionalDuration)
             assertEquals(seconds, restored.copy(note = "Changed note").plannedDurationSeconds())
-            assertEquals(120L, restored.copy(duration = "2", originalDurationSeconds = null).plannedDurationSeconds())
+            val changed = restored.copy(duration = "2", originalDurationSeconds = null)
+            assertNull(changed.preservedFractionalDuration)
+            assertEquals(120L, changed.plannedDurationSeconds())
             assertTrue(runCatching { restored.copy(duration = "0", originalDurationSeconds = null).plannedDurationSeconds() }.isFailure)
         }
     }

@@ -21,6 +21,9 @@ import java.time.ZoneId
 import java.util.UUID
 
 object DemoFixtures {
+    const val FULL_BODY = "Koko vartalo A"
+    private val durationExercises = setOf(0, 6, 7)
+
     val clock: Clock = Clock.fixed(
         Instant.parse("2026-11-13T09:15:00Z"),
         ZoneId.of("Europe/Helsinki")
@@ -28,7 +31,7 @@ object DemoFixtures {
     fun id(label: String) = UUID.nameUUIDFromBytes("inshape-demo:$label".toByteArray()).toString()
     val activeId = id("active")
     val routineId = id("full-body")
-    val pulldownId = id("Lat pulldown")
+    val pulldownId = id("Ylätalja")
     val names =
         listOf(
             "TodayWithActiveWorkout",
@@ -49,7 +52,8 @@ object DemoFixtures {
             "TodayStrength",
             "TodayMobility",
             "TodayShort",
-            "ProgressWithoutAttendance"
+            "ProgressWithoutAttendance",
+            "ProgramWorkout"
         )
     private val artworkRoutines = mapOf("TodayStrength" to routineId, "TodayMobility" to id("mobility"), "TodayShort" to id("short"))
     fun route(state: String): String = when (state) {
@@ -62,6 +66,7 @@ object DemoFixtures {
         "ProgressWithHistory" -> "History?view=progress&exercise=$pulldownId"
         "SparseHistory", "ProgressWithoutAttendance" -> "History?view=progress"
         "HistoryNovember" -> "History"
+        "ProgramWorkout" -> "program-next/rauhallinen-aloitus"
         "LibraryRoutineExpanded" -> "routine/$routineId"
         "SettingsConfigured" -> "Settings"
         else -> "Today"
@@ -69,24 +74,45 @@ object DemoFixtures {
     suspend fun load(container: AppContainer, state: String) {
         require(!container.integrationsEnabled && state in names)
         container.storageReady.await()
-        val now = clock.instant().toString()
-        val zone = clock.zone.id
-        val exerciseNames =
-            listOf(
-                "Warm-up bike",
-                "Leg press",
-                "Seated row",
-                "Chest press",
-                "Lat pulldown",
-                "Leg curl",
-                "Hip flexor stretch",
-                "Shoulder mobility",
-                "Assisted pull-up machine",
-                "Band pulldown, home"
-            )
-        val exercises = exerciseNames.mapIndexed { index, name ->
-            Exercise(
-                id = id(name), equipmentId = id("machine:$name"), name = name,
+
+        val exercises = demoExercises()
+        val routines = listOf(
+            Routine(routineId, FULL_BODY, durationMinutes = 50),
+            Routine(id("short"), "Lyhyt 20 min", "Väsyneille päiville", 20),
+            Routine(id("mobility"), "Liikkuvuutta kotona", "Ilman välineitä", 15)
+        )
+        val routineItems = demoRoutineItems(routines, exercises)
+        val activeRoutine = artworkRoutines[state]
+        val workouts = demoWorkouts(state, exercises)
+        writeFixtures(container, state, activeRoutine, exercises, routines, routineItems, workouts)
+        if (state == "ProgramWorkout") {
+            val catalog = container.programs
+            val program = catalog.programs.first()
+            val choices = program.sessions.first().exercises.associate { slot ->
+                slot.exerciseId to exercises.firstOrNull { it.name == slot.name }?.id
+            }
+            container.repository.enrollProgram(catalog.schemaVersion, program, choices)
+        }
+    }
+
+    private fun demoExercises(): List<Exercise> {
+        val names = listOf(
+            "Lämmittelypyörä",
+            "Jalkaprässi",
+            "Vaakasoutu laitteessa",
+            "Rintapunnerruslaite",
+            "Ylätalja",
+            "Reiden koukistus istuen",
+            "Lonkan koukistajan venytys",
+            "Olkapään liikkuvuus",
+            "Avustettu leuanveto",
+            "Ylätalja kuminauhalla"
+        )
+        return names.mapIndexed { index, name ->
+            val exercise = Exercise(
+                id = id(name),
+                equipmentId = id("machine:$name"),
+                name = name,
                 category = when (index) {
                     0 -> "Warm-up"
                     6, 7 -> "Mobility"
@@ -97,224 +123,82 @@ object DemoFixtures {
                     8 -> "assistance_kg"
                     else -> "kg"
                 },
-                location = if (index ==
-                    9
-                ) {
-                    "Home"
-                } else {
-                    "Gym"
-                },
-                equipmentName = if (index ==
-                    4
-                ) {
-                    "Pulldown machine"
-                } else {
-                    ""
-                },
-                favorite = index == 4,
-                muscles = if (index ==
-                    4
-                ) {
-                    "Back, arms"
-                } else {
-                    ""
-                },
-                settings = if (index ==
-                    4
-                ) {
-                    listOf(
-                        Setting("Seat height", "4"),
-                        Setting("Thigh pad", "2"),
-                        Setting("Handle", "Wide bar"),
-                        Setting("Backrest", "None")
-                    )
-                } else {
-                    emptyList()
-                },
-                instructions = if (index ==
-                    4
-                ) {
-                    "Sit tall, chest up. Pull the bar to the upper chest with elbows pointing down. Let it " +
-                        "rise slowly. Stop if the shoulder pinches."
-                } else {
-                    ""
-                },
-                alternatives = if (index ==
-                    4
-                ) {
-                    listOf(id(exerciseNames[8]), id(exerciseNames[9]))
-                } else {
-                    emptyList()
-                },
-                links = if (index ==
-                    4
-                ) {
-                    listOf(
-                        SavedLink("Exercise information", "https://www.nhs.uk/live-well/exercise/")
-                    )
-                } else {
-                    emptyList()
-                }
+                location = if (index == 9) "Koti" else "Sali"
             )
+            if (index == 4) {
+                exercise.copy(
+                    equipmentName = "Ylätalja",
+                    favorite = true,
+                    muscles = "Selkä ja kädet",
+                    settings = listOf(
+                        Setting("Istuinkorkeus", "4"),
+                        Setting("Reisituki", "2"),
+                        Setting("Kahva", "Leveä tanko"),
+                        Setting("Selkänoja", "Ei mitään")
+                    ),
+                    instructions = "Istu ryhdikkäästi. Vedä tanko ylärinnalle ja pidä kyynärpäät alaspäin. Palauta tanko hitaasti.",
+                    alternatives = listOf(id(names[8]), id(names[9])),
+                    links = listOf(SavedLink("Liikkeen tiedot", "https://www.nhs.uk/live-well/exercise/"))
+                )
+            } else {
+                exercise
+            }
         }
-        val routines =
-            listOf(
-                Routine(routineId, "Full body A", durationMinutes = 50),
-                Routine(id("short"), "Short 20 min", "For tired days", 20),
-                Routine(id("mobility"), "Mobility at home", "No equipment", 15)
-            )
-        val routineItems = routines.flatMapIndexed { r, routine ->
-            val indices = when (r) {
+    }
+
+    private fun demoRoutineItems(routines: List<Routine>, exercises: List<Exercise>): List<RoutineItem> =
+        routines.flatMapIndexed { routineIndex, routine ->
+            val indices = when (routineIndex) {
                 0 -> (0..6).toList()
                 1 -> listOf(0, 1, 2, 4)
                 else -> listOf(6, 7, 6, 7, 6, 7)
             }
             indices.mapIndexed { position, index ->
+                val quick = index in durationExercises
+                val load = if (index == 4) "27.5" else "25"
                 RoutineItem(
-                    id("plan:$r:$position"),
+                    id("plan:$routineIndex:$position"),
                     routine.id,
                     exercises[index].id,
                     position,
-                    mode = if (index in
-                        listOf(0, 6, 7)
-                    ) {
-                        "DURATION"
-                    } else {
-                        "SETS"
-                    },
-                    durationSeconds = if (index in
-                        listOf(0, 6, 7)
-                    ) {
-                        300
-                    } else {
-                        null
-                    },
-                    sets = if (index in
-                        listOf(0, 6, 7)
-                    ) {
-                        emptyList()
-                    } else {
-                        List(3) {
-                            SetTarget(
-                                if (index ==
-                                    4
-                                ) {
-                                    "27.5"
-                                } else {
-                                    "25"
-                                },
-                                10
-                            )
-                        }
-                    }
+                    mode = if (quick) "DURATION" else "SETS",
+                    durationSeconds = if (quick) 300 else null,
+                    sets = if (quick) emptyList() else List(3) { SetTarget(load, 10) }
                 )
             }
         }
+
+    private class WorkoutFixtures {
         val workouts = mutableListOf<WorkoutEntity>()
         val items = mutableListOf<SessionItem>()
         val sets = mutableListOf<SessionSet>()
         val checks = mutableListOf<CheckIn>()
         val observations = mutableListOf<BodyObservation>()
-        fun addWorkout(label: String, date: LocalDate, minutes: Int, load: String, full: Boolean = true) {
-            val start = date.atTime(10, 0).atZone(clock.zone).toInstant()
-            val end = start.plusSeconds(minutes * 60L)
-            val workoutId = id(label)
-            workouts +=
-                WorkoutEntity(
-                    workoutId,
-                    "Full body A",
-                    sourceRoutineId = routineId,
-                    state = "COMPLETED",
-                    activeKey = null,
-                    journalDate = date.toString(),
-                    start = start.toString(),
-                    end = end.toString(),
-                    zoneId = zone,
-                    startOffset = start.atZone(
-                        clock.zone
-                    ).offset.id,
-                    endOffset = end.atZone(clock.zone).offset.id,
-                    durationSeconds =
-                        minutes * 60L,
-                    durationSource = "MANUAL", timingConfirmed = true, createdAt = start.toString(), modifiedAt = end.toString()
-                )
-            val indices = if (full) (0..6).toList() else listOf(0)
-            indices.forEachIndexed { pos, index ->
-                val exercise = exercises[index]
-                val itemId = id("$label:item:$pos")
-                val quick = index in listOf(0, 6, 7)
-                items +=
-                    demoItem(exercise, itemId, workoutId, pos).copy(
-                        disposition = "DONE",
-                        quickCompletedAt = if (quick) end.toString() else null,
-                        durationSeconds = if (quick) 300 else null,
-                        note = if (index == 4) "Felt good. Keep shoulders down." else ""
-                    )
-                if (!quick) {
-                    repeat(3) { number ->
-                        sets +=
-                            SessionSet(
-                                id("$label:set:$pos:$number"),
-                                itemId,
-                                number,
-                                rawLoad = if (index ==
-                                    4
-                                ) {
-                                    load
-                                } else {
-                                    "25"
-                                },
-                                rawReps = "10",
-                                load = if (index ==
-                                    4
-                                ) {
-                                    load
-                                } else {
-                                    "25"
-                                },
-                                reps = 10,
-                                completedAt = end.toString()
-                            )
-                    }
-                }
-            }
-            val after =
-                CheckIn(id("$label:after"), workoutId, "AFTER", end.toString(), zone, "GOOD", 6)
-            val before =
-                CheckIn(id("$label:before"), workoutId, "BEFORE", start.toString(), zone, "OK")
-            checks += listOf(before, after)
-            observations +=
-                listOf(
-                    BodyObservation(before.id, "lower_back", 5, 7),
-                    BodyObservation(after.id, "lower_back", 3, 4)
-                )
-        }
+    }
+
+    private fun demoWorkouts(state: String, exercises: List<Exercise>): WorkoutFixtures {
+        val fixtures = WorkoutFixtures()
         if (state == "ProgressWithHistory") {
             val counts = listOf(1, 2, 2, 1, 3, 2, 2, 2)
             val loads = listOf("20", "20", "22.5", "22.5", "22.5", "25", "25", "27.5")
             val first = LocalDate.parse("2026-11-09").minusWeeks(7)
             counts.forEachIndexed { week, count ->
                 repeat(count) { visit ->
-                    addWorkout(
+                    val full = visit == count - 1
+                    fixtures.addCompletedWorkout(
+                        exercises,
                         "progress:$week:$visit",
-                        first.plusWeeks(week.toLong()).plusDays(
-                            if (visit ==
-                                count - 1
-                            ) {
-                                4
-                            } else {
-                                visit.toLong()
-                            }
-                        ),
+                        first.plusWeeks(week.toLong()).plusDays(if (full) 4L else visit.toLong()),
                         45,
                         loads[week],
-                        full = visit == count - 1
+                        full = full
                     )
                 }
             }
         } else {
             listOf(2, 4, 6, 9, 11).forEachIndexed { index, day ->
-                addWorkout(
+                fixtures.addCompletedWorkout(
+                    exercises,
                     "november:$day",
                     LocalDate.of(2026, 11, day),
                     listOf(45, 63, 25, 45, 52)[index],
@@ -325,146 +209,184 @@ object DemoFixtures {
         if (state !in artworkRoutines &&
             state !in setOf("ProgressWithHistory", "HistoryNovember", "SparseHistory", "Empty", "ProgressWithoutAttendance")
         ) {
-            workouts +=
-                WorkoutEntity(
-                    activeId,
-                    "Full body A",
-                    sourceRoutineId = routineId,
-                    journalDate = "2026-11-13",
-                    start = clock.instant().minusSeconds(32 * 60 + 15).toString(),
-                    zoneId = zone,
-                    startOffset = "+02:00",
-                    currentItemId = id(
-                        "active:item:4"
-                    ),
-                    createdAt = "2026-11-13T08:42:00Z", modifiedAt = now
-                )
-            exercises.take(8).forEachIndexed { index, exercise ->
-                val itemId = id("active:item:$index")
-                val quick = index in listOf(0, 6, 7)
-                items +=
-                    demoItem(exercise, itemId, activeId, index).copy(
-                        disposition = if (index <
-                            4
-                        ) {
-                            "DONE"
-                        } else {
-                            "PLANNED"
-                        },
-                        quickCompletedAt = if (index ==
-                            0
-                        ) {
-                            now
-                        } else {
-                            null
-                        },
-                        durationSeconds = if (index ==
-                            0
-                        ) {
-                            300
-                        } else {
-                            null
-                        },
-                        targetDurationSeconds = if (quick) 300 else null
+            fixtures.addActiveWorkout(exercises, state == "CheckInAfter")
+        }
+        return fixtures
+    }
+
+    private fun WorkoutFixtures.addCompletedWorkout(
+        exercises: List<Exercise>,
+        label: String,
+        date: LocalDate,
+        minutes: Int,
+        pulldownLoad: String,
+        full: Boolean = true
+    ) {
+        val zone = clock.zone
+        val start = date.atTime(10, 0).atZone(zone).toInstant()
+        val end = start.plusSeconds(minutes * 60L)
+        val workoutId = id(label)
+        workouts += WorkoutEntity(
+            workoutId,
+            FULL_BODY,
+            sourceRoutineId = routineId,
+            state = "COMPLETED",
+            activeKey = null,
+            journalDate = date.toString(),
+            start = start.toString(),
+            end = end.toString(),
+            zoneId = zone.id,
+            startOffset = start.atZone(zone).offset.id,
+            endOffset = end.atZone(zone).offset.id,
+            durationSeconds = minutes * 60L,
+            durationSource = "MANUAL",
+            timingConfirmed = true,
+            createdAt = start.toString(),
+            modifiedAt = end.toString()
+        )
+        val indices = if (full) 0..6 else 0..0
+        indices.forEachIndexed { position, index ->
+            val itemId = id("$label:item:$position")
+            val quick = index in durationExercises
+            items += demoItem(exercises[index], itemId, workoutId, position).copy(
+                disposition = "DONE",
+                quickCompletedAt = if (quick) end.toString() else null,
+                durationSeconds = if (quick) 300 else null,
+                note = if (index == 4) "Tuntui hyvältä. Pidä hartiat alhaalla." else ""
+            )
+            if (!quick) {
+                val load = if (index == 4) pulldownLoad else "25"
+                repeat(3) { number ->
+                    sets += SessionSet(
+                        id("$label:set:$position:$number"),
+                        itemId,
+                        number,
+                        rawLoad = load,
+                        rawReps = "10",
+                        load = load,
+                        reps = 10,
+                        completedAt = end.toString()
                     )
-                if (!quick) {
-                    repeat(3) { number ->
-                        val completed =
-                            index < 4 || (index == 4 && number < 2)
-                        val load = if (index ==
-                            4
-                        ) {
-                            "27.5"
-                        } else {
-                            "25"
-                        }
-                        val reps = if (index == 4 && number == 1) 9 else 10
-                        sets +=
-                            SessionSet(
-                                id(
-                                    "active:set:$index:$number"
-                                ),
-                                itemId,
-                                number,
-                                suggestedLoad = load,
-                                suggestedReps = 10,
-                                rawLoad = load,
-                                rawReps = reps.toString(),
-                                load = if (completed) load else null,
-                                reps = if (completed) reps else null,
-                                completedAt = if (completed) now else null
-                            )
-                    }
                 }
             }
-            val before =
-                CheckIn(id("active:before"), activeId, "BEFORE", "2026-11-13T08:40:00Z", zone, "OK")
-            val after = CheckIn(id("active:after"), activeId, "AFTER", now, zone, "GOOD", 6)
-            checks += listOf(before, after)
-            observations +=
-                listOf(
-                    BodyObservation(before.id, "lower_back", 5, 7),
-                    BodyObservation(after.id, "lower_back", 3, 4),
-                    BodyObservation(after.id, "right_knee", 1, 3)
-                )
         }
+        val after = CheckIn(id("$label:after"), workoutId, "AFTER", end.toString(), zone.id, "GOOD", 6)
+        val before = CheckIn(id("$label:before"), workoutId, "BEFORE", start.toString(), zone.id, "OK")
+        checks += listOf(before, after)
+        observations += listOf(
+            BodyObservation(before.id, "lower_back", 5, 7),
+            BodyObservation(after.id, "lower_back", 3, 4)
+        )
+    }
+
+    private fun WorkoutFixtures.addActiveWorkout(exercises: List<Exercise>, withAfter: Boolean) {
+        val now = clock.instant().toString()
+        val zone = clock.zone.id
+        workouts += WorkoutEntity(
+            activeId,
+            FULL_BODY,
+            sourceRoutineId = routineId,
+            journalDate = "2026-11-13",
+            start = clock.instant().minusSeconds(32 * 60 + 15).toString(),
+            zoneId = zone,
+            startOffset = "+02:00",
+            currentItemId = id("active:item:4"),
+            createdAt = "2026-11-13T08:42:00Z",
+            modifiedAt = now
+        )
+        exercises.take(8).forEachIndexed { index, exercise ->
+            val itemId = id("active:item:$index")
+            val quick = index in durationExercises
+            items += demoItem(exercise, itemId, activeId, index).copy(
+                disposition = if (index < 4) "DONE" else "PLANNED",
+                quickCompletedAt = if (index == 0) now else null,
+                durationSeconds = if (index == 0) 300 else null,
+                targetDurationSeconds = if (quick) 300 else null
+            )
+            if (!quick) sets += activeSets(index, itemId, now)
+        }
+        val before = CheckIn(id("active:before"), activeId, "BEFORE", "2026-11-13T08:40:00Z", zone, "OK")
+        val after = CheckIn(id("active:after"), activeId, "AFTER", now, zone, "GOOD", 6)
+        checks += before
+        observations += BodyObservation(before.id, "lower_back", 5, 7)
+        if (withAfter) {
+            checks += after
+            observations += listOf(
+                BodyObservation(after.id, "lower_back", 3, 4),
+                BodyObservation(after.id, "right_knee", 1, 3)
+            )
+        }
+    }
+
+    private fun activeSets(index: Int, itemId: String, now: String): List<SessionSet> = List(3) { number ->
+        val completed = index < 4 || (index == 4 && number < 2)
+        val load = if (index == 4) "27.5" else "25"
+        val reps = if (index == 4 && number == 1) 9 else 10
+        SessionSet(
+            id("active:set:$index:$number"),
+            itemId,
+            number,
+            suggestedLoad = load,
+            suggestedReps = 10,
+            rawLoad = load,
+            rawReps = reps.toString(),
+            load = if (completed) load else null,
+            reps = if (completed) reps else null,
+            completedAt = if (completed) now else null
+        )
+    }
+
+    private suspend fun writeFixtures(
+        container: AppContainer,
+        state: String,
+        selectedRoutine: String?,
+        exercises: List<Exercise>,
+        routines: List<Routine>,
+        routineItems: List<RoutineItem>,
+        fixtures: WorkoutFixtures
+    ) {
         container.database.withTransaction {
             val dao = container.database.journal()
             dao.clearWorkouts()
+            dao.clearProgramEnrollment()
+            dao.clearProgramLinks()
             dao.clearRoutines()
             dao.clearPhotos()
             dao.clearExercises()
             dao.clearDrafts()
             dao.clearHealthStates()
             dao.clearOutbox()
+            val configured = state == "SettingsConfigured"
             dao.put(
-                if (state ==
-                    "Empty"
-                ) {
-                    Preferences()
-                } else {
-                    Preferences(
-                        name = "Emma",
-                        weeklyGoal = 3,
-                        remindersEnabled =
-                            state == "SettingsConfigured",
-                        reminderDays = listOf(1, 3, 5),
-                        reminderTime = "17:30",
-                        remindersHeld =
-                            state == "SettingsConfigured"
-                    )
-                }
+                if (state == "Empty") Preferences() else Preferences(
+                    name = "Emma",
+                    weeklyGoal = 3,
+                    remindersEnabled = configured,
+                    reminderDays = listOf(1, 3, 5),
+                    reminderTime = "17:30",
+                    remindersHeld = configured
+                )
             )
-            if (state != "Empty") {
-                exercises.forEach { dao.put(it) }
-                val selectedRoutine = artworkRoutines[state]
-                routines.filter { selectedRoutine == null || it.id == selectedRoutine }.forEach { dao.put(it) }
-                routineItems.filter { selectedRoutine == null || it.routineId == selectedRoutine }.forEach { dao.put(it) }
-                val selectedWorkouts = when {
-                    state == "SparseHistory" -> workouts.take(1)
-                    state == "ProgressWithoutAttendance" || selectedRoutine != null -> emptyList()
-                    else -> workouts
-                }
-                val selectedIds = selectedWorkouts.map { it.id }.toSet()
-                val selectedItems = items.filter {
-                    it.workoutId in
-                        selectedIds
-                }
-                val itemIds = selectedItems.map { it.id }.toSet()
-                selectedWorkouts.forEach { dao.insertWorkout(it) }
-                selectedItems.forEach { dao.put(it) }
-                sets.filter {
-                    it.itemId in
-                        itemIds
-                }.forEach { dao.put(it) }
-                val selectedChecks = checks.filter { it.workoutId in selectedIds }
-                val checkIds = selectedChecks.map { it.id }.toSet()
-                selectedChecks.forEach { dao.put(it) }
-                observations.filter {
-                    it.checkInId in
-                        checkIds
-                }.forEach { dao.put(it) }
+            if (state == "Empty") return@withTransaction
+
+            exercises.forEach { dao.put(it) }
+            routines.filter { selectedRoutine == null || it.id == selectedRoutine }.forEach { dao.put(it) }
+            routineItems.filter { selectedRoutine == null || it.routineId == selectedRoutine }.forEach { dao.put(it) }
+            val workouts = when {
+                state == "SparseHistory" -> fixtures.workouts.take(1)
+                state == "ProgressWithoutAttendance" || selectedRoutine != null -> emptyList()
+                else -> fixtures.workouts
             }
+            val workoutIds = workouts.map { it.id }.toSet()
+            val items = fixtures.items.filter { it.workoutId in workoutIds }
+            val itemIds = items.map { it.id }.toSet()
+            workouts.forEach { dao.insertWorkout(it) }
+            items.forEach { dao.put(it) }
+            fixtures.sets.filter { it.itemId in itemIds }.forEach { dao.put(it) }
+            val checks = fixtures.checks.filter { it.workoutId in workoutIds }
+            val checkIds = checks.map { it.id }.toSet()
+            checks.forEach { dao.put(it) }
+            fixtures.observations.filter { it.checkInId in checkIds }.forEach { dao.put(it) }
         }
     }
 }

@@ -1,39 +1,45 @@
 package com.emmah.inshape.feature.progress
 
+import androidx.compose.foundation.layout.FlowRow
+import com.emmah.inshape.feature.checkin.bodyRegionLabel
+import com.emmah.inshape.ui.theme.finnishLocale
+import androidx.compose.ui.platform.LocalContext
+import android.content.Context
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.semantics
 import com.emmah.inshape.R
+import com.emmah.inshape.data.BodyObservation
 import com.emmah.inshape.data.DateRange
 import com.emmah.inshape.data.Exercise
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.MeasurementBasis
-import com.emmah.inshape.data.NumericInputResult
-import com.emmah.inshape.data.parseDecimalInput
+import com.emmah.inshape.data.Workout
+import com.emmah.inshape.data.WorkoutItem
 import com.emmah.inshape.data.weekStart
-import com.emmah.inshape.feature.checkin.BodyLevelPills
 import com.emmah.inshape.feature.checkin.bodyRegions
 import com.emmah.inshape.ui.components.ArtworkHeader
 import com.emmah.inshape.ui.components.DisclosureRow
 import com.emmah.inshape.ui.components.EmptyState
 import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListRow
-import com.emmah.inshape.ui.components.NumberField
 import com.emmah.inshape.ui.components.Page
 import com.emmah.inshape.ui.components.Pill
 import com.emmah.inshape.ui.components.PillTone
@@ -41,13 +47,19 @@ import com.emmah.inshape.ui.components.ResponsiveRow
 import com.emmah.inshape.ui.components.SectionHeader
 import com.emmah.inshape.ui.components.SegmentedControl
 import com.emmah.inshape.ui.components.SelectField
+import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.theme.ArtworkWash
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
-import com.emmah.inshape.ui.theme.displayDate
+import com.emmah.inshape.ui.theme.axisDate
+import com.emmah.inshape.ui.theme.formatDuration
+import com.emmah.inshape.ui.theme.observationSummary
+import com.emmah.inshape.ui.theme.shortDate
+import java.math.BigDecimal
 import java.time.LocalDate
-import java.util.Locale
+
+private const val INITIAL_OBSERVATION_COUNT = 12
 
 @Composable
 fun ProgressScreen(
@@ -57,371 +69,330 @@ fun ProgressScreen(
     initialExerciseId: String? = null,
     header: @Composable () -> Unit = {}
 ) {
-    val colors = InShapeTheme.colors
     val history = data.history
-    val available = history.flatMap {
-        it.items
-    }.filter {
-        it.hasPerformedWork
-    }.distinctBy { Triple(it.row.exerciseId, it.row.equipmentId, it.row.basis) }
-    var selected by rememberSaveable(initialExerciseId) {
-        mutableStateOf(
-            initialExerciseId
-                ?: available.firstOrNull { it.completedSets.isNotEmpty() }?.row?.exerciseId
-                ?: available.firstOrNull()?.row?.exerciseId
-        )
-    }
-    var period by rememberSaveable { mutableStateOf("12 weeks") }
-    var metric by rememberSaveable { mutableIntStateOf(0) }
-    var load by rememberSaveable { mutableStateOf("") }
-    var minimumReps by rememberSaveable { mutableStateOf("10") }
-    var basisChoice by rememberSaveable(selected) { mutableStateOf<String?>(null) }
-    val exerciseChoices = available.map { it.row.exerciseId }.distinct()
-    val selectedId = selected?.takeIf { it in exerciseChoices } ?: exerciseChoices.firstOrNull()
-    val bases = available.filter { it.row.exerciseId == selectedId }
-    val item =
-        bases.find { "${it.row.equipmentId}:${it.row.basis}" == basisChoice } ?: bases.firstOrNull()
+    var period by rememberSaveable { mutableIntStateOf(1) }
     val earliest =
         history.filter {
             it.qualifiesForAttendance
         }.minOfOrNull { LocalDate.parse(it.row.journalDate) }?.coerceAtMost(today)
             ?: today
     val range = DateRange(
-        if (period ==
-            "All"
-        ) {
+        if (period == 2) {
             earliest
         } else {
-            weekStart(today).minusWeeks(if (period == "4 weeks") 3 else 11)
+            weekStart(today).minusWeeks(if (period == 0) 3 else 11)
         },
         today
     )
-    val measures = ExerciseMetric.entries.map { it.label }
-    val parsedLoad = (parseDecimalInput(load) as? NumericInputResult.Valid)?.value
-    var region by rememberSaveable {
-        mutableStateOf(data.observations.firstOrNull()?.region ?: "lower_back")
-    }
-    var phase by rememberSaveable { mutableStateOf("AFTER") }
-    var showExercise by rememberSaveable(initialExerciseId) { mutableStateOf(initialExerciseId != null) }
-    var showBody by rememberSaveable { mutableStateOf(false) }
-    var showValues by rememberSaveable { mutableStateOf(false) }
     Page(modifier) {
         header()
-        val periods = listOf("4 weeks", "12 weeks", "All")
-        SegmentedControl(periods, periods.indexOf(period), { period = periods[it] }, compact = true)
-        Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
-            val weeks = weeklyAttendance(history, range)
-            SectionHeader("Workouts per week")
-            if (history.none { it.qualifiesForAttendance && it.row.journalDate in range }) {
-                ArtworkHeader(
-                    R.drawable.art_history_empty_training_log,
-                    104.dp,
-                    76.dp,
-                    Modifier.clip(InShapeShapes.card).background(ArtworkWash.Paper.brush()).padding(Dimens.inner)
-                ) {
-                    Text("No workouts recorded in this period.", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
-                }
-            } else {
-                ArtworkHeader(
-                    R.drawable.art_history_stacked_plates,
-                    152.dp,
-                    64.dp,
-                    Modifier.clip(InShapeShapes.card).background(ArtworkWash.Equipment.brush()).padding(Dimens.inner),
-                    cropEnd = true
-                ) {
-                    Column {
-                        Text(
-                            String.format(Locale.ENGLISH, "%.1f", averageWeeklyAttendance(history, range, today)),
-                            style = MaterialTheme.typography.displaySmall
-                        )
-                        Text("on average", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
-                    }
-                }
-                if (weeks.first().week > range.start) {
-                    Text(
-                        "Chart shows the latest ${weeks.size} weeks.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.textSecondary
-                    )
-                }
-                AttendanceChart(weeks, data.preferences.weeklyGoal, today)
-            }
-        }
-        if (!showExercise) {
-            SectionHeader("Exercises")
-            ListCard {
-                available.distinctBy { it.row.exerciseId }.forEach { exercise ->
-                    val series =
-                        calculateExerciseSeries(
-                            history,
-                            ExerciseMetricQuery(
-                                exercise.row.exerciseId,
-                                exercise.row.equipmentId,
-                                exercise.row.basis,
-                                range,
-                                ExerciseMetric.WEIGHT
-                            )
-                        )
-                    val values = series.mapNotNull { it.value }
-                    val latest = values.lastOrNull()
-                    val change = if (values.size > 1) values.last() - values.first() else null
-                    item {
-                        ListRow(
-                            exercise.row.name,
-                            subtitle = latest?.let { value ->
-                                MeasurementBasis.fromKey(exercise.row.basis).formatValue(value.stripTrailingZeros().toPlainString()) +
-                                    (
-                                        change?.takeIf {
-                                            it.signum() != 0
-                                        }?.let {
-                                            val direction = if (it.signum() > 0) "up" else "down"
-                                            val amount = it.abs().stripTrailingZeros().toPlainString()
-                                            ", $direction ${MeasurementBasis.fromKey(exercise.row.basis).formatValue(amount)}"
-                                        }
-                                            ?: ""
-                                        )
-                            } ?: stringResource(R.string.done_without_weight),
-                            trailing = { ExerciseSparkline(series) },
-                            onClick = {
-                                selected = exercise.row.exerciseId
-                                showExercise =
-                                    true
-                            }
-                        )
-                    }
-                }
+        val periods = listOf(stringResource(R.string.weeks_4), stringResource(R.string.weeks_12), stringResource(R.string.all))
+        SegmentedControl(periods, period, { period = it })
+        ProgressAttendance(history, range, today, data.preferences.weeklyGoal)
+        ProgressExercises(data.exercises, history, range, initialExerciseId)
+        ProgressBodyObservations(data.observations, history, range)
+    }
+}
+
+@Composable
+private fun ProgressAttendance(history: List<Workout>, range: DateRange, today: LocalDate, weeklyGoal: Int?) {
+    val context = LocalContext.current
+    val colors = InShapeTheme.colors
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
+        val weeks = weeklyAttendance(history, range)
+        SectionHeader(stringResource(R.string.workouts_per_week))
+        if (history.none { it.qualifiesForAttendance && it.row.journalDate in range }) {
+            ArtworkHeader(
+                R.drawable.art_history_empty_training_log,
+                Dimens.progressEmptyArtworkWidth,
+                Dimens.progressEmptyArtworkHeight,
+                Modifier.clip(InShapeShapes.card).background(ArtworkWash.Paper.brush()).padding(Dimens.inner)
+            ) {
+                Text(stringResource(R.string.no_workouts_period), style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
             }
         } else {
-            ListRow("All exercises", onClick = { showExercise = false })
-        }
-        if (showExercise) {
-            if (item ==
-                null
+            ArtworkHeader(
+                R.drawable.art_history_stacked_plates,
+                Dimens.progressAttendanceArtworkWidth,
+                Dimens.progressAttendanceArtworkHeight,
+                Modifier.clip(InShapeShapes.card).background(ArtworkWash.Equipment.brush()).padding(Dimens.inner),
+                cropEnd = true
             ) {
-                EmptyState(
-                    "Your recorded progress",
-                    "Record a completed exercise to start an exercise chart."
-                )
-            } else {
-                val query =
-                    ExerciseMetricQuery(
-                        item.row.exerciseId,
-                        item.row.equipmentId,
-                        item.row.basis,
-                        range,
-                        ExerciseMetric.entries[metric],
-                        parsedLoad,
-                        minimumReps.toIntOrNull()?.coerceAtLeast(1) ?: 10
+                Column {
+                    Text(
+                        String.format(finnishLocale, "%.1f", averageWeeklyAttendance(history, range, today)),
+                        style = MaterialTheme.typography.displaySmall
                     )
-                val points = calculateExerciseSeries(history, query)
-                val unit = when (query.metric) {
-                    ExerciseMetric.REPS, ExerciseMetric.REPS_AT_LOAD -> "reps"
-                    ExerciseMetric.SET_COUNT -> "sets"
-                    else -> MeasurementBasis.fromKey(query.basis).unitLabel
-                }
-                val recorded = points.filter { it.value != null }
-                Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
-                    val labels = exerciseChoices.map { id ->
-                        data.exercises.find { it.id == id }?.name
-                            ?: available.first { it.row.exerciseId == id }.row.name
-                    }
-                    ResponsiveRow {
-                        SelectField(
-                            "Exercise",
-                            selectedId!!,
-                            exerciseChoices,
-                            { selected = it },
-                            Modifier.weight(1f),
-                            inline = true,
-                            optionLabel = { id ->
-                                val index = exerciseChoices.indexOf(id)
-                                val label = labels[index]
-                                if (labels.count { it == label } > 1) "$label (${index + 1})" else label
-                            }
-                        )
-                        if (recorded.size >= 2) {
-                            val change = recorded.last().value!! - recorded.first().value!!
-                            if (change.signum() !=
-                                0
-                            ) {
-                                Pill(
-                                    "${if (change.signum() > 0) "+" else ""}${change.stripTrailingZeros().toPlainString()} $unit",
-                                    modifier = Modifier.align(Alignment.CenterVertically),
-                                    tone = PillTone.Accent
-                                )
-                            }
-                        }
-                    }
-                    recorded.lastOrNull()?.let { latest ->
-                        Column {
-                            Text(
-                                "${latest.value!!.stripTrailingZeros().toPlainString()} $unit",
-                                style = MaterialTheme.typography.displaySmall
-                            )
-                            if (recorded.size >=
-                                2
-                            ) {
-                                Text(
-                                    "was ${recorded.first().value!!.stripTrailingZeros().toPlainString()}" +
-                                        " $unit on ${recorded.first().date.displayDate()}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = colors.textSecondary
-                                )
-                            }
-                        }
-                    }
-                    SelectField("Measure", measures[metric], measures, { metric = measures.indexOf(it) })
-                    val basisLabels = bases.map {
-                        "${it.row.equipmentName.ifBlank { "Recorded equipment" }}, ${MeasurementBasis.fromKey(it.row.basis).optionLabel}"
-                    }
-                    if (bases.size >
-                        1
-                    ) {
-                        SelectField(
-                            "Compare",
-                            "${item.row.equipmentId}:${item.row.basis}",
-                            bases.map { "${it.row.equipmentId}:${it.row.basis}" },
-                            { basisChoice = it },
-                            optionLabel = { id ->
-                                val index = bases.indexOfFirst { "${it.row.equipmentId}:${it.row.basis}" == id }
-                                val label = basisLabels[index]
-                                if (basisLabels.count { it == label } > 1) "$label (${index + 1})" else label
-                            }
-                        )
-                    }
-                    if (metric ==
-                        2
-                    ) {
-                        NumberField(load, {
-                            load = it
-                        }, "Compare at (${MeasurementBasis.fromKey(item.row.basis).unitLabel})", decimal = true)
-                    }
-                    if (metric ==
-                        3
-                    ) {
-                        NumberField(minimumReps, { minimumReps = it }, "Minimum repetitions")
-                    }
-                    if (metric == 2 &&
-                        parsedLoad == null
-                    ) {
-                        Text(
-                            "Enter a load to compare repetitions.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    } else {
-                        ExerciseChart(points, unit)
-                    }
-                    if (metric ==
-                        1
-                    ) {
-                        Text(
-                            "Highest recorded reps per workout. Loads may differ.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.textSecondary
-                        )
-                    }
-                    if (metric ==
-                        4
-                    ) {
-                        Text(
-                            "Completed detailed sets only. Completion-only entries have no detailed sets.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.textSecondary
-                        )
-                    }
-                }
-                calculatePersonalBest(history, query)?.let { best ->
-                    Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
-                        Text(
-                            when {
-                                best.previous == null -> "First recorded result"
-                                best.isNewRecord -> "New record in this period"
-                                else -> "Best in this period"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = colors.textSecondary
-                        )
-                        Text(
-                            "${best.point.value!!.stripTrailingZeros().toPlainString()} $unit",
-                            style = MaterialTheme.typography.headlineSmall
-                        )
-                        Text(
-                            best.point.date.displayDate() + ", " + query.metric.label +
-                                if (metric ==
-                                    3
-                                ) {
-                                    ", ${query.minimumReps}+ reps"
-                                } else if (metric ==
-                                    2
-                                ) {
-                                    ", at ${MeasurementBasis.fromKey(query.basis).formatValue(query.fixedLoad.toString())}"
-                                } else {
-                                    ""
-                                },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.textSecondary
-                        )
-                        best.previous?.let {
-                            Text(
-                                "Previous best: ${it.value!!.stripTrailingZeros().toPlainString()} $unit on ${it.date.displayDate()}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = colors.textSecondary
-                            )
-                        }
-                    }
+                    Text(stringResource(R.string.on_average), style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
                 }
             }
+            if (weeks.first().week > range.start) {
+                Text(
+                    stringResource(R.string.chart_latest_weeks, weeks.size),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textSecondary
+                )
+            }
+            AttendanceChart(weeks, weeklyGoal, today)
         }
-        ListRow(
-            "Pain and stiffness",
-            subtitle = data.observations.mapNotNull { observation ->
-                bodyRegions.find {
-                    it.id ==
-                        observation.region
-                }?.label
-            }.distinct().joinToString(", ").ifBlank { null },
-            onClick = { showBody = !showBody }
-        )
-        if (showBody) {
-            Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
-                val area = bodyRegions.firstOrNull { it.id == region } ?: bodyRegions.first()
-                SelectField("Body area", area.label, bodyRegions.map { it.label }, { label ->
-                    region =
-                        bodyRegions.first { it.label == label }.id
-                }, inline = true)
-                val phases = listOf("BEFORE", "AFTER", "NEXT_DAY")
-                SegmentedControl(listOf("Before", "After", "Next day"), phases.indexOf(phase), {
-                    phase =
-                        phases[it]
-                })
-                val points = observationSeries(history, data.observations, region, phase, range)
-                if (points.isEmpty()) {
-                    Text(
-                        "No observations for ${area.label.lowercase(Locale.ENGLISH)} in this period.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.textSecondary
-                    )
-                } else {
-                    ResponsiveRow {
-                        ObservationLegend("Pain", points.lastOrNull { it.pain != null }?.pain, false)
-                        ObservationLegend(
-                            "Stiffness",
-                            points.lastOrNull {
-                                it.stiffness != null
-                            }?.stiffness,
-                            true
-                        )
-                    }
-                    ObservationChart(points)
-                    DisclosureRow("Values", showValues, { showValues = !showValues })
-                    if (showValues) {
-                        points.forEach {
-                            Text(it.date.displayDate(), style = MaterialTheme.typography.bodyLarge)
-                            BodyLevelPills(it.pain, it.stiffness)
-                        }
-                    }
+    }
+}
+
+@Composable
+private fun ProgressExercises(
+    exercises: List<Exercise>,
+    history: List<Workout>,
+    range: DateRange,
+    initialExerciseId: String?
+) {
+    val available = history.flatMap { it.items }
+        .filter { it.hasPerformedWork }
+        .distinctBy { Triple(it.row.exerciseId, it.row.equipmentId, it.row.basis) }
+    val exerciseChoices = available.map { it.row.exerciseId }.distinct()
+    var selected by rememberSaveable(initialExerciseId) { mutableStateOf(initialExerciseId) }
+    val selectedId = selected?.takeIf { it in exerciseChoices } ?: exerciseChoices.firstOrNull()
+    var basisChoice by rememberSaveable(selectedId) { mutableStateOf<String?>(null) }
+    var showExercise by rememberSaveable(initialExerciseId) { mutableStateOf(initialExerciseId != null) }
+    if (!showExercise) {
+        ProgressExerciseList(exercises, available, history, range) {
+            selected = it
+            basisChoice = null
+            showExercise = true
+        }
+        return
+    }
+
+    ListRow(stringResource(R.string.all_exercises), onClick = { showExercise = false })
+    val bases = available.filter { it.row.exerciseId == selectedId }
+    val item = bases.find { it.comparisonKey() == basisChoice }
+        ?: defaultComparison(exercises.find { it.id == selectedId }, bases)
+    if (item == null) {
+        EmptyState(stringResource(R.string.recorded_progress), stringResource(R.string.record_for_chart))
+        return
+    }
+
+    val query = ExerciseMetricQuery(item.row.exerciseId, item.row.equipmentId, item.row.basis, range)
+    ProgressExerciseDetail(
+        history,
+        query,
+        exerciseSelector = {
+            ProgressExerciseSelector(
+                exercises, available, exerciseChoices, item.row.exerciseId,
+                onSelect = { selected = it },
+                modifier = Modifier.weight(1f).align(Alignment.CenterVertically)
+            )
+        },
+        comparisonSelector = { ProgressComparisonSelector(item, bases) { basisChoice = it } }
+    )
+}
+
+private fun defaultComparison(exercise: Exercise?, recorded: List<WorkoutItem>): WorkoutItem? {
+    if (exercise == null) return recorded.firstOrNull()
+    return recorded.firstOrNull { it.row.basis == exercise.basis && it.row.equipmentId == exercise.equipmentId }
+        ?: recorded.firstOrNull { it.row.basis == exercise.basis }
+        ?: recorded.firstOrNull()
+}
+
+private fun WorkoutItem.comparisonKey(): String = "${row.equipmentId}:${row.basis}"
+
+@Composable
+private fun ProgressExerciseList(
+    exercises: List<Exercise>,
+    available: List<WorkoutItem>,
+    history: List<Workout>,
+    range: DateRange,
+    onSelect: (String) -> Unit
+) {
+    if (available.isEmpty()) return
+    val context = LocalContext.current
+    SectionHeader(stringResource(R.string.exercises))
+    ListCard {
+        available.groupBy { it.row.exerciseId }.forEach { (exerciseId, recorded) ->
+            val exercise = exercises.find { it.id == exerciseId }
+            val representative = defaultComparison(exercise, recorded) ?: return@forEach
+            val basis = MeasurementBasis.fromKey(representative.row.basis)
+            val query = ExerciseMetricQuery(exerciseId, representative.row.equipmentId, representative.row.basis, range)
+            val series = calculateExerciseSeries(history, query)
+            val values = series.mapNotNull { it.value }
+            val latest = values.lastOrNull()
+            val change = latest?.let { it - values.first() }
+            val subtitle = latest?.let {
+                val current = basis.progressValue(context, it)
+                when {
+                    change == null || change.signum() == 0 -> current
+                    else -> context.getString(R.string.progress_change, current, context.getString(change.direction()), basis.progressChange(context, change.abs()))
                 }
+            } ?: context.getString(R.string.done).takeIf { series.isNotEmpty() }
+            item {
+                ListRow(
+                    exercise?.name ?: representative.row.name,
+                    subtitle = subtitle,
+                    trailing = if (values.size >= 2) ({ ExerciseSparkline(series) }) else null,
+                    onClick = { onSelect(exerciseId) }
+                )
             }
         }
     }
 }
+
+@Composable
+private fun ProgressExerciseSelector(
+    exercises: List<Exercise>,
+    available: List<WorkoutItem>,
+    exerciseChoices: List<String>,
+    selectedId: String,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val labels = exerciseChoices.map { id ->
+        exercises.find { it.id == id }?.name
+            ?: available.first { it.row.exerciseId == id }.row.name
+    }
+    SelectField(
+        stringResource(R.string.exercise),
+        selectedId,
+        exerciseChoices,
+        onSelect,
+        modifier,
+        inline = true,
+        optionLabel = { id ->
+            val index = exerciseChoices.indexOf(id)
+            val label = labels[index]
+            if (labels.count { it == label } > 1) "$label (${index + 1})" else label
+        }
+    )
+}
+
+@Composable
+private fun ProgressComparisonSelector(item: WorkoutItem, bases: List<WorkoutItem>, onSelect: (String) -> Unit) {
+    if (bases.size <= 1) return
+    val context = LocalContext.current
+    val basisLabels = bases.map {
+        "${it.row.equipmentName.ifBlank { context.getString(R.string.recorded_equipment) }}, ${context.getString(MeasurementBasis.fromKey(it.row.basis).optionLabel)}"
+    }
+    SelectField(
+        stringResource(R.string.compare),
+        item.comparisonKey(),
+        bases.map { it.comparisonKey() },
+        onSelect,
+        optionLabel = { id ->
+            val index = bases.indexOfFirst { it.comparisonKey() == id }
+            val label = basisLabels[index]
+            if (basisLabels.count { it == label } > 1) "$label (${index + 1})" else label
+        }
+    )
+}
+
+@Composable
+private fun ProgressExerciseDetail(
+    history: List<Workout>,
+    query: ExerciseMetricQuery,
+    exerciseSelector: @Composable FlowRowScope.() -> Unit,
+    comparisonSelector: @Composable () -> Unit
+) {
+    val context = LocalContext.current
+    val colors = InShapeTheme.colors
+    val points = calculateExerciseSeries(history, query)
+    val basis = MeasurementBasis.fromKey(query.basis)
+    val recorded = points.mapNotNull { point -> point.value?.let { point.date to it } }
+    val baseline = recorded.firstOrNull()
+    val latest = recorded.lastOrNull()
+    val change = if (baseline != null && latest != null) {
+        (latest.second - baseline.second).takeUnless { it.signum() == 0 }
+    } else {
+        null
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
+        ResponsiveRow {
+            exerciseSelector()
+            if (change != null) {
+                val sign = if (change.signum() > 0) "+" else "−"
+                FlowRow(
+                    Modifier.align(Alignment.CenterVertically),
+                    horizontalArrangement = Arrangement.spacedBy(Dimens.innerSmall),
+                    itemVerticalAlignment = Alignment.CenterVertically
+                ) {
+                    Pill(sign + basis.progressChange(context, change.abs()), tone = PillTone.Accent)
+                    Text(stringResource(R.string.progress_since_date, checkNotNull(baseline).first.axisDate()),
+                        style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+                }
+            }
+        }
+        if (latest != null) {
+            val current = latest.second
+            val best = if (basis == MeasurementBasis.Assistance) recorded.minOf { it.second } else recorded.maxOf { it.second }
+            Column {
+                Text(basis.progressValue(context, current), style = MaterialTheme.typography.displaySmall)
+                if (current.compareTo(best) == 0) {
+                    Text(stringResource(R.string.best_so_far), style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+                }
+            }
+        }
+        comparisonSelector()
+        ExerciseChart(points, basis)
+    }
+}
+
+internal fun MeasurementBasis.progressValue(context: Context, value: BigDecimal): String {
+    val text = value.stripTrailingZeros().toPlainString()
+    return when (this) {
+        MeasurementBasis.Time -> formatDuration(value.min(Long.MAX_VALUE.toBigDecimal()).toLong())
+        else -> formatValue(context, text)
+    }
+}
+
+private fun MeasurementBasis.progressChange(context: Context, value: BigDecimal): String = if (this == MeasurementBasis.MachineLevel) {
+    val count = value.toInt()
+    context.resources.getQuantityString(R.plurals.level_count, count, count)
+} else {
+    progressValue(context, value)
+}
+
+
+@Composable
+private fun ProgressBodyObservations(observations: List<BodyObservation>, history: List<Workout>, range: DateRange) {
+    val context = LocalContext.current
+    val colors = InShapeTheme.colors
+    var region by rememberSaveable { mutableStateOf(observations.firstOrNull()?.region ?: "lower_back") }
+    var showBody by rememberSaveable { mutableStateOf(false) }
+    var showAll by rememberSaveable(region, range) { mutableStateOf(false) }
+    DisclosureRow(stringResource(R.string.pain_and_stiffness), showBody, { showBody = !showBody })
+    if (showBody) {
+        Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
+            val area = bodyRegions.firstOrNull { it.id == region } ?: bodyRegions.first()
+            SelectField(
+                stringResource(R.string.body_area), area.id, bodyRegions.map { it.id }, { region = it }, inline = true,
+                optionLabel = { id -> context.getString(bodyRegionLabel(id)) }
+            )
+            val points = observationSeries(history, observations, area.id, range)
+            if (points.isEmpty()) {
+                Text(
+                    stringResource(R.string.no_area_observations, stringResource(area.label).lowercase(finnishLocale)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textSecondary
+                )
+            } else {
+                ListCard {
+                    val visible = if (showAll) points else points.take(INITIAL_OBSERVATION_COUNT)
+                    visible.forEach { point ->
+                        item {
+                            ListRow(
+                                point.date.shortDate(),
+                                modifier = Modifier.semantics(mergeDescendants = true) {},
+                                subtitle = when (point.phase) {
+                                    "BEFORE" -> stringResource(R.string.before_workout)
+                                    "AFTER" -> stringResource(R.string.after_workout)
+                                    else -> stringResource(R.string.next_day)
+                                },
+                                trailingValue = { Pill(observationSummary(LocalContext.current, point.observation)) }
+                            )
+                        }
+                    }
+                }
+                if (!showAll && points.size > INITIAL_OBSERVATION_COUNT) TextAction(stringResource(R.string.show_all), { showAll = true }, icon = Icons.AutoMirrored.Outlined.List)
+            }
+        }
+    }
+}
+
+private fun BigDecimal.direction(): Int = if (signum() > 0) R.string.progress_up else R.string.progress_down

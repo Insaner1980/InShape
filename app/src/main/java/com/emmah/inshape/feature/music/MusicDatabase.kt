@@ -23,8 +23,22 @@ data class MusicTrack(
     val title: String,
     val artist: String,
     val durationMs: Long?,
-    val available: Boolean = true
+    val available: Boolean = true,
+    val energy: String? = null,
+    val contentFingerprint: String? = null
 )
+
+@Entity(indices = [Index("workoutId")])
+data class ListeningEvent(
+    @PrimaryKey val id: String,
+    val trackId: String,
+    val workoutId: String?,
+    val startedAt: String,
+    val playedMs: Long
+)
+
+@Entity
+data class PlaylistReceipt(@PrimaryKey val id: String, val digest: String, val playlistId: String)
 
 @Entity
 data class MusicPlaylist(@PrimaryKey val id: String, val name: String)
@@ -41,6 +55,17 @@ data class MusicMembership(val playlistId: String, val trackId: String, val posi
 
 @Dao
 interface MusicDao {
+    @Query("SELECT * FROM ListeningEvent WHERE workoutId = :workoutId")
+    suspend fun listening(workoutId: String): List<ListeningEvent>
+
+    @Query("SELECT * FROM ListeningEvent WHERE id = :id")
+    suspend fun listeningEvent(id: String): ListeningEvent?
+
+    @Upsert
+    suspend fun saveListening(event: ListeningEvent)
+
+    @Query("UPDATE MusicTrack SET energy = :energy WHERE id = :id AND available = 1")
+    suspend fun setEnergy(id: String, energy: String?)
     @Query("SELECT * FROM MusicSource LIMIT 1")
     suspend fun source(): MusicSource?
 
@@ -62,6 +87,11 @@ interface MusicDao {
 
 @Dao
 interface MusicPlaylistDao {
+    @Query("SELECT * FROM PlaylistReceipt WHERE id = :id")
+    suspend fun receipt(id: String): PlaylistReceipt?
+
+    @Upsert
+    suspend fun saveReceipt(receipt: PlaylistReceipt)
     @Query("SELECT * FROM MusicPlaylist ORDER BY rowid")
     suspend fun playlists(): List<MusicPlaylist>
 
@@ -88,8 +118,11 @@ interface MusicPlaylistDao {
 }
 
 @Database(
-    entities = [MusicSource::class, MusicTrack::class, MusicPlaylist::class, MusicMembership::class],
-    version = 1
+    entities = [
+        MusicSource::class, MusicTrack::class, MusicPlaylist::class, MusicMembership::class,
+        ListeningEvent::class, PlaylistReceipt::class
+    ],
+    version = 2
 )
 abstract class MusicDatabase : RoomDatabase() {
     abstract fun music(): MusicDao

@@ -1,0 +1,1094 @@
+{
+  "schemaVersion": 1,
+  "title": "Kolme aloittelijan kuntosaliohjelmaa",
+  "notice": "Nämä ovat koottuja, alkuperäisiä ohjelmapohjia, eivät yksittäisen lähteen ohjelmien kopioita tai lääketieteellisiä yksilöohjeita.",
+  "language": "fi",
+  "warmup": {
+    "minutes": 5,
+    "to": 10,
+    "suggestions": [
+      "kuntopyörä",
+      "kevyt aerobinen laite"
+    ],
+    "optionalMobilityMinutes": 2,
+    "note": "Ennen ensimmäistä pääliikettä voidaan tehdä yksi kevyt harjoittelusarja."
+  },
+  "coolDown": {
+    "minutes": 3,
+    "to": 5,
+    "optional": true,
+    "note": "Rauhallinen liike ja hengityksen tasaaminen haluttaessa."
+  },
+  "effort": "Aloita niin, että sarjan päättyessä olisi jäljellä noin 3-4 hallittua toistoa (RIR 3-4). Älä tee maksimisuorituksia tai pakota toistoja.",
+  "progression": {
+    "method": "double_progression",
+    "whenToSuggestMoreLoad": "Ehdota kuorman nostamista vasta, kun toistohaarukan yläraja onnistuu kaikissa työsarjoissa vähintään kahdella peräkkäisellä saman liikkeen suorituskerralla, tekniikka on hallittu, palautuminen on riittävää eikä ilmene kipua tai poikkeavia oireita.",
+    "suggestion": "Nosta vastusta vain laitteen tai välineen pienimmällä järkevällä korotusportaalla. Pyydä aina käyttäjän hyväksyntä.",
+    "ifNotReady": "Pidä sama paino tai vähennä toistoja/sarjoja. Kuormaa ei ole pakko lisätä viikoittain.",
+    "noForcedFailure": true,
+    "deload": "Kevennä tilapäisesti jaksamisen mukaan; kahdeksannen viikon pakollinen kevennys ei ole tarpeen."
+  },
+  "scheduling": {
+    "restDaysBetweenStrengthSessionsMinimum": 1,
+    "scheduleByRotationNotWeekday": true,
+    "missedWorkout": "Jatka seuraavalla vuorossa olevalla harjoituksella. Älä yritä korvata kahta harjoitusta samana päivänä.",
+    "switchPlan": "Aloita uuden ohjelman ensimmäisestä harjoituksesta. Säilytä aiempi historia ja harjoituspainot."
+  },
+  "safety": "Harjoittele oman voinnin mukaan. Lopeta liike, jos tulee kipua, huimausta tai muita poikkeavia oireita. Tekniikan opettelu ja turvallisuus ovat kuormia tärkeämpiä.",
+  "sources": [
+    {
+      "name": "Treeniohjelma.org: aloittelijoiden ohjelmat",
+      "url": "https://www.treeniohjelma.org/#aloittelijat"
+    },
+    {
+      "name": "PunttiKontti: yksijakoinen saliohjelma aloittelijalle",
+      "url": "https://punttikontti.fi/yksijakoinen-saliohjelma-aloittelijalle/"
+    },
+    {
+      "name": "SisuLift: aloittelijan 8 viikon kuntosaliohjelma",
+      "url": "https://www.sisulift.app/treeniohjelmat/aloittelijan-kuntosaliohjelma"
+    },
+    {
+      "name": "SisuLift: 2-jakoinen treeniohjelma",
+      "url": "https://www.sisulift.app/treeniohjelmat/2-jakoinen-treeniohjelma"
+    },
+    {
+      "name": "Kuntokeskus Liikku: yleistä lihaskuntoa tukeva ohjelma, 2020",
+      "url": null,
+      "note": "Käytetty vain yleisten aloitusperiaatteiden taustana; erillistä ohjelmaa ei kopioitu."
+    },
+    {
+      "name": "UKK-instituutti: lihaskunto",
+      "url": "https://ukkinstituutti.fi/fyysinen-kunto/kunnon-osa-alueet/lihaskunto/"
+    },
+    {
+      "name": "ACSM: 2026 Resistance Training Guidelines",
+      "url": "https://acsm.org/resistance-training-guidelines-update-2026/"
+    }
+  ],
+  "programs": [
+    {
+      "id": "rauhallinen-aloitus",
+      "name": "Rauhallinen aloitus",
+      "tagline": "Sama helppo kokovartalotreeni laitteilla",
+      "description": "Yksinkertainen vaihtoehto pitkän tauon jälkeen. Tavoitteena on oppia laitteet ja rakentaa rutiini.",
+      "recommendedWeeklySessions": 2,
+      "allowedWeeklySessions": [
+        1,
+        2
+      ],
+      "estimatedSessionMinutes": {
+        "min": 30,
+        "max": 40
+      },
+      "durationWeeks": 8,
+      "type": "kokovartalo",
+      "equipmentFocus": "laitteet",
+      "sequence": [
+        "A"
+      ],
+      "phases": [
+        {
+          "weeks": [
+            1,
+            2
+          ],
+          "sets": "1–2 sarjaa",
+          "effort": "RIR 3-4",
+          "goal": "Opettele säädöt ja tekniikka; painot kevyet."
+        },
+        {
+          "weeks": [
+            3,
+            4
+          ],
+          "sets": "2 per liike",
+          "effort": "RIR 3-4",
+          "goal": "Toista harjoitus tasaisesti; lisää ensin toistoja."
+        },
+        {
+          "weeks": [
+            5,
+            7
+          ],
+          "sets": "2 per liike; halutessa 3. sarja jalkaprässiin",
+          "effort": "RIR 2-3",
+          "goal": "Nosta vastusta vain, jos tekniikka pysyy hyvänä."
+        },
+        {
+          "weeks": [
+            8,
+            8
+          ],
+          "sets": "2 per liike",
+          "effort": "RIR 3-4; tarvittaessa kevyemmin",
+          "goal": "Arvioi jaksaminen ja sopiiko seuraavaksi A/B."
+        }
+      ],
+      "sessions": [
+        {
+          "id": "A",
+          "name": "Koko vartalo laitteilla",
+          "exercises": [
+            {
+              "exerciseId": "leg_press",
+              "name": "Jalkaprässi",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 10,
+                "max": 15,
+                "perSide": false
+              },
+              "restSeconds": 120,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "supported_bench_squat",
+                  "name": "Tuettu kyykky penkille",
+                  "label": "Tuettu kyykky penkille"
+                }
+              ],
+              "instruction": "Säädä istuin ja käytä kivutonta, hallittua liikerataa."
+            },
+            {
+              "exerciseId": "machine_chest_press",
+              "name": "Rintapunnerruslaite",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 10,
+                "max": 15,
+                "perSide": false
+              },
+              "restSeconds": 90,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "wall_push_up",
+                  "name": "Seinäpunnerrus",
+                  "label": "Seinäpunnerrus"
+                }
+              ],
+              "instruction": "Pidä hartiat rentoina ja liike hallittuna."
+            },
+            {
+              "exerciseId": "machine_row",
+              "name": "Vaakasoutu laitteessa",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 10,
+                "max": 15,
+                "perSide": false
+              },
+              "restSeconds": 90,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "low_cable_row",
+                  "name": "Alataljasoutu",
+                  "label": "Alataljasoutu"
+                }
+              ],
+              "instruction": "Älä nykäise painoa. Vedä kyynärpäitä taakse."
+            },
+            {
+              "exerciseId": "seated_leg_curl",
+              "name": "Reiden koukistus istuen",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 10,
+                "max": 15,
+                "perSide": false
+              },
+              "restSeconds": 75,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "floor_glute_bridge",
+                  "name": "Lantionnosto lattialla",
+                  "label": "Lantionnosto lattialla"
+                }
+              ],
+              "instruction": "Jälkimmäinen vaihtoehto kuormittaa enemmän pakaroita kuin takareiden koukistusta."
+            },
+            {
+              "exerciseId": "lat_pulldown",
+              "name": "Ylätalja",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 10,
+                "max": 15,
+                "perSide": false
+              },
+              "restSeconds": 90,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "neutral_lat_pulldown",
+                  "name": "Ylätalja neutraaliotteella",
+                  "label": "Ylätalja neutraaliotteella"
+                }
+              ],
+              "instruction": "Vedä kahvaa rinnan yläosaa kohti ilman vartalon heiluttamista."
+            },
+            {
+              "exerciseId": "machine_crunch",
+              "name": "Vatsarutistuslaite",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 10,
+                "max": 15,
+                "perSide": false
+              },
+              "restSeconds": 60,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "dead_bug",
+                  "name": "Dead bug",
+                  "label": "Dead bug, 2 x 6-10 per puoli",
+                  "sets": 2,
+                  "target": {
+                    "min": 6,
+                    "max": 10,
+                    "perSide": true
+                  }
+                }
+              ],
+              "instruction": "Pidä liike pienenä ja hallittuna."
+            }
+          ],
+          "miniExerciseIds": [
+            "leg_press",
+            "machine_chest_press",
+            "machine_row",
+            "seated_leg_curl"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tasapainoinen-perusohjelma",
+      "name": "Tasapainoinen perusohjelma",
+      "tagline": "Kaksi vuorottelevaa kokovartalotreeniä A ja B",
+      "description": "Kattava kahden päivän ohjelma, jossa eri liikkeet täydentävät toisiaan. Laitteet ovat oletus, käsipainot mahdollisia vaihtoehtoja.",
+      "recommendedWeeklySessions": 2,
+      "allowedWeeklySessions": [
+        2
+      ],
+      "estimatedSessionMinutes": {
+        "min": 40,
+        "max": 50
+      },
+      "durationWeeks": 8,
+      "type": "kokovartalo A/B",
+      "equipmentFocus": "laitteet ja valinnaiset käsipainot",
+      "sequence": [
+        "A",
+        "B"
+      ],
+      "phases": [
+        {
+          "weeks": [
+            1,
+            2
+          ],
+          "sets": "2 per liike",
+          "effort": "RIR 3-4",
+          "goal": "Opettele molempien päivien liikkeet ja sopivat painot."
+        },
+        {
+          "weeks": [
+            3,
+            5
+          ],
+          "sets": "2 per liike",
+          "effort": "RIR 2-3",
+          "goal": "Lisää toistoja ennen painojen korottamista."
+        },
+        {
+          "weeks": [
+            6,
+            7
+          ],
+          "sets": "2 per liike; halutessa 3 sarjaa ensimmäiseen jalkaliikkeeseen ja rintapunnerrukseen",
+          "effort": "RIR 2-3",
+          "goal": "Pidä sama tekniikka ja riittävä palautuminen."
+        },
+        {
+          "weeks": [
+            8,
+            8
+          ],
+          "sets": "2 per liike",
+          "effort": "RIR 3-4; tarvittaessa kevennys",
+          "goal": "Arvioi nousujohteisuus ja päätä jatkosta."
+        }
+      ],
+      "sessions": [
+        {
+          "id": "A",
+          "name": "Treeni A: jalat, rinta, selkä ja keskivartalo",
+          "exercises": [
+            {
+              "exerciseId": "leg_press",
+              "name": "Jalkaprässi",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 8,
+                "max": 12,
+                "perSide": false
+              },
+              "restSeconds": 120,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "bench_goblet_squat",
+                  "name": "Goblet-kyykky penkille",
+                  "label": "Goblet-kyykky penkille"
+                }
+              ],
+              "instruction": "Valitse hallittava vastus."
+            },
+            {
+              "exerciseId": "machine_chest_press",
+              "name": "Rintapunnerruslaite",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 8,
+                "max": 12,
+                "perSide": false
+              },
+              "restSeconds": 90,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "dumbbell_bench_press",
+                  "name": "Penkkipunnerrus käsipainoilla",
+                  "label": "Penkkipunnerrus käsipainoilla"
+                }
+              ],
+              "instruction": "Käsipainovaihtoehto vain, kun tekniikka ja turvallisuus ovat kunnossa."
+            },
+            {
+              "exerciseId": "lat_pulldown",
+              "name": "Ylätalja",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 8,
+                "max": 12,
+                "perSide": false
+              },
+              "restSeconds": 90,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "neutral_lat_pulldown",
+                  "name": "Ylätalja neutraaliotteella",
+                  "label": "Ylätalja neutraaliotteella"
+                }
+              ],
+              "instruction": ""
+            },
+            {
+              "exerciseId": "seated_leg_curl",
+              "name": "Reiden koukistus istuen",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 10,
+                "max": 15,
+                "perSide": false
+              },
+              "restSeconds": 75,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "floor_glute_bridge",
+                  "name": "Lantionnosto lattialla",
+                  "label": "Lantionnosto lattialla"
+                }
+              ],
+              "instruction": ""
+            },
+            {
+              "exerciseId": "machine_row",
+              "name": "Vaakasoutu laitteessa",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 10,
+                "max": 12,
+                "perSide": false
+              },
+              "restSeconds": 90,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "low_cable_row",
+                  "name": "Alataljasoutu",
+                  "label": "Alataljasoutu"
+                }
+              ],
+              "instruction": ""
+            },
+            {
+              "exerciseId": "pallof_press",
+              "name": "Pallof-punnerrus taljassa",
+              "equipment": "talja",
+              "sets": 2,
+              "target": {
+                "min": 8,
+                "max": 12,
+                "perSide": true
+              },
+              "restSeconds": 60,
+              "optional": false,
+              "primary": false,
+              "alternatives": [
+                {
+                  "exerciseId": "dead_bug",
+                  "name": "Dead bug",
+                  "label": "Dead bug, 2 x 6-10 per puoli",
+                  "sets": 2,
+                  "target": {
+                    "min": 6,
+                    "max": 10,
+                    "perSide": true
+                  }
+                }
+              ],
+              "instruction": ""
+            }
+          ],
+          "miniExerciseIds": [
+            "leg_press",
+            "machine_chest_press",
+            "lat_pulldown",
+            "seated_leg_curl"
+          ]
+        },
+        {
+          "id": "B",
+          "name": "Treeni B: jalat, hartiat, selkä ja keskivartalo",
+          "exercises": [
+            {
+              "exerciseId": "bench_goblet_squat",
+              "name": "Goblet-kyykky penkille",
+              "equipment": "käsipaino + penkki",
+              "sets": 2,
+              "target": {
+                "min": 8,
+                "max": 12,
+                "perSide": false
+              },
+              "restSeconds": 120,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "leg_press",
+                  "name": "Jalkaprässi",
+                  "label": "Jalkaprässi"
+                }
+              ],
+              "instruction": "Istu tai hipaise penkkiä hallitusti. Harjoittele ensin ilman lisäpainoa."
+            },
+            {
+              "exerciseId": "machine_row",
+              "name": "Vaakasoutu laitteessa",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 8,
+                "max": 12,
+                "perSide": false
+              },
+              "restSeconds": 90,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "low_cable_row",
+                  "name": "Alataljasoutu",
+                  "label": "Alataljasoutu"
+                }
+              ],
+              "instruction": ""
+            },
+            {
+              "exerciseId": "machine_shoulder_press",
+              "name": "Pystypunnerruslaite",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 8,
+                "max": 12,
+                "perSide": false
+              },
+              "restSeconds": 90,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "seated_dumbbell_shoulder_press",
+                  "name": "Pystypunnerrus käsipainoilla istuen",
+                  "label": "Pystypunnerrus käsipainoilla istuen"
+                }
+              ],
+              "instruction": "Ohita liike, jos se aiheuttaa olkapääkipua. Käsipainovaihtoehto vaatii turvallisen hallinnan."
+            },
+            {
+              "exerciseId": "hip_thrust_machine",
+              "name": "Lantionnosto laitteessa",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 10,
+                "max": 15,
+                "perSide": false
+              },
+              "restSeconds": 90,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "floor_glute_bridge",
+                  "name": "Lantionnosto lattialla",
+                  "label": "Lantionnosto lattialla"
+                },
+                {
+                  "exerciseId": "dumbbell_romanian_deadlift",
+                  "name": "Romanialainen maastaveto käsipainoilla",
+                  "label": "Romanialainen maastaveto käsipainoilla, jos tekniikka on opeteltu"
+                }
+              ],
+              "instruction": "Vaihtoehtoja ei tarvitse tehdä samassa treenissä."
+            },
+            {
+              "exerciseId": "machine_chest_press",
+              "name": "Rintapunnerruslaite",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 10,
+                "max": 12,
+                "perSide": false
+              },
+              "restSeconds": 90,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "wall_push_up",
+                  "name": "Seinäpunnerrus",
+                  "label": "Seinäpunnerrus"
+                }
+              ],
+              "instruction": "Hieman A-päivää kevyempi kuorma on hyvä vaihtoehto."
+            },
+            {
+              "exerciseId": "dead_bug",
+              "name": "Dead bug",
+              "equipment": "matto",
+              "sets": 2,
+              "target": {
+                "min": 6,
+                "max": 10,
+                "perSide": true
+              },
+              "restSeconds": 60,
+              "optional": false,
+              "primary": false,
+              "alternatives": [
+                {
+                  "exerciseId": "machine_crunch",
+                  "name": "Vatsarutistuslaite",
+                  "label": "Vatsarutistuslaite, 2 x 10-15",
+                  "sets": 2,
+                  "target": {
+                    "min": 10,
+                    "max": 15,
+                    "perSide": false
+                  }
+                }
+              ],
+              "instruction": ""
+            }
+          ],
+          "miniExerciseIds": [
+            "bench_goblet_squat",
+            "machine_row",
+            "machine_shoulder_press",
+            "hip_thrust_machine"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kolme-lyhytta-kokovartaloa",
+      "name": "Kolme lyhyttä kokovartalotreeniä",
+      "tagline": "Lyhyemmät A, B ja C -harjoitukset kolmena päivänä",
+      "description": "Vaihtelua useammalle salikäynnille ilman pitkiä harjoituksia. Jokaisella kerralla tehdään yksi jaloille, yksi punnerrus, yksi veto ja muita tärkeitä liikkeitä.",
+      "recommendedWeeklySessions": 3,
+      "allowedWeeklySessions": [
+        3
+      ],
+      "estimatedSessionMinutes": {
+        "min": 30,
+        "max": 40
+      },
+      "durationWeeks": 8,
+      "type": "kokovartalo A/B/C",
+      "equipmentFocus": "laitteet, valinnaiset käsipainot",
+      "sequence": [
+        "A",
+        "B",
+        "C"
+      ],
+      "phases": [
+        {
+          "weeks": [
+            1,
+            2
+          ],
+          "sets": "1-2 per liike, jaksamisen mukaan",
+          "effort": "RIR 3-4",
+          "goal": "Opettele A, B ja C. Kevennä tarvittaessa kolmatta treeniä."
+        },
+        {
+          "weeks": [
+            3,
+            5
+          ],
+          "sets": "2 per liike",
+          "effort": "RIR 3",
+          "goal": "Pyri tasaiseen tekemiseen, ei maksimisuorituksiin."
+        },
+        {
+          "weeks": [
+            6,
+            7
+          ],
+          "sets": "2 per liike; vain halutessa 3 sarjaa ensimmäiseen jalkaliikkeeseen",
+          "effort": "RIR 2-3",
+          "goal": "Lisää toistoja ja tarvittaessa kuormaa."
+        },
+        {
+          "weeks": [
+            8,
+            8
+          ],
+          "sets": "2 per liike",
+          "effort": "RIR 3-4, tarvittaessa kevennys",
+          "goal": "Arvioi, onko kolme harjoitusta sopiva määrä."
+        }
+      ],
+      "sessions": [
+        {
+          "id": "A",
+          "name": "Treeni A: perustyöntö ja veto",
+          "exercises": [
+            {
+              "exerciseId": "leg_press",
+              "name": "Jalkaprässi",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 10,
+                "max": 12,
+                "perSide": false
+              },
+              "restSeconds": 120,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "supported_bench_squat",
+                  "name": "Tuettu kyykky penkille",
+                  "label": "Tuettu kyykky penkille"
+                }
+              ],
+              "instruction": ""
+            },
+            {
+              "exerciseId": "machine_chest_press",
+              "name": "Rintapunnerruslaite",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 8,
+                "max": 12,
+                "perSide": false
+              },
+              "restSeconds": 90,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "wall_push_up",
+                  "name": "Seinäpunnerrus",
+                  "label": "Seinäpunnerrus"
+                }
+              ],
+              "instruction": ""
+            },
+            {
+              "exerciseId": "lat_pulldown",
+              "name": "Ylätalja",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 10,
+                "max": 12,
+                "perSide": false
+              },
+              "restSeconds": 90,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "neutral_lat_pulldown",
+                  "name": "Ylätalja neutraaliotteella",
+                  "label": "Ylätalja neutraaliotteella"
+                }
+              ],
+              "instruction": ""
+            },
+            {
+              "exerciseId": "seated_leg_curl",
+              "name": "Reiden koukistus istuen",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 10,
+                "max": 15,
+                "perSide": false
+              },
+              "restSeconds": 75,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "floor_glute_bridge",
+                  "name": "Lantionnosto lattialla",
+                  "label": "Lantionnosto lattialla"
+                }
+              ],
+              "instruction": ""
+            },
+            {
+              "exerciseId": "dead_bug",
+              "name": "Dead bug",
+              "equipment": "matto",
+              "sets": 2,
+              "target": {
+                "min": 6,
+                "max": 10,
+                "perSide": true
+              },
+              "restSeconds": 60,
+              "optional": false,
+              "primary": false,
+              "alternatives": [
+                {
+                  "exerciseId": "machine_crunch",
+                  "name": "Vatsarutistuslaite",
+                  "label": "Vatsarutistuslaite, 2 x 10-15",
+                  "sets": 2,
+                  "target": {
+                    "min": 10,
+                    "max": 15,
+                    "perSide": false
+                  }
+                }
+              ],
+              "instruction": ""
+            }
+          ],
+          "miniExerciseIds": [
+            "leg_press",
+            "machine_chest_press",
+            "lat_pulldown",
+            "seated_leg_curl"
+          ]
+        },
+        {
+          "id": "B",
+          "name": "Treeni B: kyykky, soutu ja hartiat",
+          "exercises": [
+            {
+              "exerciseId": "bench_goblet_squat",
+              "name": "Goblet-kyykky penkille",
+              "equipment": "käsipaino + penkki",
+              "sets": 2,
+              "target": {
+                "min": 8,
+                "max": 12,
+                "perSide": false
+              },
+              "restSeconds": 120,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "leg_press",
+                  "name": "Jalkaprässi",
+                  "label": "Jalkaprässi"
+                }
+              ],
+              "instruction": "Liikkeen voi aloittaa ilman painoa."
+            },
+            {
+              "exerciseId": "machine_row",
+              "name": "Vaakasoutu laitteessa",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 8,
+                "max": 12,
+                "perSide": false
+              },
+              "restSeconds": 90,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "low_cable_row",
+                  "name": "Alataljasoutu",
+                  "label": "Alataljasoutu"
+                }
+              ],
+              "instruction": ""
+            },
+            {
+              "exerciseId": "machine_shoulder_press",
+              "name": "Pystypunnerruslaite",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 10,
+                "max": 12,
+                "perSide": false
+              },
+              "restSeconds": 90,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "machine_chest_press",
+                  "name": "Rintapunnerruslaite",
+                  "label": "Rintapunnerruslaite, jos hartioiden punnerrus ei sovi"
+                }
+              ],
+              "instruction": ""
+            },
+            {
+              "exerciseId": "hip_thrust_machine",
+              "name": "Lantionnosto laitteessa",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 10,
+                "max": 15,
+                "perSide": false
+              },
+              "restSeconds": 90,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "floor_glute_bridge",
+                  "name": "Lantionnosto lattialla",
+                  "label": "Lantionnosto lattialla"
+                }
+              ],
+              "instruction": ""
+            },
+            {
+              "exerciseId": "pallof_press",
+              "name": "Pallof-punnerrus taljassa",
+              "equipment": "talja",
+              "sets": 2,
+              "target": {
+                "min": 8,
+                "max": 12,
+                "perSide": true
+              },
+              "restSeconds": 60,
+              "optional": false,
+              "primary": false,
+              "alternatives": [
+                {
+                  "exerciseId": "dead_bug",
+                  "name": "Dead bug",
+                  "label": "Dead bug, 2 x 6-10 per puoli",
+                  "sets": 2,
+                  "target": {
+                    "min": 6,
+                    "max": 10,
+                    "perSide": true
+                  }
+                }
+              ],
+              "instruction": ""
+            }
+          ],
+          "miniExerciseIds": [
+            "bench_goblet_squat",
+            "machine_row",
+            "machine_shoulder_press",
+            "hip_thrust_machine"
+          ]
+        },
+        {
+          "id": "C",
+          "name": "Treeni C: rinta, selkä ja jalat",
+          "exercises": [
+            {
+              "exerciseId": "leg_press",
+              "name": "Jalkaprässi",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 10,
+                "max": 12,
+                "perSide": false
+              },
+              "restSeconds": 120,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "supported_bench_squat",
+                  "name": "Tuettu kyykky penkille",
+                  "label": "Tuettu kyykky penkille"
+                }
+              ],
+              "instruction": ""
+            },
+            {
+              "exerciseId": "machine_chest_press",
+              "name": "Rintapunnerruslaite",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 8,
+                "max": 12,
+                "perSide": false
+              },
+              "restSeconds": 90,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "dumbbell_bench_press",
+                  "name": "Penkkipunnerrus käsipainoilla",
+                  "label": "Penkkipunnerrus käsipainoilla, jos tekniikka hallussa"
+                }
+              ],
+              "instruction": ""
+            },
+            {
+              "exerciseId": "machine_row",
+              "name": "Vaakasoutu laitteessa",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 10,
+                "max": 12,
+                "perSide": false
+              },
+              "restSeconds": 90,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "low_cable_row",
+                  "name": "Alataljasoutu",
+                  "label": "Alataljasoutu"
+                }
+              ],
+              "instruction": ""
+            },
+            {
+              "exerciseId": "seated_leg_curl",
+              "name": "Reiden koukistus istuen",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 10,
+                "max": 15,
+                "perSide": false
+              },
+              "restSeconds": 75,
+              "optional": false,
+              "primary": true,
+              "alternatives": [
+                {
+                  "exerciseId": "floor_glute_bridge",
+                  "name": "Lantionnosto lattialla",
+                  "label": "Lantionnosto lattialla"
+                }
+              ],
+              "instruction": ""
+            },
+            {
+              "exerciseId": "machine_crunch",
+              "name": "Vatsarutistuslaite",
+              "equipment": "laite",
+              "sets": 2,
+              "target": {
+                "min": 10,
+                "max": 15,
+                "perSide": false
+              },
+              "restSeconds": 60,
+              "optional": false,
+              "primary": false,
+              "alternatives": [
+                {
+                  "exerciseId": "dead_bug",
+                  "name": "Dead bug",
+                  "label": "Dead bug, 2 x 6-10 per puoli",
+                  "sets": 2,
+                  "target": {
+                    "min": 6,
+                    "max": 10,
+                    "perSide": true
+                  }
+                }
+              ],
+              "instruction": ""
+            }
+          ],
+          "miniExerciseIds": [
+            "leg_press",
+            "machine_chest_press",
+            "machine_row",
+            "seated_leg_curl"
+          ]
+        }
+      ]
+    }
+  ]
+}

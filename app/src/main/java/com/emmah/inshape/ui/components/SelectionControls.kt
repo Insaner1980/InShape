@@ -3,6 +3,7 @@ package com.emmah.inshape.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,6 +42,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import com.emmah.inshape.ui.theme.DarkColors
 import com.emmah.inshape.ui.theme.Dimens
@@ -55,7 +57,7 @@ fun Pill(
     text: String,
     modifier: Modifier = Modifier,
     tone: PillTone = PillTone.Neutral,
-    style: TextStyle = MaterialTheme.typography.labelMedium
+    style: TextStyle = MaterialTheme.typography.labelSmall
 ) {
     val colors = InShapeTheme.colors
     val accent = tone == PillTone.Accent
@@ -129,7 +131,7 @@ fun FilterPill(text: String, selected: Boolean, onClick: () -> Unit, modifier: M
         ) {
             Text(
                 text,
-                style = MaterialTheme.typography.labelMedium.copy(
+                style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
                 ),
                 color = if (selected) colors.background else colors.text
@@ -146,58 +148,74 @@ fun SegmentedControl(
     options: List<String>,
     selected: Int,
     onSelect: (Int) -> Unit,
-    modifier: Modifier = Modifier,
-    compact: Boolean = false
+    modifier: Modifier = Modifier
 ) {
     val colors = InShapeTheme.colors
-    val stacked = LocalDensity.current.fontScale >= 1.3f
+    val density = LocalDensity.current
+    val labelStyle = MaterialTheme.typography.labelSmall
+    val textMeasurer = rememberTextMeasurer()
     Surface(
         modifier.fillMaxWidth(),
         shape = InShapeShapes.field,
         color = colors.surface
     ) {
-        FlowRow(
-            Modifier.padding(Dimens.innerTiny),
-            horizontalArrangement = Arrangement.spacedBy(Dimens.innerTiny),
-            verticalArrangement = Arrangement.spacedBy(Dimens.innerTiny),
-            maxItemsInEachRow = if (stacked) 1 else options.size.coerceAtLeast(1)
-        ) {
-            options.forEachIndexed { index, label ->
-                Surface(
-                    onClick = {
-                        onSelect(index)
-                    },
-                    modifier = Modifier.weight(1f).heightIn(min = Dimens.touch).semantics {
-                        this.selected =
-                            selected == index
-                        role = Role.Tab
-                    },
-                    shape = InShapeShapes.segment,
-                    color = if (selected ==
-                        index
+        BoxWithConstraints(Modifier.padding(Dimens.innerTiny)) {
+            val widestLabel = options.maxOfOrNull {
+                textMeasurer.measure(it, labelStyle, softWrap = false, maxLines = 1).size.width
+            } ?: 0
+            val itemWidth = with(density) { widestLabel.toDp() } + Dimens.innerTiny * 2
+            val count = options.size.coerceAtLeast(1)
+            val itemsPerRow = when {
+                density.fontScale >= 1.3f -> 1
+                itemWidth * count + Dimens.innerTiny * (count - 1) <= maxWidth -> count
+                itemWidth * 2 + Dimens.innerTiny <= maxWidth -> 2
+                else -> 1
+            }
+            FlowRow(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Dimens.innerTiny),
+                verticalArrangement = Arrangement.spacedBy(Dimens.innerTiny),
+                maxItemsInEachRow = itemsPerRow
+            ) {
+                options.forEachIndexed { index, label ->
+                    Surface(
+                        onClick = {
+                            onSelect(index)
+                        },
+                        modifier = Modifier.weight(1f).heightIn(min = Dimens.touch).semantics {
+                            this.selected =
+                                selected == index
+                            role = Role.Tab
+                        },
+                        shape = InShapeShapes.segment,
+                        color = if (selected ==
+                            index
+                        ) {
+                            colors.ink
+                        } else {
+                            Color.Transparent
+                        }
                     ) {
-                        colors.ink
-                    } else {
-                        Color.Transparent
-                    }
-                ) {
-                    Box(
-                        Modifier.padding(horizontal = Dimens.innerTiny, vertical = Dimens.innerTiny),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            label,
-                            Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center,
-                            style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
-                            color = if (selected ==
-                                index
-                            ) {
-                                colors.onInk
-                            } else {
-                                colors.textSecondary
-                            }
-                        )
+                        Box(
+                            Modifier.padding(horizontal = Dimens.innerTiny, vertical = Dimens.innerTiny),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                label,
+                                Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center,
+                                style = labelStyle,
+                                maxLines = 1,
+                                softWrap = false,
+                                color = if (selected ==
+                                    index
+                                ) {
+                                    colors.onInk
+                                } else {
+                                    colors.textSecondary
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -254,7 +272,7 @@ fun Stepper(
                 Modifier.size(Dimens.touch),
                 enabled = decreaseEnabled,
                 colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = InShapeTheme.colors.surfaceStrong,
+                    containerColor = InShapeTheme.colors.surface,
                     contentColor = InShapeTheme.colors.text
                 )
             ) {
@@ -270,7 +288,7 @@ fun Stepper(
                 onIncrease,
                 Modifier.size(Dimens.touch),
                 colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = InShapeTheme.colors.surfaceStrong,
+                    containerColor = InShapeTheme.colors.surface,
                     contentColor = InShapeTheme.colors.text
                 )
             ) {
@@ -310,7 +328,7 @@ fun ProgressSegments(
                     when (state) {
                         ProgressState.Done -> colors.ink
                         ProgressState.Current -> colors.textTertiary
-                        ProgressState.Pending -> colors.surfaceStrong
+                        ProgressState.Pending -> colors.surface
                     }
                 },
                 border = if (onDarkSurface && state == ProgressState.Pending) {

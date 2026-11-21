@@ -1,5 +1,6 @@
 package com.emmah.inshape.transfer
 
+import com.emmah.inshape.R
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -7,6 +8,8 @@ import android.net.Uri
 import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
 import androidx.test.core.app.ApplicationProvider
+import androidx.work.WorkManager
+import androidx.work.testing.WorkManagerTestInitHelper
 import com.emmah.inshape.AppContainer
 import com.emmah.inshape.data.Exercise
 import com.emmah.inshape.data.PhotoAsset
@@ -15,6 +18,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.RandomAccessFile
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -216,9 +220,9 @@ class StorageRecoveryTest {
             container.backups.recoverOwnedStaging()
             assertTrue(retained.isFile)
             assertFalse(empty.exists())
-            if (System.getProperty("os.name").startsWith("Windows")) {
+            if (System.getProperty("os.name").orEmpty().startsWith("Windows")) {
                 assertTrue(orphan.exists())
-                assertTrue(ShadowLog.getLogsForTag("BackupService").any { it.msg.contains("startup recovery") })
+                assertTrue(ShadowLog.getLogsForTag("BackupService").any { it.msg?.contains("startup recovery") == true })
             }
         }
         container.backups.recoverOwnedStaging()
@@ -238,7 +242,38 @@ class StorageRecoveryTest {
         }
     }
 
+    @Test fun aRecreatedTransferSavesOnlyTheExportSelectedByThePicker() = runBlocking {
+        val selected = File(context.cacheDir, "exports/${newId()}").apply { mkdirs() }
+        val other = File(context.cacheDir, "exports/${newId()}").apply { mkdirs() }
+        val selectedFile = File(selected, "InShape.pdf").apply { writeText("selected") }
+        val otherFile = File(other, "InShape.pdf").apply { writeText("other export") }
+        val saved = ByteArrayOutputStream()
+        val destination = Uri.parse("content://storage/picker-destination")
+        shadowOf(context.contentResolver).registerOutputStream(destination, saved)
+        val transfers = TransferController(container, this)
+        try {
+            transfers.saveExport(destination, selected.name, "PDF")
+            val success = transfers.state.first { !it.busy }
+            assertFalse(success.isError)
+            assertEquals("selected", saved.toString("UTF-8"))
+            assertFalse(selectedFile.exists())
+            assertEquals("other export", otherFile.readText())
+
+            transfers.saveExport(destination, selected.name, "PDF")
+            val missing = transfers.state.first { !it.busy }
+            assertTrue(missing.isError)
+            assertEquals(context.getString(R.string.export_missing), missing.message)
+            assertEquals("selected", saved.toString("UTF-8"))
+        } finally {
+            transfers.close()
+            selected.deleteRecursively()
+            other.deleteRecursively()
+        }
+    }
+
     @Test fun sharingRefreshesExpiryAndRejectsAnExportThatWasRemoved() {
+        WorkManagerTestInitHelper.initializeTestWorkManager(context)
+        val manager = WorkManager.getInstance(context)
         val folder = File(context.cacheDir, "exports/${newId()}").apply { mkdirs() }
         val file = File(folder, "InShape.pdf").apply { writeText("test export") }
         val prepared = PreparedExport(file, "PDF", 1)
@@ -247,11 +282,19 @@ class StorageRecoveryTest {
             assertEquals("content", container.exports.sharedUri(prepared).scheme)
             assertTrue(prepared.shared)
             assertTrue(folder.lastModified() > 1)
+            val workName = "${ExportService.CACHE_EXPIRY_WORK}:${prepared.id}"
+            assertEquals(1, manager.getWorkInfosForUniqueWork(workName).get().size)
+            assertTrue(ExportService.cleanup(context).contains(folder))
+            assertTrue(file.isFile)
+            assertTrue(folder.setLastModified(1))
+            ExportService.cleanup(context)
+            assertFalse(file.exists())
             prepared.shared = false
-            container.exports.release(prepared)
             assertThrows(IllegalStateException::class.java) { container.exports.sharedUri(prepared) }
             assertFalse(prepared.shared)
         } finally {
+            manager.cancelAllWork().result.get()
+            WorkManagerTestInitHelper.closeWorkDatabase()
             folder.deleteRecursively()
         }
     }

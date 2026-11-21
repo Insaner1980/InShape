@@ -1,5 +1,7 @@
 package com.emmah.inshape
 
+import com.emmah.inshape.ui.theme.withFinnishLocale
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -18,6 +20,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 open class MainActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase.withFinnishLocale())
+    }
+
     protected open val allowWorkoutStart = false
     private var entryAction by mutableStateOf<Pair<String, Long>?>(null)
     private var entrySequence = 0L
@@ -37,7 +43,12 @@ open class MainActivity : ComponentActivity() {
                 }
             }
         }
-        if (savedInstanceState == null) acceptIntent(intent)
+        if (savedInstanceState == null) {
+            acceptIntent(intent)
+        } else {
+            entrySequence = savedInstanceState.getLong(ENTRY_SEQUENCE)
+            entryAction = savedInstanceState.getString(ENTRY_ACTION)?.let { it to entrySequence }
+        }
         enableEdgeToEdge()
         val container = (application as InShapeApplication).container
         setContent {
@@ -49,6 +60,12 @@ open class MainActivity : ComponentActivity() {
             }
         }
     }
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putLong(ENTRY_SEQUENCE, entrySequence)
+        outState.putString(ENTRY_ACTION, entryAction?.first)
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -62,6 +79,8 @@ open class MainActivity : ComponentActivity() {
         }
     }
     companion object {
+        private const val ENTRY_ACTION = "entry_action"
+        private const val ENTRY_SEQUENCE = "entry_sequence"
         const val START_OR_RESUME = "com.emmah.inshape.START_OR_RESUME"
         const val OPEN_WORKOUT = "com.emmah.inshape.OPEN_WORKOUT"
         const val OPEN_FINISH = "com.emmah.inshape.OPEN_FINISH"

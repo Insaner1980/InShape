@@ -1,5 +1,9 @@
 package com.emmah.inshape.feature.music
 
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.ui.res.stringResource
+import androidx.compose.material.icons.outlined.Close
+import com.emmah.inshape.ui.components.HeaderIconButton
 import android.app.Activity
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -18,7 +22,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -39,16 +42,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.SaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,9 +66,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -92,9 +89,10 @@ internal fun MusicHome(
     store: MusicStore,
     playback: MusicPlayback,
     onPlaylist: (String) -> Unit,
+    onBack: () -> Unit,
     fixture: MusicCatalog? = null,
-    onPlay: () -> Unit = {},
-    onClose: (() -> Unit)? = null
+    onPlaylistAssistant: (() -> Unit)? = null,
+    onEnergy: ((String) -> Unit)? = null
 ) {
     val observedCatalog by store.catalog.collectAsStateWithLifecycle()
     val catalog = fixture ?: observedCatalog
@@ -127,102 +125,68 @@ internal fun MusicHome(
         val query = search.trim()
         catalog.songs.filter { it.title.contains(query, ignoreCase = true) || it.artist.contains(query, ignoreCase = true) }
     }
-    val largeText = LocalDensity.current.fontScale >= 1.3f
     val hasFolder = catalog.source != null
     val needsFolder = !hasFolder && catalog.songs.isEmpty()
     fun newPlaylist() {
         editor = "new"
         firstSong = null
     }
-    val newButton: @Composable () -> Unit = {
-        OutlineButton("New playlist", ::newPlaylist, icon = Icons.Filled.Add)
-    }
-    val folderActions: @Composable () -> Unit = {
-        if (hasFolder) {
+    var addMenu by remember { mutableStateOf(false) }
+    MusicColumn {
+        PushedHeader(onBack, title = stringResource(R.string.music)) {
             Box {
-                IconButton({ folderMenu = true }) { Icon(Icons.Filled.MoreVert, "Music folder options") }
-                AppMenu(folderMenu, { folderMenu = false }) {
-                    MenuAction("Choose folder", Icons.Outlined.FolderOpen, {
-                        folderMenu = false
-                        chooseFolder()
-                    }, enabled = !scanning)
-                    MenuAction("Refresh", Icons.Outlined.Refresh, {
-                        folderMenu = false
-                        store.scan()
-                    }, enabled = !scanning && !catalog.accessLost)
+                HeaderIconButton(Icons.Filled.Add, stringResource(R.string.new_playlist), {
+                    if (selected == 0) addMenu = true else newPlaylist()
+                })
+                AppMenu(addMenu, { addMenu = false }) {
+                    MenuAction(stringResource(R.string.new_playlist), Icons.Filled.Add, {
+                        addMenu = false
+                        newPlaylist()
+                    })
+                    if (onPlaylistAssistant != null && catalog.songs.isNotEmpty()) {
+                        MenuAction(stringResource(R.string.playlist_with_assistant), Icons.Outlined.AutoAwesome, {
+                            addMenu = false
+                            onPlaylistAssistant()
+                        })
+                    }
                 }
             }
-        }
-    }
-    MusicColumn {
-        onClose?.let { close ->
-            PushedHeader(close, title = "Music", endInset = !largeText && !hasFolder) {
-                if (!largeText) newButton()
-                folderActions()
-            }
+            MusicFolderActions(
+                folderMenu,
+                { folderMenu = it },
+                canChoose = !scanning,
+                canRefresh = hasFolder && !scanning && !catalog.accessLost,
+                onChoose = ::chooseFolder,
+                onRefresh = { store.scan() }
+            )
         }
         LazyColumn(
             Modifier.weight(1f).fillMaxWidth().imePadding().padding(horizontal = Dimens.screenPadding),
             state = if (selected == 0) playlistScroll else songScroll
         ) {
             item(key = "music-header") {
-                Column(
-                    Modifier.padding(top = Dimens.screenTop, bottom = Dimens.itemGap),
-                    verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)
-                ) {
-                    if (onClose == null) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.weight(1f)) { MusicTitle() }
-                            if (!largeText) newButton()
-                            folderActions()
-                        }
-                    }
-                    if (largeText) newButton()
-                }
-                ScreenTabs(listOf("Playlists", "Songs"), selected, { selected = it })
+                ScreenTabs(listOf(stringResource(R.string.playlists), stringResource(R.string.songs)), selected, { selected = it })
                 if (scanning) {
                     LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = Dimens.itemGap))
-                    Text("Scanning music folder…", Modifier.padding(top = Dimens.innerSmall))
-                    com.emmah.inshape.ui.components.TextAction("Cancel scan", store::cancelScan)
+                    Text(stringResource(R.string.scanning_music), Modifier.padding(top = Dimens.innerSmall))
+                    com.emmah.inshape.ui.components.TextAction(stringResource(R.string.cancel_scan), store::cancelScan, icon = Icons.Outlined.Close)
                 }
-                MusicStatus(playing.error ?: message)
+                MusicStatus(message)
+                MusicStatus(playing.error)
                 if (selected == 1 && !needsFolder) {
-                    SearchField(search, { search = it }, "Search songs", Modifier.padding(top = Dimens.itemGap))
+                    SearchField(search, { search = it }, stringResource(R.string.search_songs), Modifier.padding(top = Dimens.itemGap))
                 }
-                if (catalog.accessLost) MusicStatus("Music folder access was lost.")
+                if (catalog.accessLost) MusicStatus(stringResource(R.string.music_access_lost))
                 if (!scanning) {
-                    val padding = Modifier.padding(top = Dimens.itemGap)
-                    when {
-                        needsFolder -> EmptyState(
-                            "Add your music",
-                            "Choose a folder on this phone. InShape plays the files from there.",
-                            padding,
-                            "Choose music folder",
-                            ::chooseFolder,
-                            Icons.Outlined.FolderOpen
-                        )
-
-                        selected == 0 && catalog.playlists.isEmpty() -> EmptyState(
-                            "No playlists yet",
-                            "Make a playlist for your workouts.",
-                            padding,
-                            "New playlist",
-                            ::newPlaylist,
-                            Icons.Filled.Add
-                        )
-
-                        selected == 1 && songs.isEmpty() && search.isNotBlank() -> EmptyState(
-                            "No matching songs",
-                            "Try another word.",
-                            padding
-                        )
-
-                        selected == 1 && songs.isEmpty() -> EmptyState(
-                            "No songs found",
-                            "Choose a folder that contains audio files.",
-                            padding
-                        )
-                    }
+                    MusicHomeEmptyState(
+                        needsFolder,
+                        selectedTab = selected,
+                        playlistsEmpty = catalog.playlists.isEmpty(),
+                        songsEmpty = songs.isEmpty(),
+                        hasSearch = search.isNotBlank(),
+                        onChooseFolder = ::chooseFolder,
+                        onNewPlaylist = ::newPlaylist
+                    )
                 }
                 Box(Modifier.size(Dimens.itemGap))
             }
@@ -230,7 +194,6 @@ internal fun MusicHome(
                 items(catalog.playlists, key = { it.id }) { playlist ->
                     PlaylistRow(playlist, { onPlaylist(playlist.id) }) {
                         playback.start(playlist.tracks)
-                        onPlay()
                     }
                     if (playlist.id != catalog.playlists.last().id) MusicDivider()
                 }
@@ -238,9 +201,8 @@ internal fun MusicHome(
                 items(songs, key = { it.id }) { song ->
                     SongRow(song, {
                         playback.start(songs, song.id)
-                        onPlay()
                     }) {
-                        SongMenu(song, { playback.playAfterCurrent(song) }, { addSong = song.id })
+                        SongMenu(song, { playback.playAfterCurrent(song) }, { addSong = song.id }, onEnergy?.let { choose -> { choose(song.id) } })
                     }
                     MusicDivider()
                 }
@@ -248,7 +210,11 @@ internal fun MusicHome(
         }
     }
     if (editor == "new") {
-        PlaylistEditor(store, catalog.songs, onClose = { editor = null }, firstSong = firstSong)
+        PlaylistEditor(store, catalog.songs, onClose = { editor = null }, firstSong = firstSong, onCreated = { editor = it })
+    } else {
+        observedCatalog.playlists.firstOrNull { it.id == editor }?.let { playlist ->
+            EditSavedPlaylist(store, playlist, onClose = { editor = null })
+        }
     }
     addSong?.let { id ->
         AddSongDialog(store, catalog.playlists, id, onClose = { addSong = null }, onCreate = {
@@ -259,8 +225,62 @@ internal fun MusicHome(
 }
 
 @Composable
-private fun MusicTitle() {
-    Text("Music", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.semantics { heading() })
+private fun MusicFolderActions(
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    canChoose: Boolean,
+    canRefresh: Boolean,
+    onChoose: () -> Unit,
+    onRefresh: () -> Unit
+) {
+    Box {
+        HeaderIconButton(Icons.Filled.MoreVert, stringResource(R.string.music_folder_options), { onExpandedChange(true) })
+        AppMenu(expanded, { onExpandedChange(false) }) {
+            MenuAction(stringResource(R.string.choose_folder), Icons.Outlined.FolderOpen, {
+                onExpandedChange(false)
+                onChoose()
+            }, enabled = canChoose)
+            MenuAction(stringResource(R.string.refresh), Icons.Outlined.Refresh, {
+                onExpandedChange(false)
+                onRefresh()
+            }, enabled = canRefresh)
+        }
+    }
+}
+
+@Composable
+private fun MusicHomeEmptyState(
+    needsFolder: Boolean,
+    selectedTab: Int,
+    playlistsEmpty: Boolean,
+    songsEmpty: Boolean,
+    hasSearch: Boolean,
+    onChooseFolder: () -> Unit,
+    onNewPlaylist: () -> Unit
+) {
+    val padding = Modifier.padding(top = Dimens.itemGap)
+    when {
+        needsFolder -> EmptyState(
+            stringResource(R.string.add_music),
+            stringResource(R.string.choose_folder_hint),
+            padding,
+            stringResource(R.string.choose_music_folder),
+            onChooseFolder,
+            Icons.Outlined.FolderOpen
+        )
+
+        selectedTab == 0 && playlistsEmpty -> EmptyState(
+            stringResource(R.string.no_playlists),
+            stringResource(R.string.create_workout_playlist),
+            padding,
+            stringResource(R.string.new_playlist),
+            onNewPlaylist,
+            Icons.Filled.Add
+        )
+
+        selectedTab == 1 && songsEmpty && hasSearch -> EmptyState(stringResource(R.string.no_matching_songs), stringResource(R.string.try_another_word), padding)
+        selectedTab == 1 && songsEmpty -> EmptyState(stringResource(R.string.no_songs_found), stringResource(R.string.choose_audio_folder), padding)
+    }
 }
 
 @Composable
@@ -268,19 +288,19 @@ private fun PlaylistRow(playlist: SavedPlaylist, open: () -> Unit, play: () -> U
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Row(
             Modifier.weight(1f)
-                .clickable(role = Role.Button, onClickLabel = "Open ${playlist.name}", onClick = open)
+                .clickable(role = Role.Button, onClickLabel = stringResource(R.string.open_named, playlist.name), onClick = open)
                 .padding(vertical = Dimens.innerSmall),
             horizontalArrangement = Arrangement.spacedBy(Dimens.inner),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            MusicArtwork(playlistCover(playlist), 68.dp)
+            MusicArtwork(playlistCover(playlist), Dimens.playlistArtworkThumbnail)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.innerTiny)) {
                 Text(playlist.name, style = MaterialTheme.typography.bodyLarge)
                 SongCount(playlist.tracks.size)
             }
         }
         IconButton(play, Modifier.size(Dimens.touch), enabled = playlist.tracks.any { it.available }) {
-            Icon(Icons.Filled.PlayArrow, "Play ${playlist.name}", Modifier.size(Dimens.iconLarge))
+            Icon(Icons.Filled.PlayArrow, stringResource(R.string.play_named, playlist.name), Modifier.size(Dimens.iconLarge))
         }
     }
 }
@@ -292,7 +312,7 @@ internal fun PlaylistDetail(
     playback: MusicPlayback,
     onBack: () -> Unit,
     fixture: MusicCatalog? = null,
-    onPlay: () -> Unit = {}
+    onAssistant: (() -> Unit)? = null
 ) {
     val observedCatalog by store.catalog.collectAsStateWithLifecycle()
     val catalog = fixture ?: observedCatalog
@@ -300,8 +320,8 @@ internal fun PlaylistDetail(
     val playing by playback.state.collectAsStateWithLifecycle()
     var edit by rememberSaveable(id) { mutableStateOf<String?>(null) }
     MusicColumn {
-        PushedHeader(onBack, title = "Playlist") {
-            if (playlist != null) PlaylistMenu { edit = it }
+        PushedHeader(onBack) {
+            if (playlist != null) PlaylistMenu(onAssistant) { edit = it }
         }
         if (playlist == null) return@MusicColumn
         val canPlay = playlist.tracks.any { it.available }
@@ -314,15 +334,13 @@ internal fun PlaylistDetail(
                 ) {
                     PlaylistHeader(playlist)
                     val play: @Composable (Modifier) -> Unit = { modifier ->
-                        PrimaryButton("Play", {
+                        PrimaryButton(stringResource(R.string.play), {
                             playback.start(playlist.tracks)
-                            onPlay()
                         }, modifier, Icons.Filled.PlayArrow, canPlay)
                     }
                     val shuffle: @Composable (Modifier) -> Unit = { modifier ->
-                        OutlineButton("Shuffle", {
+                        OutlineButton(stringResource(R.string.shuffle), {
                             playback.start(playlist.tracks, shuffle = true)
-                            onPlay()
                         }, modifier, canPlay, Icons.Filled.Shuffle)
                     }
                     if (largeText) {
@@ -340,10 +358,10 @@ internal fun PlaylistDetail(
                 MusicStatus(playing.error)
                 if (playlist.tracks.isEmpty()) {
                     EmptyState(
-                        "No songs in this playlist",
-                        "Add songs to play during your workouts.",
+                        stringResource(R.string.empty_playlist),
+                        stringResource(R.string.add_songs_hint),
                         Modifier.padding(bottom = Dimens.itemGap),
-                        "Add songs",
+                        stringResource(R.string.add_songs),
                         { edit = "add" },
                         Icons.Filled.Add
                     )
@@ -352,7 +370,6 @@ internal fun PlaylistDetail(
             items(playlist.tracks, key = { it.id }) { track ->
                 SongRow(track, {
                     playback.start(playlist.tracks, track.id)
-                    onPlay()
                 })
                 MusicDivider()
             }
@@ -368,11 +385,11 @@ private fun PlaylistHeader(playlist: SavedPlaylist) {
     val measurer = rememberTextMeasurer()
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val regular = hasArtworkColumns()
-        val height = (maxWidth / 2.4f).coerceIn(112.dp, 180.dp)
+        val height = (maxWidth / 2.4f).coerceIn(Dimens.playlistHeaderMinHeight, Dimens.playlistHeaderMaxHeight)
         val protectedWidth = maxWidth * .44f
         val textWidth = protectedWidth - Dimens.inner
         val density = LocalDensity.current
-        val headline = MaterialTheme.typography.headlineSmall
+        val headline = MaterialTheme.typography.titleLarge
         val showPanorama = wide != null && regular && LocalLayoutDirection.current == LayoutDirection.Ltr &&
             with(density) {
                 !measurer.measure(
@@ -381,7 +398,7 @@ private fun PlaylistHeader(playlist: SavedPlaylist) {
                     maxLines = 3,
                     constraints = Constraints(
                         maxWidth = textWidth.roundToPx(),
-                        maxHeight = (height - 56.dp).roundToPx()
+                        maxHeight = (height - Dimens.button).roundToPx()
                     )
                 ).hasVisualOverflow
             }
@@ -406,12 +423,12 @@ private fun PlaylistHeader(playlist: SavedPlaylist) {
             }
         } else if (!regular || wide != null) {
             Column(verticalArrangement = Arrangement.spacedBy(Dimens.inner)) {
-                MusicArtwork(cover, 104.dp)
+                MusicArtwork(cover, Dimens.playlistCoverSize)
                 PlaylistTitle(playlist)
             }
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(Dimens.inner)) {
-                MusicArtwork(cover, 104.dp)
+                MusicArtwork(cover, Dimens.playlistCoverSize)
                 Box(Modifier.weight(1f).padding(top = Dimens.innerTiny)) { PlaylistTitle(playlist) }
             }
         }
@@ -425,7 +442,7 @@ private fun PlaylistTitle(
     countColor: Color = InShapeTheme.colors.textSecondary
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.innerTiny)) {
-        Text(playlist.name, Modifier.semantics { heading() }, color = titleColor, style = MaterialTheme.typography.headlineSmall)
+        Text(playlist.name, Modifier.semantics { heading() }, color = titleColor, style = MaterialTheme.typography.titleLarge)
         SongCount(playlist.tracks.size, countColor)
     }
 }
@@ -440,24 +457,30 @@ private fun SongCount(count: Int, color: Color = InShapeTheme.colors.textSeconda
 }
 
 @Composable
-private fun PlaylistMenu(onAction: (String) -> Unit) {
+private fun PlaylistMenu(onAssistant: (() -> Unit)?, onAction: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
-        IconButton({ open = true }, Modifier.size(Dimens.touch)) { Icon(Icons.Filled.MoreVert, "Playlist options") }
-        AppMenu(open, { open = false }) {
-            MenuAction("Add songs", Icons.Filled.Add, {
+        HeaderIconButton(Icons.Filled.MoreVert, stringResource(R.string.playlist_options), { open = true })
+        AppMenu(open, { open = false }, inHeader = true) {
+            MenuAction(stringResource(R.string.add_songs), Icons.Filled.Add, {
                 open = false
                 onAction("add")
             })
-            MenuAction("Edit playlist", Icons.AutoMirrored.Filled.QueueMusic, {
+            MenuAction(stringResource(R.string.edit_playlist), Icons.AutoMirrored.Filled.QueueMusic, {
                 open = false
                 onAction("edit")
             })
-            MenuAction("Rename", Icons.Filled.Edit, {
+            if (onAssistant != null) {
+                MenuAction(stringResource(R.string.edit_with_playlist_assistant), Icons.Outlined.AutoAwesome, {
+                    open = false
+                    onAssistant()
+                })
+            }
+            MenuAction(stringResource(R.string.rename), Icons.Filled.Edit, {
                 open = false
                 onAction("rename")
             })
-            MenuAction("Delete playlist", Icons.Filled.DeleteOutline, {
+            MenuAction(stringResource(R.string.delete_playlist), Icons.Filled.DeleteOutline, {
                 open = false
                 onAction("delete")
             }, destructive = true)
@@ -466,20 +489,24 @@ private fun PlaylistMenu(onAction: (String) -> Unit) {
 }
 
 @Composable
-private fun SongMenu(song: MusicTrack, next: () -> Unit, add: () -> Unit) {
+private fun SongMenu(song: MusicTrack, next: () -> Unit, add: () -> Unit, onEnergy: (() -> Unit)? = null) {
     var open by remember { mutableStateOf(false) }
     Box {
-        IconButton({ open = true }, Modifier.size(Dimens.touch)) { Icon(Icons.Filled.MoreVert, "Options for ${song.title}") }
+        IconButton({ open = true }, Modifier.size(Dimens.touch)) { Icon(Icons.Filled.MoreVert, stringResource(R.string.named_options, song.title)) }
         AppMenu(open, { open = false }) {
             if (song.available) {
-                MenuAction("Play next", Icons.AutoMirrored.Filled.QueueMusic, {
+                MenuAction(stringResource(R.string.play_next), Icons.AutoMirrored.Filled.QueueMusic, {
                     open = false
                     next()
                 })
             }
-            MenuAction("Add to playlist", Icons.Filled.Add, {
+            MenuAction(stringResource(R.string.add_to_playlist), Icons.Filled.Add, {
                 open = false
                 add()
+            })
+            if (onEnergy != null) MenuAction(stringResource(R.string.set_energy_label), Icons.AutoMirrored.Filled.QueueMusic, {
+                open = false
+                onEnergy()
             })
         }
     }
@@ -490,7 +517,7 @@ internal fun SongRow(track: MusicTrack, play: () -> Unit, actions: (@Composable 
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Row(
             Modifier.weight(1f).heightIn(min = Dimens.rowMinTwoLine)
-                .clickable(enabled = track.available, onClickLabel = "Play ${track.title}", role = Role.Button, onClick = play)
+                .clickable(enabled = track.available, onClickLabel = stringResource(R.string.play_named, track.title), role = Role.Button, onClick = play)
                 .padding(vertical = Dimens.innerSmall),
             horizontalArrangement = Arrangement.spacedBy(Dimens.innerSmall),
             verticalAlignment = Alignment.CenterVertically
@@ -507,7 +534,7 @@ internal fun TrackLabels(track: MusicTrack, modifier: Modifier = Modifier, arran
     Column(modifier, verticalArrangement = arrangement) {
         Text(track.title, style = MaterialTheme.typography.bodyLarge)
         Text(
-            if (track.available) track.artist else "${track.artist}, unavailable",
+            if (track.available) track.artist else stringResource(R.string.unavailable_artist, track.artist),
             style = MaterialTheme.typography.bodyMedium,
             color = InShapeTheme.colors.textSecondary
         )
@@ -527,29 +554,6 @@ internal fun MusicDivider() = HorizontalDivider(thickness = Dimens.line, color =
 @Composable
 private fun MusicStatus(message: String?) {
     if (message != null) Text(message, Modifier.padding(vertical = Dimens.innerSmall), color = InShapeTheme.colors.textSecondary)
-}
-
-@Composable
-internal fun MusicChooser(store: MusicStore, playback: MusicPlayback, onClose: () -> Unit, fixture: MusicCatalog? = null) {
-    var playlist by rememberSaveable { mutableStateOf<String?>(null) }
-    val holder: SaveableStateHolder = rememberSaveableStateHolder()
-    Dialog(
-        onDismissRequest = { if (playlist == null) onClose() else playlist = null },
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
-    ) {
-        Surface(Modifier.fillMaxSize(), color = InShapeTheme.colors.background, contentColor = InShapeTheme.colors.text) {
-            Box(Modifier.safeDrawingPadding()) {
-                val id = playlist
-                if (id == null) {
-                    holder.SaveableStateProvider("chooser-home") {
-                        MusicHome(store, playback, { playlist = it }, fixture, onPlay = onClose, onClose = onClose)
-                    }
-                } else {
-                    PlaylistDetail(id, store, playback, { playlist = null }, fixture, onPlay = onClose)
-                }
-            }
-        }
-    }
 }
 
 internal fun songTime(milliseconds: Long?) = milliseconds?.let { formatElapsed(it / 1_000).removePrefix("0") } ?: "—"

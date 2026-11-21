@@ -1,5 +1,6 @@
 package com.emmah.inshape.feature.checkin
 
+import com.emmah.inshape.R
 import com.emmah.inshape.data.BodyObservation
 import com.emmah.inshape.data.CheckIn
 import org.junit.Assert.assertEquals
@@ -9,7 +10,7 @@ import org.junit.Test
 class CheckInLevelsTest {
     @Test fun energyLabelsUseSentenceCaseAndKeepStoredKeys() {
         assertEquals(listOf("LOW", "OK", "GOOD"), EnergyLevel.entries.map { it.key })
-        assertEquals(listOf("Low", "OK", "Good"), EnergyLevel.entries.map { it.label })
+        assertEquals(listOf(R.string.energy_low, R.string.energy_ok, R.string.energy_good), EnergyLevel.entries.map { it.label })
         EnergyLevel.entries.forEach { assertEquals(it, EnergyLevel.fromKey(it.key)) }
         assertNull(EnergyLevel.fromKey("unknown"))
     }

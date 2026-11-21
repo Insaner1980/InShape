@@ -1,5 +1,7 @@
 package com.emmah.inshape.ui.components
 
+import androidx.compose.ui.res.stringResource
+import com.emmah.inshape.R
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -20,11 +22,11 @@ import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeTheme
 
 @Composable
-internal fun ReorderHandle(label: String, onMove: (Int) -> Unit) {
+internal fun ReorderHandle(label: String, enabled: Boolean = true, onMove: (Int) -> Unit) {
     val move by rememberUpdatedState(onMove)
     val rowHeight = with(LocalDensity.current) { Dimens.rowMinTwoLine.toPx() }
-    Box(
-        Modifier.size(Dimens.touch).pointerInput(rowHeight) {
+    val drag = if (enabled) {
+        Modifier.pointerInput(rowHeight) {
             var distance = 0f
             detectDragGesturesAfterLongPress(
                 onDragStart = { distance = 0f },
@@ -37,23 +39,29 @@ internal fun ReorderHandle(label: String, onMove: (Int) -> Unit) {
                     if (offset != 0) move(offset)
                 }
             )
-        },
-        contentAlignment = Alignment.Center
-    ) {
+        }
+    } else {
+        Modifier
+    }
+    Box(Modifier.size(Dimens.touch).then(drag), contentAlignment = Alignment.Center) {
         Icon(
             Icons.Outlined.DragIndicator,
-            "Drag to reorder $label",
+            if (enabled) stringResource(R.string.drag_reorder, label) else null,
             Modifier.size(Dimens.buttonIcon),
             tint = InShapeTheme.colors.textSecondary
         )
     }
 }
 
-internal fun Modifier.reorderActions(canMoveUp: Boolean, canMoveDown: Boolean, onMove: (Int) -> Unit): Modifier = semantics {
-    customActions = buildList {
+@Composable
+internal fun Modifier.reorderActions(canMoveUp: Boolean, canMoveDown: Boolean, onMove: (Int) -> Unit): Modifier {
+    val moveUp = stringResource(R.string.move_up)
+    val moveDown = stringResource(R.string.move_down)
+    return semantics {
+        customActions = buildList {
         if (canMoveUp) {
             add(
-                CustomAccessibilityAction("Move up") {
+                CustomAccessibilityAction(moveUp) {
                     onMove(-1)
                     true
                 }
@@ -61,11 +69,12 @@ internal fun Modifier.reorderActions(canMoveUp: Boolean, canMoveDown: Boolean, o
         }
         if (canMoveDown) {
             add(
-                CustomAccessibilityAction("Move down") {
+                CustomAccessibilityAction(moveDown) {
                     onMove(1)
                     true
                 }
             )
         }
     }
+}
 }

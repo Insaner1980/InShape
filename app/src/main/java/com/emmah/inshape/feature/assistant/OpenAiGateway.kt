@@ -6,8 +6,8 @@ import java.io.IOException
 import java.net.URL
 import java.util.UUID
 import javax.net.ssl.HttpsURLConnection
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.CancellableContinuation
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -37,9 +37,12 @@ internal fun interface OpenAiTransport {
 
 internal class OpenAiGateway(
     private val credential: () -> String?,
-    private val transport: OpenAiTransport = OpenAiTransport(::httpsPost),
-    private val usageLog: AssistantUsageLog? = null
+    transport: OpenAiTransport? = null,
+    private val usageLog: AssistantUsageLog? = null,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : AssistantGateway {
+    private val transport = transport ?: OpenAiTransport { request -> httpsPost(request, ioDispatcher) }
+
     override suspend fun checkConnection(): String {
         val schema = buildJsonObject {
             put("type", "object")
@@ -56,15 +59,11 @@ internal class OpenAiGateway(
         return respond("Text", instructions, input, emptyList(), schema, 30_000)
     }
 
-    override suspend fun extract(
-        instructions: String,
-        input: String,
-        images: List<AssistantImage>,
-        schema: JsonObject
-    ): AssistantAnswer {
-        if ((input.isBlank() && images.isEmpty()) || input.length > 20_000 || images.size > 4 ||
-            images.any { it.bytes.isEmpty() || it.bytes.size > 1_572_864 } || images.sumOf { it.bytes.size } > 8 * 1024 * 1024
-        ) {
+    override suspend fun extract(instructions: String, input: String, images: List<AssistantImage>, schema: JsonObject): AssistantAnswer {
+        if ((input.isBlank() && images.isEmpty()) || input.length > 20_000) {
+            throw AssistantFailure(AssistantFailureKind.LIMIT)
+        }
+        if (images.size > 4 || images.any { it.bytes.size !in 1..1_572_864 } || images.sumOf { it.bytes.size } > 8 * 1024 * 1024) {
             throw AssistantFailure(AssistantFailureKind.LIMIT)
         }
         return respond("Extraction", instructions, input, images, schema, 60_000)
@@ -83,23 +82,38 @@ internal class OpenAiGateway(
             put("store", false)
             put("max_output_tokens", if (timeout > 30_000) 8000 else 2000)
             put("instructions", instructions)
-            put("input", buildJsonArray {
-                add(buildJsonObject {
-                    put("role", "user")
-                    put("content", buildJsonArray {
-                        add(buildJsonObject {
-                            put("type", "input_text")
-                            put("text", input.ifBlank { "Extract the selected images." })
-                        })
-                        images.forEach { image ->
-                            add(buildJsonObject {
-                                put("type", "input_image")
-                                put("image_url", "data:image/jpeg;base64,${Base64.encodeToString(image.bytes, Base64.NO_WRAP)}")
-                            })
+            put(
+                "input",
+                buildJsonArray {
+                    add(
+                        buildJsonObject {
+                            put("role", "user")
+                            put(
+                                "content",
+                                buildJsonArray {
+                                    add(
+                                        buildJsonObject {
+                                            put("type", "input_text")
+                                            put("text", input.ifBlank { "Extract the selected images." })
+                                        }
+                                    )
+                                    images.forEach { image ->
+                                        add(
+                                            buildJsonObject {
+                                                put("type", "input_image")
+                                                put(
+                                                    "image_url",
+                                                    "data:image/jpeg;base64,${Base64.encodeToString(image.bytes, Base64.NO_WRAP)}"
+                                                )
+                                            }
+                                        )
+                                    }
+                                }
+                            )
                         }
-                    })
-                })
-            })
+                    )
+                }
+            )
             putJsonObject("text") {
                 putJsonObject("format") {
                     put("type", "json_schema")
@@ -152,12 +166,12 @@ internal class OpenAiGateway(
 
     override suspend fun narrate(text: String): ByteArray {
         if (text.length !in 1..400) throw AssistantFailure(AssistantFailureKind.LIMIT)
-        val key = withContext(Dispatchers.IO) { credential() } ?: throw AssistantFailure(AssistantFailureKind.NO_KEY)
+        val key = withContext(ioDispatcher) { credential() } ?: throw AssistantFailure(AssistantFailureKind.NO_KEY)
         return openAiNarration(key, text).also { usageLog?.record("Speech", REALTIME_MODEL, null) }
     }
 
     private suspend fun post(path: String, type: String, body: ByteArray, timeout: Int): JsonObject {
-        val key = withContext(Dispatchers.IO) { credential() } ?: throw AssistantFailure(AssistantFailureKind.NO_KEY)
+        val key = withContext(ioDispatcher) { credential() } ?: throw AssistantFailure(AssistantFailureKind.NO_KEY)
         val response = withTimeoutOrNull(timeout.toLong()) {
             transport.post(ProviderRequest("https://api.openai.com/v1/$path", "Bearer $key", type, body, timeout))
         } ?: throw AssistantFailure(AssistantFailureKind.CONNECTION)
@@ -180,55 +194,67 @@ private fun badResponse(): Nothing = throw AssistantFailure(AssistantFailureKind
 
 internal fun JsonObject.text(key: String): String? = (get(key) as? JsonPrimitive)?.takeIf { it.isString }?.content
 
-private suspend fun httpsPost(request: ProviderRequest): String = withContext(Dispatchers.IO) {
+private suspend fun httpsPost(request: ProviderRequest, ioDispatcher: CoroutineDispatcher): String = withContext(ioDispatcher) {
+    val connection = URL(request.url).openConnection() as HttpsURLConnection
     suspendCancellableCoroutine { caller ->
-        val connection = URL(request.url).openConnection() as HttpsURLConnection
         caller.invokeOnCancellation { connection.disconnect() }
-        try {
+        val result = try {
             if (!caller.isActive) return@suspendCancellableCoroutine
-            connection.instanceFollowRedirects = false
-            connection.requestMethod = "POST"
-            connection.connectTimeout = request.timeoutMillis
-            connection.readTimeout = request.timeoutMillis
-            connection.useCaches = false
-            connection.doOutput = true
-            connection.setRequestProperty("Authorization", request.authorization)
-            connection.setRequestProperty("Content-Type", request.contentType)
-            connection.setFixedLengthStreamingMode(request.body.size)
-            connection.outputStream.use { it.write(request.body) }
-            val status = connection.responseCode
-            if (status !in 200..299) {
-                val quota = status == 429 && connection.errorStream?.use { stream ->
-                    val bytes = ByteArray(4096)
-                    val count = stream.read(bytes)
-                    count > 0 && bytes.decodeToString(endIndex = count).contains("insufficient_quota")
-                } == true
-                throw AssistantFailure(when (status) {
-                    401 -> AssistantFailureKind.AUTHENTICATION
-                    403, 404 -> AssistantFailureKind.MODEL_ACCESS
-                    429 -> if (quota) AssistantFailureKind.QUOTA else AssistantFailureKind.RATE_LIMIT
-                    in 500..599 -> AssistantFailureKind.SERVICE
-                    else -> AssistantFailureKind.RESPONSE
-                })
-            }
-            val response = connection.inputStream.use { stream ->
-                val out = ByteArrayOutputStream()
-                val chunk = ByteArray(8192)
-                while (caller.isActive) {
-                    val count = stream.read(chunk)
-                    if (count == -1) break
-                    if (out.size() + count > 512 * 1024) badResponse()
-                    out.write(chunk, 0, count)
-                }
-                out.toByteArray().decodeToString()
-            }
-            if (caller.isActive) caller.resume(response)
+            Result.success(connection.transmit(request, caller))
         } catch (_: IOException) {
-            if (caller.isActive) caller.resumeWithException(AssistantFailure(AssistantFailureKind.CONNECTION))
-        } catch (failure: Exception) {
-            if (caller.isActive) caller.resumeWithException(failure)
+            Result.failure(AssistantFailure(AssistantFailureKind.CONNECTION))
+        } catch (failure: AssistantFailure) {
+            Result.failure(failure)
         } finally {
             connection.disconnect()
         }
+        if (caller.isActive) caller.resumeWith(result)
     }
+}
+
+private fun HttpsURLConnection.transmit(request: ProviderRequest, caller: CancellableContinuation<String>): String {
+    instanceFollowRedirects = false
+    requestMethod = "POST"
+    connectTimeout = request.timeoutMillis
+    readTimeout = request.timeoutMillis
+    useCaches = false
+    doOutput = true
+    setRequestProperty("Authorization", request.authorization)
+    setRequestProperty("Content-Type", request.contentType)
+    setFixedLengthStreamingMode(request.body.size)
+    outputStream.use { it.write(request.body) }
+    val status = responseCode
+    if (status !in 200..299) throw AssistantFailure(failureKind(status))
+    return readResponse(caller)
+}
+
+private fun HttpsURLConnection.failureKind(status: Int): AssistantFailureKind = when (status) {
+    401 -> AssistantFailureKind.AUTHENTICATION
+
+    403, 404 -> AssistantFailureKind.MODEL_ACCESS
+
+    429 -> {
+        val quota = errorStream?.use { stream ->
+            val bytes = ByteArray(4096)
+            val count = stream.read(bytes)
+            count > 0 && bytes.decodeToString(endIndex = count).contains("insufficient_quota")
+        } == true
+        if (quota) AssistantFailureKind.QUOTA else AssistantFailureKind.RATE_LIMIT
+    }
+
+    in 500..599 -> AssistantFailureKind.SERVICE
+
+    else -> AssistantFailureKind.RESPONSE
+}
+
+private fun HttpsURLConnection.readResponse(caller: CancellableContinuation<String>): String = inputStream.use { stream ->
+    val out = ByteArrayOutputStream()
+    val chunk = ByteArray(8192)
+    while (caller.isActive) {
+        val count = stream.read(chunk)
+        if (count == -1) break
+        if (out.size() + count > 512 * 1024) badResponse()
+        out.write(chunk, 0, count)
+    }
+    out.toByteArray().decodeToString()
 }

@@ -1,6 +1,5 @@
 package com.emmah.inshape.ui.components
 
-import com.emmah.inshape.ui.theme.Dimens
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -20,6 +19,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
+import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.hasArtworkColumns
 
 @Composable

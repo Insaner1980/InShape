@@ -26,11 +26,12 @@ import androidx.room.Upsert
         HealthOutbox::class,
         ProgramEnrollment::class,
         ProgramExerciseLink::class,
+        ProgramDayOverride::class,
         AssistantDraft::class,
         AssistantReceipt::class,
         AssistantMemory::class
     ],
-    version = 2,
+    version = 4,
     exportSchema = true
 )
 @TypeConverters(JournalConverters::class, ProgramConverters::class)
@@ -52,7 +53,9 @@ interface JournalDao {
     suspend fun assistantMemories(): List<AssistantMemory>
 
     @Upsert suspend fun put(value: AssistantDraft)
+
     @Upsert suspend fun put(value: AssistantReceipt)
+
     @Upsert suspend fun put(value: AssistantMemory)
 
     @Query("DELETE FROM AssistantDraft WHERE `key` = :key AND id = :id")
@@ -69,13 +72,26 @@ interface JournalDao {
 
     @Query("DELETE FROM AssistantMemory")
     suspend fun clearAssistantMemories()
+
     @Query("SELECT * FROM ProgramEnrollment WHERE slot = 1")
     suspend fun programEnrollment(): ProgramEnrollment?
 
     @Query("SELECT * FROM ProgramExerciseLink")
     suspend fun programLinks(): List<ProgramExerciseLink>
 
+    @Query("SELECT * FROM ProgramDayOverride ORDER BY catalogVersion, programId, dayId")
+    suspend fun programDayOverrides(): List<ProgramDayOverride>
+
+    @Upsert suspend fun put(value: ProgramDayOverride)
+
+    @Query("DELETE FROM ProgramDayOverride WHERE catalogVersion = :catalogVersion AND programId = :programId AND dayId = :dayId")
+    suspend fun deleteProgramDayOverride(catalogVersion: Int, programId: String, dayId: String)
+
+    @Query("DELETE FROM ProgramDayOverride")
+    suspend fun clearProgramDayOverrides()
+
     @Upsert suspend fun put(value: ProgramEnrollment)
+
     @Upsert suspend fun put(value: ProgramExerciseLink)
 
     @Query("DELETE FROM ProgramEnrollment")
@@ -83,6 +99,7 @@ interface JournalDao {
 
     @Query("DELETE FROM ProgramExerciseLink")
     suspend fun clearProgramLinks()
+
     @Query("SELECT * FROM Exercise ORDER BY name COLLATE NOCASE")
     suspend fun exercises(): List<Exercise>
 

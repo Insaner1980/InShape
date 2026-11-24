@@ -1,16 +1,23 @@
 package com.emmah.inshape.feature.checkin
 
-import androidx.compose.ui.res.stringResource
-import com.emmah.inshape.R
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.emmah.inshape.R
 import com.emmah.inshape.ui.components.ActionRow
 import com.emmah.inshape.ui.components.Pill
 
-enum class EffortLevel(val label: Int, val stored: Int) { Easy(R.string.effort_easy, 3), JustRight(R.string.effort_right, 6), Hard(R.string.effort_hard, 8) }
+enum class EffortLevel(val label: Int, val stored: Int) {
+    Easy(
+        R.string.effort_easy,
+        3
+    ),
+    JustRight(R.string.effort_right, 6),
+    Hard(R.string.effort_hard, 8)
+}
 fun effortLevelOf(value: Int?): EffortLevel? = when (value) {
     null -> null
     in 0..4 -> EffortLevel.Easy
@@ -28,7 +35,15 @@ enum class EnergyLevel(val key: String, val label: Int) {
     }
 }
 
-enum class BodyLevel(val label: Int, val stored: Int) { None(R.string.body_level_none, 0), Mild(R.string.body_level_mild, 2), Medium(R.string.body_level_medium, 5), Strong(R.string.body_level_strong, 8) }
+enum class BodyLevel(val label: Int, val stored: Int) {
+    None(
+        R.string.body_level_none,
+        0
+    ),
+    Mild(R.string.body_level_mild, 2),
+    Medium(R.string.body_level_medium, 5),
+    Strong(R.string.body_level_strong, 8)
+}
 fun bodyLevelOf(value: Int?): BodyLevel? = when (value) {
     null -> null
     0 -> BodyLevel.None

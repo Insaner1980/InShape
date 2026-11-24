@@ -66,6 +66,7 @@ interface MusicDao {
 
     @Query("UPDATE MusicTrack SET energy = :energy WHERE id = :id AND available = 1")
     suspend fun setEnergy(id: String, energy: String?)
+
     @Query("SELECT * FROM MusicSource LIMIT 1")
     suspend fun source(): MusicSource?
 
@@ -92,6 +93,7 @@ interface MusicPlaylistDao {
 
     @Upsert
     suspend fun saveReceipt(receipt: PlaylistReceipt)
+
     @Query("SELECT * FROM MusicPlaylist ORDER BY rowid")
     suspend fun playlists(): List<MusicPlaylist>
 

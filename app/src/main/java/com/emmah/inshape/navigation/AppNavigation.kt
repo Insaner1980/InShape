@@ -75,6 +75,7 @@ import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.StartSource
 import com.emmah.inshape.feature.checkin.CheckInScreen
 import com.emmah.inshape.feature.history.HistoryScreen
+import com.emmah.inshape.feature.history.WorkoutDetailMenu
 import com.emmah.inshape.feature.history.WorkoutDetailScreen
 import com.emmah.inshape.feature.library.ExerciseEditor
 import com.emmah.inshape.feature.library.ExerciseScreen
@@ -88,11 +89,15 @@ import com.emmah.inshape.feature.music.MusicTrack
 import com.emmah.inshape.feature.music.NowPlaying
 import com.emmah.inshape.feature.music.PlaylistDetail
 import com.emmah.inshape.feature.music.rememberMusicPlayback
+import com.emmah.inshape.feature.program.ProgramDayEditor
+import com.emmah.inshape.feature.program.localExerciseId
 import com.emmah.inshape.feature.settings.SettingsScreen
+import com.emmah.inshape.feature.today.TodayNavigation
 import com.emmah.inshape.feature.today.TodayScreen
 import com.emmah.inshape.feature.workout.FinishScreen
 import com.emmah.inshape.feature.workout.WorkoutScreen
 import com.emmah.inshape.feature.workout.WorkoutTimingEditor
+import com.emmah.inshape.ui.components.LocalPageHasNavigationHeader
 import com.emmah.inshape.ui.components.LocalPageSnackbar
 import com.emmah.inshape.ui.components.OutlineButton
 import com.emmah.inshape.ui.components.PushedHeader
@@ -194,10 +199,13 @@ fun AppNavigation(
         )
     }
     val workoutId = entry?.arguments?.getString("id")
+    val hasNavigationHeader = !isMain && !destinationOwnsHeader(route)
     Scaffold(
         modifier = modifier,
         topBar = {
-            NavigationHeader(route, workoutId ?: entry?.arguments?.getString("kind"), isMain) { nav.popBackStack() }
+            if (hasNavigationHeader) {
+                NavigationHeader(route, workoutId ?: entry?.arguments?.getString("kind")) { nav.popBackStack() }
+            }
         },
         bottomBar = {
             val inMusic = route == "Music" || route.startsWith("music-playlist/")
@@ -212,7 +220,10 @@ fun AppNavigation(
         ) {
             JournalLoading(snapshotFailure != null, vm::refresh, Modifier.fillMaxSize().padding(padding))
         } else {
-            CompositionLocalProvider(LocalPageSnackbar provides snackbar) {
+            CompositionLocalProvider(
+                LocalPageSnackbar provides snackbar,
+                LocalPageHasNavigationHeader provides hasNavigationHeader
+            ) {
                 NavHost(nav, initialRoute, Modifier.padding(padding).consumeWindowInsets(padding)) {
                     journalDestinations(state, today, vm, container, nav, ::start, ::exercise)
                     musicDestinations(container, nav, playback, musicFixture, state)
@@ -221,7 +232,10 @@ fun AppNavigation(
                     }
                     composable("AssistantSettings") {
                         com.emmah.inshape.feature.assistant.AssistantSettings(
-                            container.assistantCredentials, container.assistant, vm, state.assistantMemories
+                            container.assistantCredentials,
+                            container.assistant,
+                            vm,
+                            state.assistantMemories
                         )
                     }
                     composable("Export") { com.emmah.inshape.transfer.ExportScreen(state, vm) }
@@ -287,11 +301,12 @@ private fun HandleEntryAction(
     consumeEntry: () -> Unit
 ) {
     val latestData by rememberUpdatedState(data)
+    val currentStart by rememberUpdatedState(start)
     val currentConsumeEntry by rememberUpdatedState(consumeEntry)
     LaunchedEffect(entryAction, data != null) {
         if (latestData != null && entryAction != null) {
             when (entryAction.first) {
-                MainActivity.START_OR_RESUME -> start(StartSource.Empty)
+                MainActivity.START_OR_RESUME -> currentStart(StartSource.Empty)
 
                 MainActivity.OPEN_WORKOUT, MainActivity.OPEN_FINISH -> {
                     val active = latestData?.active
@@ -316,30 +331,63 @@ private fun HandleEntryAction(
     }
 }
 
+private fun destinationOwnsHeader(route: String): Boolean = when (route.substringBefore('/')) {
+    "checkin", "exercise", "workout", "finish", "detail", "routine", "Music",
+    "music-playlist", "program-setup", "program-next", "program-edit", NOW_PLAYING_ROUTE -> true
+
+    else -> false
+}
+
 @Composable
-private fun NavigationHeader(route: String, workoutId: String?, isMain: Boolean, onBack: () -> Unit) {
-    val hasScreenHeader = when (route.substringBefore('/')) {
-        "checkin", "exercise", "workout", "finish", "detail", "routine", "Music",
-        "music-playlist", "program-setup", "program-next", NOW_PLAYING_ROUTE -> true
-        else -> false
-    }
-    if (!isMain && !hasScreenHeader) {
-        val title = when {
-            route.startsWith("exercise-edit") -> if (workoutId == "new") stringResource(R.string.new_exercise) else stringResource(R.string.edit_exercise)
-            route == "timing/{id}/correct" -> stringResource(R.string.edit_workout)
-            route == "Settings" -> stringResource(R.string.settings)
-            route == "AssistantSettings" -> stringResource(R.string.assistant)
-            route == "Export" -> stringResource(R.string.export)
-            route == "guide/{key}" -> stringResource(R.string.exercise_guide)
-            route.startsWith("journal-questions") -> stringResource(R.string.ask_journal)
-            route.startsWith("routine-proposal") -> stringResource(if (workoutId == "new") R.string.build_routine else R.string.adapt_workout)
-            route.startsWith("assistant-import") -> stringResource(if (workoutId == "equipment") R.string.import_equipment else R.string.import_program)
-            route.startsWith("playlist-assistant") -> stringResource(if (workoutId == "new") R.string.playlist_assistant else R.string.edit_playlist)
-            route.startsWith("track-energy") -> stringResource(R.string.track_energy)
-            else -> ""
+private fun NavigationHeader(route: String, workoutId: String?, onBack: () -> Unit) {
+    val title = when {
+        route.startsWith("exercise-edit") -> if (workoutId ==
+            "new"
+        ) {
+            stringResource(R.string.new_exercise)
+        } else {
+            stringResource(R.string.edit_exercise)
         }
-        PushedHeader(onBack = onBack, title = title)
+
+        route == "timing/{id}/correct" -> stringResource(R.string.edit_workout)
+
+        route == "Settings" -> stringResource(R.string.settings)
+
+        route == "AssistantSettings" -> stringResource(R.string.assistant)
+
+        route == "Export" -> stringResource(R.string.export)
+
+        route == "guide/{key}?program={program}&day={day}" -> stringResource(R.string.exercise_guide)
+
+        route.startsWith("journal-questions") -> stringResource(R.string.ask_journal)
+
+        route.startsWith("routine-proposal") -> stringResource(if (workoutId == "new") R.string.build_routine else R.string.adapt_workout)
+
+        route.startsWith("assistant-import") -> stringResource(
+            if (workoutId ==
+                "equipment"
+            ) {
+                R.string.import_equipment
+            } else {
+                R.string.import_program
+            }
+        )
+
+        route.startsWith("playlist-assistant") -> stringResource(
+            if (workoutId ==
+                "new"
+            ) {
+                R.string.playlist_assistant
+            } else {
+                R.string.edit_playlist
+            }
+        )
+
+        route.startsWith("track-energy") -> stringResource(R.string.track_energy)
+
+        else -> ""
     }
+    PushedHeader(onBack = onBack, title = title)
 }
 
 @Composable
@@ -416,7 +464,7 @@ private fun NavigationBottomBar(
 }
 
 @Composable
-private fun JournalLoading(hasSnapshotFailure: Boolean, retry: () -> Unit, modifier: Modifier) {
+private fun JournalLoading(hasSnapshotFailure: Boolean, retry: () -> Unit, modifier: Modifier = Modifier) {
     Box(
         modifier,
         contentAlignment = Alignment.Center
@@ -441,29 +489,7 @@ private fun NavGraphBuilder.journalDestinations(
     start: (StartSource) -> Unit,
     exercise: (String, String) -> Unit
 ) {
-    composable("Today") {
-        val enrollment = state.programEnrollment
-        val program = enrollment?.takeIf { it.catalogVersion == container.programs.schemaVersion }
-            ?.let { container.programs.program(it.programId) }
-        val day = enrollment?.let { program?.sequence?.getOrNull(it.nextDayIndex) }
-        TodayScreen(
-            state,
-            today,
-            onSettings = { nav.navigate("Settings") },
-            onMusic = { nav.navigate("Music") },
-            onStart = start,
-            onWorkout = {
-                val screen = if (it == state.active?.row?.id) "workout" else "detail"
-                nav.navigate("$screen/$it")
-            },
-            clock = container.clock,
-            onCreateRoutine = { nav.navigate("routine/new") },
-            nextProgramLabel = if (program != null && day != null) stringResource(R.string.program_next_day, program.name, day) else null,
-            onProgram = { program?.let { nav.navigate("program-next/${it.id}") } }
-        ) {
-            com.emmah.inshape.health.HealthToday(state.preferences, container)
-        }
-    }
+    todayDestination(state, today, container, nav, start)
     composable(
         "History?view={view}&exercise={exercise}",
         arguments = listOf(
@@ -495,23 +521,75 @@ private fun NavGraphBuilder.journalDestinations(
     composable(
         "journal-questions?exercise={exercise}&workout={workout}",
         arguments = listOf(
-            androidx.navigation.navArgument("exercise") { nullable = true; defaultValue = null },
-            androidx.navigation.navArgument("workout") { nullable = true; defaultValue = null }
+            androidx.navigation.navArgument("exercise") {
+                nullable = true
+                defaultValue = null
+            },
+            androidx.navigation.navArgument("workout") {
+                nullable = true
+                defaultValue = null
+            }
         )
     ) { entry ->
         com.emmah.inshape.feature.assistant.JournalEvidenceScreen(
-            state, today, entry.arguments?.getString("exercise"), entry.arguments?.getString("workout")
+            state,
+            today,
+            entry.arguments?.getString("exercise"),
+            entry.arguments?.getString("workout")
         ) { nav.navigate("detail/$it") }
     }
     composable("Library") {
-        LibraryScreen(state, {
-            exercise(it, "")
-        }, { nav.navigate("routine/$it") }, vm,
+        LibraryScreen(
+            state,
+            {
+                exercise(it, "")
+            },
+            { nav.navigate("routine/$it") },
+            vm,
             onProgram = { nav.navigate("program/$it") },
             onRoutineProposal = { nav.navigate("routine-proposal/new") },
             onImport = { nav.navigate("assistant-import/$it") }
         )
     }
+    assistantDestinations(state, vm, nav)
+    programDestinations(state, vm, container, nav, start)
+}
+
+private fun NavGraphBuilder.todayDestination(
+    state: JournalSnapshot,
+    today: LocalDate,
+    container: AppContainer,
+    nav: NavHostController,
+    start: (StartSource) -> Unit
+) {
+    composable("Today") {
+        val enrollment = state.programEnrollment
+        val program = enrollment?.takeIf { it.catalogVersion == container.programs.schemaVersion }
+            ?.let { container.programs.program(it.programId) }
+        val day = enrollment?.let { program?.sequence?.getOrNull(it.nextDayIndex) }
+        TodayScreen(
+            state,
+            today,
+            TodayNavigation(
+                onSettings = { nav.navigate("Settings") },
+                onMusic = { nav.navigate("Music") },
+                onWorkout = {
+                    val screen = if (it == state.active?.row?.id) "workout" else "detail"
+                    nav.navigate("$screen/$it")
+                },
+                onCreateRoutine = { nav.navigate("routine/new") }
+            ),
+            onStart = start,
+            clock = container.clock,
+            nextProgramLabel = if (program != null && day != null) stringResource(R.string.program_next_day, program.name, day) else null,
+            onProgram = { program?.let { nav.navigate("program-next/${it.id}") } }
+        ) {
+            com.emmah.inshape.health.HealthToday(state.preferences, container)
+        }
+    }
+}
+
+private fun NavGraphBuilder.assistantDestinations(state: JournalSnapshot, vm: JournalViewModel, nav: NavHostController) {
     composable("routine-proposal/{id}") { entry ->
         val id = entry.arguments?.getString("id").orEmpty()
         val workout = state.workout(id)
@@ -524,23 +602,58 @@ private fun NavGraphBuilder.journalDestinations(
     }
     composable("assistant-import/{kind}") { entry ->
         com.emmah.inshape.feature.assistant.AssistantImportScreen(
-            entry.arguments?.getString("kind") == "equipment", state, vm, { nav.navigate("AssistantSettings") }
+            entry.arguments?.getString("kind") == "equipment",
+            state,
+            vm,
+            { nav.navigate("AssistantSettings") }
         ) { id, equipment ->
             nav.popBackStack()
             if (id != null) nav.navigate(if (equipment) "exercise/$id?item=" else "routine/$id")
         }
     }
+}
+
+private fun NavGraphBuilder.programDestinations(
+    state: JournalSnapshot,
+    vm: JournalViewModel,
+    container: AppContainer,
+    nav: NavHostController,
+    start: (StartSource) -> Unit
+) {
     composable("program/{id}") { entry ->
         val id = entry.arguments?.getString("id").orEmpty()
-        com.emmah.inshape.feature.program.ProgramScreen(container.programs, id, { nav.navigate("program-setup/$id") }) {
-            nav.navigate("guide/$it")
+        val program = container.programs.personalProgram(id, state.programDayOverrides)
+        val enrolled = state.programEnrollment?.let { it.programId == id && it.catalogVersion == container.programs.schemaVersion } == true
+        com.emmah.inshape.feature.program.ProgramScreen(
+            container.programs,
+            program,
+            enrolled,
+            onUse = { nav.navigate(if (enrolled) "program-next/$id" else "program-setup/$id") },
+            onRestart = { nav.navigate("program-setup/$id") },
+            onEdit = { day -> nav.navigate("program-edit/$id/$day") }
+        ) { day, key ->
+            val personalId = program?.sessions?.find { it.id == day }?.exercises?.find { it.exerciseId == key }?.localExerciseId
+            nav.navigate(if (personalId != null) "exercise/$personalId?item=" else "guide/$key?program=$id&day=$day")
         }
+    }
+    composable("program-edit/{id}/{day}") { entry ->
+        ProgramDayEditor(
+            container.programs,
+            entry.arguments?.getString("id").orEmpty(),
+            entry.arguments?.getString("day").orEmpty(),
+            state,
+            vm,
+            onBack = { nav.popBackStack() }
+        )
     }
     listOf(true, false).forEach { enrolling ->
         composable(if (enrolling) "program-setup/{id}" else "program-next/{id}") { entry ->
-            container.programs.program(entry.arguments?.getString("id").orEmpty())?.let { program ->
+            container.programs.personalProgram(entry.arguments?.getString("id").orEmpty(), state.programDayOverrides)?.let { program ->
                 com.emmah.inshape.feature.program.ProgramSetupScreen(
-                    program, state, vm, enrolling,
+                    program,
+                    state,
+                    vm,
+                    enrolling,
                     onBack = { nav.popBackStack() },
                     onDone = {
                         nav.navigate("Today") {
@@ -548,13 +661,25 @@ private fun NavGraphBuilder.journalDestinations(
                             launchSingleTop = true
                         }
                     },
+                    onEdit = { day -> nav.navigate("program-edit/${program.id}/$day") },
                     onStart = { start(StartSource.Program(it)) }
                 )
             }
         }
     }
-    composable("guide/{key}") { entry ->
-        com.emmah.inshape.feature.program.ProgramGuideScreen(container.programs, entry.arguments?.getString("key").orEmpty())
+    composable(
+        "guide/{key}?program={program}&day={day}",
+        arguments = listOf(
+            androidx.navigation.navArgument("program") { defaultValue = "" },
+            androidx.navigation.navArgument("day") { defaultValue = "" }
+        )
+    ) { entry ->
+        val key = entry.arguments?.getString("key").orEmpty()
+        val program = entry.arguments?.getString("program").orEmpty()
+        val day = entry.arguments?.getString("day").orEmpty()
+        val slot = container.programs.personalProgram(program, state.programDayOverrides)?.sessions
+            ?.find { it.id == day }?.exercises?.find { it.exerciseId == key }
+        com.emmah.inshape.feature.program.ProgramGuideScreen(container.programs, key, slot) { nav.navigate("guide/$it") }
     }
 }
 
@@ -566,9 +691,14 @@ private fun NavGraphBuilder.musicDestinations(
     state: JournalSnapshot
 ) {
     composable("Music") {
-        MusicHome(container.music, playback, { nav.navigate("music-playlist/$it") }, {
-            if (!nav.popBackStack()) nav.navigate("Today")
-        }, musicFixture,
+        MusicHome(
+            container.music,
+            playback,
+            { nav.navigate("music-playlist/$it") },
+            {
+                if (!nav.popBackStack()) nav.navigate("Today")
+            },
+            musicFixture,
             onPlaylistAssistant = { nav.navigate("playlist-assistant/new") },
             onEnergy = { nav.navigate("track-energy/$it") }
         )
@@ -583,7 +713,10 @@ private fun NavGraphBuilder.musicDestinations(
         val previous = state.history.filter { it.qualifiesForAttendance }
             .maxWithOrNull(compareBy({ it.row.journalDate }, { it.row.createdAt }, { it.row.id }))
         com.emmah.inshape.feature.music.PlaylistAssistantScreen(
-            container, previous, id, onSettings = { nav.navigate("AssistantSettings") }
+            container,
+            previous,
+            id,
+            onSettings = { nav.navigate("AssistantSettings") }
         ) { saved ->
             nav.popBackStack()
             if (saved != id) nav.navigate("music-playlist/$saved")
@@ -621,20 +754,24 @@ private fun NavGraphBuilder.libraryEditors(
             backStack.arguments!!.getString("id")!!,
             state,
             vm,
-            onCreated = { id ->
-                if (nav.isActive(backStack)) nav.navigate("exercise-edit/$id") {
-                    popUpTo("exercise-edit/new") { inclusive = true }
+            onCreate = { id ->
+                if (nav.isActive(backStack)) {
+                    nav.navigate("exercise-edit/$id") {
+                        popUpTo("exercise-edit/new") { inclusive = true }
+                    }
                 }
             },
-            onArchived = { if (nav.isActive(backStack)) nav.popBackStack() }
+            onArchive = { if (nav.isActive(backStack)) nav.popBackStack() }
         )
     }
     composable("routine/{id}") { backStack ->
         RoutineEditor(backStack.arguments!!.getString("id")!!, state, vm, {
             if (nav.isActive(backStack)) nav.popBackStack()
         }, { id ->
-            if (nav.isActive(backStack)) nav.navigate("routine/$id") {
-                popUpTo("routine/new") { inclusive = true }
+            if (nav.isActive(backStack)) {
+                nav.navigate("routine/$id") {
+                    popUpTo("routine/new") { inclusive = true }
+                }
             }
         }, { id ->
             if (nav.isActive(backStack)) start(StartSource.Routine(id))
@@ -658,14 +795,16 @@ private fun NavGraphBuilder.activeWorkoutDestination(
                 nav.navigate("checkin/$id/BEFORE")
             }, {
                 if (nav.isActive(backStack)) {
-                    if (state.workout(id)?.isPastEntry == true) nav.showFinishedWorkout(id)
-                    else nav.navigate("finish/$id")
+                    nav.finishFromActiveWorkout(id, state.workout(id)?.isPastEntry == true)
                 }
             },
             {
                 if (nav.isActive(backStack)) {
-                    if (state.workout(id)?.isPastEntry == true) nav.popBackStack()
-                    else nav.popBackStack("Today", false)
+                    if (state.workout(id)?.isPastEntry == true) {
+                        nav.popBackStack()
+                    } else {
+                        nav.popBackStack("Today", false)
+                    }
                 }
             }, { nav.popBackStack() },
             musicPlayback = playback.takeIf { state.active?.row?.id == id },
@@ -673,6 +812,14 @@ private fun NavGraphBuilder.activeWorkoutDestination(
             onAssistantSettings = { nav.navigate("AssistantSettings") },
             onAdaptWorkout = { nav.navigate("routine-proposal/$id") }
         )
+    }
+}
+
+private fun NavHostController.finishFromActiveWorkout(id: String, isPastEntry: Boolean) {
+    if (isPastEntry) {
+        showFinishedWorkout(id)
+    } else {
+        navigate("finish/$id")
     }
 }
 
@@ -685,14 +832,18 @@ private fun NavGraphBuilder.workoutHistoryDestinations(
 ) {
     composable("detail/{id}") { backStack ->
         val id = backStack.arguments!!.getString("id")!!
-        WorkoutDetailScreen(id, state, vm, {
-            start(StartSource.Repeat(id))
-        }, {
-            nav.navigate("checkin/$id/$it")
-        }, {
-            nav.navigate("timing/$id/correct")
-        }, { nav.popBackStack() }, { exerciseId, item -> exercise(exerciseId, item) },
-            onQuestions = { nav.navigate("journal-questions?workout=$id") }
+        WorkoutDetailScreen(
+            id,
+            state,
+            vm,
+            WorkoutDetailMenu(
+                onRepeat = { start(StartSource.Repeat(id)) },
+                onTiming = { nav.navigate("timing/$id/correct") },
+                onQuestions = { nav.navigate("journal-questions?workout=$id") }
+            ),
+            onCheckIn = { nav.navigate("checkin/$id/$it") },
+            onDelete = { nav.popBackStack() },
+            onExercise = exercise
         )
     }
     composable("checkin/{id}/{phase}") { backStack ->

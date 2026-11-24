@@ -97,6 +97,10 @@ fun InShapeCard(
 @Suppress("CompositionLocalAllowlist")
 val LocalPageSnackbar = staticCompositionLocalOf<SnackbarHostState?> { null }
 
+// The navigation host supplies this to pages that own their layout inside a destination.
+@Suppress("CompositionLocalAllowlist")
+internal val LocalPageHasNavigationHeader = staticCompositionLocalOf { false }
+
 @Composable
 fun Page(
     modifier: Modifier = Modifier,
@@ -120,6 +124,9 @@ fun Page(
                     verticalArrangement = Arrangement.spacedBy(Dimens.itemGap),
                     content = content
                 )
+                if ((topBar != null || LocalPageHasNavigationHeader.current) && scrollState.canScrollBackward) {
+                    HorizontalDivider(color = InShapeTheme.colors.divider, thickness = Dimens.line)
+                }
             }
             LocalPageSnackbar.current?.let { state ->
                 val colors = InShapeTheme.colors
@@ -173,7 +180,13 @@ fun PushedHeader(
             actions()
             if (trailingText) Spacer(Modifier.width(Dimens.headerActionEnd))
         },
-        expandedHeight = if (LocalDensity.current.fontScale >= 1.3f && (title.isNotEmpty() || titleContent != null)) Dimens.topBarLarge else Dimens.rowMinTwoLine,
+        expandedHeight = if (LocalDensity.current.fontScale >= 1.3f &&
+            (title.isNotEmpty() || titleContent != null)
+        ) {
+            Dimens.topBarLarge
+        } else {
+            Dimens.rowMinTwoLine
+        },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = colors.background,
             scrolledContainerColor = colors.background,
@@ -256,11 +269,7 @@ fun ScreenHeader(
 }
 
 @Composable
-fun SectionHeader(
-    text: String,
-    modifier: Modifier = Modifier,
-    trailing: (@Composable () -> Unit)? = null
-) {
+fun SectionHeader(text: String, modifier: Modifier = Modifier, trailing: (@Composable () -> Unit)? = null) {
     ResponsiveRow(modifier.padding(top = Dimens.sectionGap - Dimens.itemGap)) {
         Text(
             text,
@@ -285,7 +294,6 @@ fun GroupLabel(text: String, modifier: Modifier = Modifier) {
 @Composable
 fun EmptyState(
     title: String,
-    message: String,
     modifier: Modifier = Modifier,
     action: String? = null,
     onAction: () -> Unit = {},
@@ -293,11 +301,6 @@ fun EmptyState(
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
         Text(title, style = MaterialTheme.typography.titleMedium)
-        Text(
-            message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = InShapeTheme.colors.textSecondary
-        )
         if (action != null) OutlineButton(action, onAction, icon = icon)
     }
 }

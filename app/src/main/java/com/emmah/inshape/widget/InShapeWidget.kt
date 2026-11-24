@@ -1,10 +1,5 @@
 package com.emmah.inshape.widget
 
-import androidx.glance.layout.Box
-import com.emmah.inshape.ui.theme.shortDate
-import com.emmah.inshape.data.weekStart
-import androidx.glance.layout.size
-import androidx.glance.ColorFilter
 import android.appwidget.AppWidgetProviderInfo
 import android.content.Context
 import android.content.Intent
@@ -15,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.DpSize
+import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
@@ -33,6 +29,7 @@ import androidx.glance.appwidget.provideContent
 import androidx.glance.background
 import androidx.glance.color.ColorProvider
 import androidx.glance.layout.Alignment
+import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.ContentScale
 import androidx.glance.layout.Row
@@ -41,6 +38,7 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
+import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.glance.layout.wrapContentHeight
 import androidx.glance.text.Text
@@ -48,10 +46,12 @@ import androidx.glance.text.TextStyle
 import com.emmah.inshape.InShapeApplication
 import com.emmah.inshape.MainActivity
 import com.emmah.inshape.R
+import com.emmah.inshape.data.weekStart
 import com.emmah.inshape.ui.theme.DarkColors
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.LightColors
 import com.emmah.inshape.ui.theme.WidgetTypography
+import com.emmah.inshape.ui.theme.shortDate
 import com.emmah.inshape.ui.theme.workoutTime
 import java.time.Duration
 import java.time.Instant
@@ -84,7 +84,10 @@ class InShapeWidget(private val previewOnly: Boolean = false) : GlanceAppWidget(
                 workoutTimer(context, Duration.between(it, container.clock.instant()))
             }
             val time = start?.takeUnless { state.timingNeedsReview }?.let {
-                context.getString(R.string.started_at, it.workoutTime(state.activeZone ?: container.clock.zone, DateFormat.is24HourFormat(context)))
+                context.getString(
+                    R.string.started_at,
+                    it.workoutTime(state.activeZone ?: container.clock.zone, DateFormat.is24HourFormat(context))
+                )
             }
             WidgetContent(
                 state,
@@ -120,20 +123,21 @@ internal fun WidgetContent(state: WidgetState, open: Action, timer: RemoteViews?
     val wideIdle = !state.resume && LocalSize.current.width >= Dimens.widgetWide
     val largeText = LocalContext.current.resources.configuration.fontScale >= 1.3f
     val showBand = wideIdle && !largeText
-    val background = if (wideIdle) {
-        GlanceModifier.background(ImageProvider(R.drawable.inshape_widget_idle), ContentScale.FillBounds)
-    } else {
-        GlanceModifier.background(ColorProvider(LightColors.background, DarkColors.surface))
-    }
     Column(
-        GlanceModifier.fillMaxSize().then(background)
+        GlanceModifier.fillMaxSize().background(ImageProvider(R.drawable.inshape_widget_idle), ContentScale.FillBounds)
             .cornerRadius(Dimens.cardPadding).clickable(open)
             .padding(horizontal = Dimens.inner, vertical = if (state.resume) Dimens.innerSmall else Dimens.innerTiny),
         verticalAlignment = Alignment.Vertical.CenterVertically
     ) {
         if (state.resume) {
             WidgetHeader(true, time.takeIf { LocalSize.current.width >= Dimens.widgetWide }, labelStyle)
-            Text(state.activeTitle?.ifBlank { context.getString(R.string.workout) } ?: context.getString(R.string.workout), style = titleStyle, maxLines = 1)
+            Text(
+                state.activeTitle?.ifBlank {
+                    context.getString(R.string.workout)
+                } ?: context.getString(R.string.workout),
+                style = titleStyle,
+                maxLines = 1
+            )
             val progress = context.getString(R.string.count_of_total, state.doneExercises, state.totalExercises)
             val summary = state.exerciseSummary?.takeIf { LocalSize.current.width >= Dimens.widgetWide && !largeText }
             Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Vertical.CenterVertically) {
@@ -158,7 +162,8 @@ internal fun WidgetContent(state: WidgetState, open: Action, timer: RemoteViews?
                 Box(
                     GlanceModifier.height(Dimens.widgetActionHeight)
                         .background(
-                            ImageProvider(R.drawable.widget_button), ContentScale.FillBounds,
+                            ImageProvider(R.drawable.widget_button),
+                            ContentScale.FillBounds,
                             colorFilter = ColorFilter.tint(ColorProvider(LightColors.ink, DarkColors.ink))
                         )
                         .clickable(open).padding(horizontal = Dimens.inner),
@@ -187,9 +192,12 @@ internal fun WidgetContent(state: WidgetState, open: Action, timer: RemoteViews?
 @Composable
 private fun WidgetWeekMarks(state: WidgetState) {
     val context = LocalContext.current
+    val days = 7
+    val cellWidth = (LocalSize.current.width - Dimens.inner * 2) / days
+    val markSize = minOf(Dimens.widgetMark, cellWidth - Dimens.innerTiny)
     Row(GlanceModifier.fillMaxWidth().padding(vertical = Dimens.innerTiny)) {
-        for (day in 0L..6L) {
-            val date = state.week.plusDays(day)
+        for (day in 0 until days) {
+            val date = state.week.plusDays(day.toLong())
             val done = date in state.completedDays
             val current = date == state.today
             val drawable = when {
@@ -197,13 +205,20 @@ private fun WidgetWeekMarks(state: WidgetState) {
                 current -> R.drawable.widget_mark_today
                 else -> R.drawable.widget_mark_pending
             }
-            val tint = if (done || current) ColorProvider(LightColors.ink, DarkColors.ink)
-                else ColorProvider(LightColors.markRing, DarkColors.markRing)
+            val tint = if (done || current) {
+                ColorProvider(LightColors.ink, DarkColors.ink)
+            } else {
+                ColorProvider(LightColors.markRing, DarkColors.markRing)
+            }
             Box(GlanceModifier.defaultWeight(), contentAlignment = Alignment.Center) {
                 Image(
                     ImageProvider(drawable),
-                    contentDescription = context.getString(R.string.widget_day_status, date.shortDate(), context.getString(if (done) R.string.workout_recorded else R.string.no_workout)),
-                    modifier = GlanceModifier.size(Dimens.widgetMark),
+                    contentDescription = context.getString(
+                        R.string.widget_day_status,
+                        date.shortDate(),
+                        context.getString(if (done) R.string.workout_recorded else R.string.no_workout)
+                    ),
+                    modifier = GlanceModifier.size(markSize),
                     colorFilter = ColorFilter.tint(tint)
                 )
             }
@@ -214,7 +229,11 @@ private fun WidgetWeekMarks(state: WidgetState) {
 @Composable
 private fun WidgetHeader(active: Boolean, subtitle: String?, style: TextStyle) {
     Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Vertical.CenterVertically) {
-        Text(LocalContext.current.getString(if (active) R.string.workout_in_progress else R.string.this_week), GlanceModifier.defaultWeight(), style = style)
+        Text(
+            LocalContext.current.getString(if (active) R.string.workout_in_progress else R.string.this_week),
+            GlanceModifier.defaultWeight(),
+            style = style
+        )
         if (subtitle != null) Text(subtitle, style = style)
     }
 }

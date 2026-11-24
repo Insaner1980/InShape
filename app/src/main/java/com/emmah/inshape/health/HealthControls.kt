@@ -1,13 +1,7 @@
 package com.emmah.inshape.health
 
-import androidx.compose.ui.res.stringResource
-import com.emmah.inshape.R
-import androidx.compose.material.icons.outlined.LockOpen
-import com.emmah.inshape.ui.theme.workoutTime
-import com.emmah.inshape.ui.theme.formatDuration
-import com.emmah.inshape.ui.components.KeyValueRow
-import android.text.format.DateFormat
 import android.content.Intent
+import android.text.format.DateFormat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,6 +9,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,6 +21,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.selected
 import androidx.health.connect.client.HealthConnectClient
@@ -36,6 +33,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.emmah.inshape.AppContainer
 import com.emmah.inshape.JournalViewModel
+import com.emmah.inshape.R
 import com.emmah.inshape.data.Exercise
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.Preferences
@@ -43,6 +41,7 @@ import com.emmah.inshape.data.Workout
 import com.emmah.inshape.ui.components.ConfirmDialog
 import com.emmah.inshape.ui.components.InShapeCard
 import com.emmah.inshape.ui.components.InShapeSwitch
+import com.emmah.inshape.ui.components.KeyValueRow
 import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListRow
 import com.emmah.inshape.ui.components.OutlineButton
@@ -52,6 +51,8 @@ import com.emmah.inshape.ui.components.SelectField
 import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeTheme
+import com.emmah.inshape.ui.theme.formatDuration
+import com.emmah.inshape.ui.theme.workoutTime
 import java.time.ZonedDateTime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
@@ -108,7 +109,11 @@ fun ColumnScope.HealthSettings(data: JournalSnapshot, vm: JournalViewModel) {
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { refreshGeneration++ }
     SectionHeader(stringResource(R.string.health_connect))
     if (!available) {
-        Text(stringResource(R.string.not_available_on_phone), style = MaterialTheme.typography.bodyMedium, color = InShapeTheme.colors.textSecondary)
+        Text(
+            stringResource(R.string.not_available_on_phone),
+            style = MaterialTheme.typography.bodyMedium,
+            color = InShapeTheme.colors.textSecondary
+        )
     }
     HealthCapabilitiesCard(data.preferences, vm, available, grants, { request.launch(it) }) {
         try {
@@ -194,7 +199,7 @@ fun ColumnScope.HealthSettings(data: JournalSnapshot, vm: JournalViewModel) {
     heldRemoval?.let { id ->
         ConfirmDialog(
             stringResource(R.string.remove_old_shared_question),
-            stringResource(R.string.remove_health_old_message, id),
+            stringResource(R.string.remove_health_old_message),
             stringResource(R.string.confirm_removal),
             destructive = true,
             {
@@ -224,7 +229,13 @@ private fun HealthCapabilitiesCard(
                 val enabled = capability.enabled(preferences)
                 val needsGrant = available && capability.permission !in grants
                 ListRow(
-                    if (capability == HealthCapability.HEART) stringResource(R.string.latest_heart_rate) else stringResource(capability.label),
+                    if (capability ==
+                        HealthCapability.HEART
+                    ) {
+                        stringResource(R.string.latest_heart_rate)
+                    } else {
+                        stringResource(capability.label)
+                    },
                     titleStyle = MaterialTheme.typography.bodyLarge,
                     subtitle = if (enabled && needsGrant) stringResource(R.string.permission_needed) else null,
                     trailing = {
@@ -237,7 +248,9 @@ private fun HealthCapabilitiesCard(
                     }
                 )
                 if (enabled && needsGrant) {
-                    TextAction(stringResource(R.string.allow_access), { requestPermission(setOf(capability.permission)) }, icon = Icons.Outlined.LockOpen)
+                    TextAction(stringResource(R.string.allow_access), {
+                        requestPermission(setOf(capability.permission))
+                    }, icon = Icons.Outlined.LockOpen)
                 }
             }
         }
@@ -282,7 +295,13 @@ fun HealthToday(preferences: Preferences, container: AppContainer) {
         context?.steps?.let { stringResource(R.string.steps_today) to it.toString() },
         context?.sleepSeconds?.let { stringResource(R.string.sleep_last_night) to formatDuration(it) },
         context?.heart?.let { sample ->
-            stringResource(R.string.heart_rate) to stringResource(R.string.heart_rate_at_time, sample.beats, sample.time.workoutTime(container.clock.zone, uses24Hours))
+            stringResource(R.string.heart_rate) to
+                pluralStringResource(
+                    R.plurals.heart_rate_at_time,
+                    sample.beats.toInt(),
+                    sample.beats,
+                    sample.time.workoutTime(container.clock.zone, uses24Hours)
+                )
         }
     ).take(2)
     if (values.isNotEmpty()) {

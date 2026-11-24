@@ -1,8 +1,5 @@
 package com.emmah.inshape.feature.progress
 
-import com.emmah.inshape.ui.theme.decimalDisplay
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -28,7 +25,9 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -42,6 +41,7 @@ import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.InShapeType
 import com.emmah.inshape.ui.theme.axisDate
+import com.emmah.inshape.ui.theme.decimalDisplay
 import com.emmah.inshape.ui.theme.formatDuration
 import java.time.LocalDate
 import kotlin.math.ceil
@@ -76,9 +76,11 @@ fun ColumnScope.ExerciseChart(points: List<MetricPoint>, basis: MeasurementBasis
                 }
             }
             val chartDescription = stringResource(R.string.exercise_chart_description, stringResource(basis.unitLabel))
-            Canvas(Modifier.weight(1f).height(Dimens.chartExercise).padding(Dimens.innerSmall).semantics {
-                contentDescription = chartDescription
-            }) {
+            Canvas(
+                Modifier.weight(1f).height(Dimens.chartExercise).padding(Dimens.innerSmall).semantics {
+                    contentDescription = chartDescription
+                }
+            ) {
                 fun x(index: Int) = if (points.size == 1) size.width / 2 else index.toFloat() / points.lastIndex * size.width
                 fun y(value: Float) = size.height - (value - low) / (high - low) * size.height
                 drawChartGrid(colors.divider)

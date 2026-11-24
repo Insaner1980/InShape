@@ -1,9 +1,7 @@
 package com.emmah.inshape.feature.assistant
 
-import com.emmah.inshape.ui.UiException
-import com.emmah.inshape.R
-import com.emmah.inshape.ui.requireUi
 import androidx.room.withTransaction
+import com.emmah.inshape.R
 import com.emmah.inshape.data.AssistantDraft
 import com.emmah.inshape.data.AssistantReceipt
 import com.emmah.inshape.data.Exercise
@@ -16,6 +14,8 @@ import com.emmah.inshape.data.Routine
 import com.emmah.inshape.data.RoutineItem
 import com.emmah.inshape.data.SetTarget
 import com.emmah.inshape.data.validatedSetValues
+import com.emmah.inshape.ui.UiException
+import com.emmah.inshape.ui.requireUi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -57,7 +57,8 @@ private val importedRowSchema = schemaObject(
     "load" to stringValue, "duration" to stringValue, "rest" to stringValue, "group" to stringValue,
     "groupType" to stringValue, "rounds" to stringValue, "note" to stringValue, "sourceExcerpt" to stringValue,
     "roundTargets" to schemaArray(
-        schemaObject("load" to stringValue, "min" to stringValue, "max" to stringValue, "perSide" to schemaValue("boolean")), 20
+        schemaObject("load" to stringValue, "min" to stringValue, "max" to stringValue, "perSide" to schemaValue("boolean")),
+        20
     )
 )
 internal val programImportSchema = schemaObject(
@@ -74,20 +75,25 @@ Use only basis keys kg, bodyweight, assistance_kg, level, duration or null. Neve
 Use Finnish for user-facing names, equipment, notes and uncertainties. Keep source excerpts verbatim.
 """
 internal fun parseProgramImport(result: JsonObject): List<ImportedDay> = result.objects("days").take(8).map { day ->
-    ImportedDay(day.text("title").orEmpty().take(120), day.objects("rows").take(24).map { row ->
-        fun field(key: String, limit: Int = 120) = row.text(key).orEmpty().take(limit)
-        ImportedRow(
-            field("name"), field("equipment"), field("basis"), field("sets"), field("min"), field("max"),
-            row["perSide"]?.toString() == "true", field("load"), field("duration"), field("rest"),
-            field("group"), field("groupType"), field("rounds"), field("note", 1000), field("sourceExcerpt", 1000),
-            roundTargets = row.objects("roundTargets").take(20).map { round ->
-                ImportedRound(
-                    round.text("load").orEmpty().take(32), round.text("min").orEmpty().take(8),
-                    round.text("max").orEmpty().take(8), round["perSide"]?.toString() == "true"
-                )
-            }
-        )
-    })
+    ImportedDay(
+        day.text("title").orEmpty().take(120),
+        day.objects("rows").take(24).map { row ->
+            fun field(key: String, limit: Int = 120) = row.text(key).orEmpty().take(limit)
+            ImportedRow(
+                field("name"), field("equipment"), field("basis"), field("sets"), field("min"), field("max"),
+                row["perSide"]?.toString() == "true", field("load"), field("duration"), field("rest"),
+                field("group"), field("groupType"), field("rounds"), field("note", 1000), field("sourceExcerpt", 1000),
+                roundTargets = row.objects("roundTargets").take(20).map { round ->
+                    ImportedRound(
+                        round.text("load").orEmpty().take(32),
+                        round.text("min").orEmpty().take(8),
+                        round.text("max").orEmpty().take(8),
+                        round["perSide"]?.toString() == "true"
+                    )
+                }
+            )
+        }
+    )
 }.also { requireUi(it.isNotEmpty() && it.all { day -> day.rows.isNotEmpty() }, R.string.program_import_empty) }
 
 internal suspend fun JournalRepository.confirmProgramImport(
@@ -111,9 +117,7 @@ internal suspend fun JournalRepository.confirmProgramImport(
         val routine = Routine(title = day.title.trim())
         val items = rows.map { row ->
             val exercise = if (row.selection == CREATE_IMPORT_EXERCISE) {
-                val basis = row.basis.ifBlank { if (row.duration.isBlank()) "kg" else "duration" }
-                requireUi(MeasurementBasis.entries.any { it.key == basis }, R.string.supported_unit_required)
-                Exercise(name = row.name.trim(), equipmentName = row.equipment, basis = basis).also { saveExercise(it) }
+                row.toExercise().also { saveExercise(it) }
             } else {
                 val current = live[row.selection]
                 requireUi(current != null && !current.archived && current == previous[row.selection], R.string.choose_exercise_again)
@@ -128,6 +132,12 @@ internal suspend fun JournalRepository.confirmProgramImport(
     dao.put(AssistantReceipt(draft.id, digest, "program-import", Json.encodeToString(result)))
     dao.deleteAssistantDraft(draft.key, draft.id)
     result
+}
+
+private fun ImportedRow.toExercise(): Exercise {
+    val unit = basis.ifBlank { if (duration.isBlank()) "kg" else "duration" }
+    requireUi(MeasurementBasis.entries.any { it.key == unit }, R.string.supported_unit_required)
+    return Exercise(name = name.trim(), equipmentName = equipment, basis = unit)
 }
 
 private fun ImportedRow.toRoutineItem(routineId: String, exercise: Exercise): RoutineItem {
@@ -161,9 +171,17 @@ private fun ImportedRound.toSetTarget(exercise: Exercise): SetTarget {
     val reps = if (minimum != null && maximum != null) PlannedReps(minimum, maximum, perSide) else null
     val plannedLoad = load.takeIf(String::isNotBlank)?.let { validatedSetValues(it, "").first }
     requireUi(plannedLoad == null || exercise.basis !in setOf("bodyweight", "duration"), R.string.unit_without_weight)
-    requireUi(exercise.basis != "level" || plannedLoad == null || plannedLoad.toIntOrNull()?.let { it > 0 } == true, R.string.assistant_level_whole)
+    requireUi(
+        exercise.basis != "level" || plannedLoad == null || plannedLoad.toIntOrNull()?.let {
+            it > 0
+        } == true,
+        R.string.assistant_level_whole
+    )
     return SetTarget(load = plannedLoad, plannedReps = reps)
 }
 
-private fun String.positiveInt(): Int? = if (isBlank()) null else
+private fun String.positiveInt(): Int? = if (isBlank()) {
+    null
+} else {
     trim().toIntOrNull()?.takeIf { it in 1..86_400 } ?: throw UiException(R.string.positive_whole_number)
+}

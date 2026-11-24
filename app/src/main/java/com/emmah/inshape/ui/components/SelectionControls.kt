@@ -144,12 +144,7 @@ fun FilterPill(text: String, selected: Boolean, onClick: () -> Unit, modifier: M
 }
 
 @Composable
-fun SegmentedControl(
-    options: List<String>,
-    selected: Int,
-    onSelect: (Int) -> Unit,
-    modifier: Modifier = Modifier
-) {
+fun SegmentedControl(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
     val colors = InShapeTheme.colors
     val density = LocalDensity.current
     val labelStyle = MaterialTheme.typography.labelSmall

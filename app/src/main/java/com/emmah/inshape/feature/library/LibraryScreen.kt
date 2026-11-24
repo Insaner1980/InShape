@@ -1,40 +1,30 @@
 package com.emmah.inshape.feature.library
 
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.FileOpen
-import androidx.compose.material.icons.outlined.FileUpload
-import com.emmah.inshape.ui.components.AppMenu
-import com.emmah.inshape.ui.components.MenuAction
-import androidx.compose.ui.platform.LocalContext
 import android.content.Context
-import androidx.compose.ui.res.stringResource
-import androidx.compose.foundation.layout.padding
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.foundation.layout.widthIn
-import com.emmah.inshape.feature.workout.setSummary
-import com.emmah.inshape.data.SetTarget
-import com.emmah.inshape.ui.components.HeaderIconButton
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarBorder
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Icon
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.FileOpen
+import androidx.compose.material.icons.outlined.FileUpload
+import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,21 +35,27 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.text.style.TextOverflow
 import com.emmah.inshape.JournalViewModel
 import com.emmah.inshape.R
 import com.emmah.inshape.data.Exercise
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.MeasurementBasis
 import com.emmah.inshape.data.PhotoAsset
+import com.emmah.inshape.data.SetTarget
 import com.emmah.inshape.data.Workout
 import com.emmah.inshape.data.WorkoutItem
+import com.emmah.inshape.feature.workout.setSummary
 import com.emmah.inshape.media.PhotoStore
+import com.emmah.inshape.ui.components.AppMenu
 import com.emmah.inshape.ui.components.EmptyState
+import com.emmah.inshape.ui.components.HeaderIconButton
 import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListRow
+import com.emmah.inshape.ui.components.MenuAction
 import com.emmah.inshape.ui.components.OutlineButton
 import com.emmah.inshape.ui.components.Page
 import com.emmah.inshape.ui.components.ScreenHeader
@@ -68,10 +64,9 @@ import com.emmah.inshape.ui.components.SearchField
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
-import com.emmah.inshape.ui.theme.InShapeType
 import com.emmah.inshape.ui.theme.formatDuration
-import com.emmah.inshape.ui.theme.shortDate
 import com.emmah.inshape.ui.theme.hasArtworkColumns
+import com.emmah.inshape.ui.theme.shortDate
 import java.time.Instant
 import java.time.LocalDate
 
@@ -131,34 +126,13 @@ fun LibraryScreen(
     val recorded = remember(history, context) { lastRecordedValues(context, history) }
     val firstPhotos = remember(data.photos) { firstPhotosByExercise(data.photos) }
     val colors = InShapeTheme.colors
-    var addMenu by remember { mutableStateOf(false) }
     Page(modifier) {
-        ScreenHeader(stringResource(R.string.library), trailing = {
-            Box {
-                val creatingRoutine = segment == 0
-                val label = stringResource(if (creatingRoutine) R.string.new_routine else R.string.new_exercise)
-                HeaderIconButton(Icons.Outlined.Add, label, { addMenu = true }, primaryAdd = true)
-                AppMenu(addMenu, { addMenu = false }) {
-                    MenuAction(label, Icons.Outlined.Add, {
-                        addMenu = false
-                        if (creatingRoutine) onRoutine("new") else onExercise("new")
-                    })
-                    if (creatingRoutine && onRoutineProposal != null) {
-                        MenuAction(stringResource(R.string.build_routine), Icons.Outlined.AutoAwesome, {
-                            addMenu = false
-                            onRoutineProposal()
-                        })
-                    }
-                    if (onImport != null) {
-                        val importIcon = if (creatingRoutine) Icons.Outlined.FileOpen else Icons.Outlined.FileUpload
-                        MenuAction(stringResource(if (creatingRoutine) R.string.import_program else R.string.import_equipment), importIcon, {
-                            addMenu = false
-                            onImport(if (creatingRoutine) "program" else "equipment")
-                        })
-                    }
-                }
-            }
-        })
+        LibraryHeader(
+            creatingRoutine = segment == 0,
+            onCreate = { if (segment == 0) onRoutine("new") else onExercise("new") },
+            onRoutineProposal = onRoutineProposal,
+            onImport = onImport
+        )
         ScreenTabs(listOf(stringResource(R.string.routines), stringResource(R.string.exercises)), segment, { segment = it })
         if (segment == 0) {
             LibraryRoutines(data, onRoutine)
@@ -172,7 +146,9 @@ fun LibraryScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 SearchField(
-                    search, { search = it }, stringResource(R.string.search_exercises),
+                    search,
+                    { search = it },
+                    stringResource(R.string.search_exercises),
                     Modifier.weight(1f).heightIn(min = Dimens.button).fillMaxHeight()
                 )
                 Surface(
@@ -197,9 +173,14 @@ fun LibraryScreen(
             val matching = data.exercises.filter { exercise ->
                 !exercise.archived && (!favorites || exercise.favorite) && query.all { term ->
                     listOf(
-                        exercise.name, exercise.name.exerciseDisplayName(context), exercise.nickname,
-                        exercise.category, exercise.category.categoryLabel(context), exercise.location,
-                        exercise.location.locationLabel(context), exercise.equipmentName
+                        exercise.name,
+                        exercise.name.exerciseDisplayName(context),
+                        exercise.nickname,
+                        exercise.category,
+                        exercise.category.categoryLabel(context),
+                        exercise.location,
+                        exercise.location.locationLabel(context),
+                        exercise.equipmentName
                     )
                         .any { it.contains(term, ignoreCase = true) }
                 }
@@ -211,7 +192,10 @@ fun LibraryScreen(
                     matching.forEach { exercise ->
                         item {
                             LibraryExerciseRow(
-                                exercise, recorded[exercise.id], firstPhotos[exercise.id], vm.container.photos,
+                                exercise,
+                                recorded[exercise.id],
+                                firstPhotos[exercise.id],
+                                vm.container.photos,
                                 onClick = { onExercise(exercise.id) }
                             )
                         }
@@ -223,8 +207,48 @@ fun LibraryScreen(
 }
 
 @Composable
-internal fun exerciseCountLabel(count: Int): String =
-    pluralStringResource(R.plurals.exercise_count, count, count)
+private fun LibraryHeader(
+    creatingRoutine: Boolean,
+    onCreate: () -> Unit,
+    onRoutineProposal: (() -> Unit)?,
+    onImport: ((String) -> Unit)?
+) {
+    var addMenu by remember { mutableStateOf(false) }
+    ScreenHeader(stringResource(R.string.library), trailing = {
+        Box {
+            val label = stringResource(if (creatingRoutine) R.string.new_routine else R.string.new_exercise)
+            HeaderIconButton(Icons.Outlined.Add, label, { addMenu = true }, primaryAdd = true)
+            AppMenu(addMenu, { addMenu = false }) {
+                MenuAction(label, Icons.Outlined.Add, {
+                    addMenu = false
+                    onCreate()
+                })
+                if (creatingRoutine && onRoutineProposal != null) {
+                    MenuAction(stringResource(R.string.build_routine), Icons.Outlined.AutoAwesome, {
+                        addMenu = false
+                        onRoutineProposal()
+                    })
+                }
+                if (onImport != null) {
+                    val importIcon = if (creatingRoutine) Icons.Outlined.FileOpen else Icons.Outlined.FileUpload
+                    MenuAction(
+                        stringResource(
+                            if (creatingRoutine) R.string.import_program else R.string.import_equipment
+                        ),
+                        importIcon,
+                        {
+                            addMenu = false
+                            onImport(if (creatingRoutine) "program" else "equipment")
+                        }
+                    )
+                }
+            }
+        }
+    })
+}
+
+@Composable
+internal fun exerciseCountLabel(count: Int): String = pluralStringResource(R.plurals.exercise_count, count, count)
 
 @Composable
 internal fun estimatedDurationLabel(minutes: Int?): String? =
@@ -238,11 +262,9 @@ internal fun routineSummary(count: Int, minutes: Int?): String = listOfNotNull(
 
 @Composable
 private fun LibraryRoutines(data: JournalSnapshot, onRoutine: (String) -> Unit) {
-    val colors = InShapeTheme.colors
     if (data.routines.isEmpty()) {
         EmptyState(
             stringResource(R.string.no_routines),
-            stringResource(R.string.add_your_exercises),
             action = stringResource(R.string.new_routine),
             onAction = { onRoutine("new") },
             icon = Icons.Outlined.Add
@@ -252,22 +274,10 @@ private fun LibraryRoutines(data: JournalSnapshot, onRoutine: (String) -> Unit) 
             data.routines.forEach { routine ->
                 item {
                     val count = data.routineItems.count { it.routineId == routine.id }
-                    val description = routine.description.takeIf(String::isNotBlank)
                     ListRow(
                         routine.title,
                         subtitle = routineSummary(count, routine.durationMinutes),
-                        onClick = { onRoutine(routine.id) },
-                        details = {
-                            if (description != null) {
-                                Text(
-                                    description,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = colors.textSecondary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
+                        onClick = { onRoutine(routine.id) }
                     )
                 }
             }
@@ -276,51 +286,18 @@ private fun LibraryRoutines(data: JournalSnapshot, onRoutine: (String) -> Unit) 
 }
 
 @Composable
-private fun LibraryExerciseRow(
-    exercise: Exercise,
-    last: LastRecordedValue?,
-    photo: PhotoAsset?,
-    photos: PhotoStore,
-    onClick: () -> Unit
-) {
-    val colors = InShapeTheme.colors
+private fun LibraryExerciseRow(exercise: Exercise, last: LastRecordedValue?, photo: PhotoAsset?, photos: PhotoStore, onClick: () -> Unit) {
+    val context = LocalContext.current
     BoxWithConstraints {
         val showArtwork = hasArtworkColumns()
-        val thumbnail = exerciseThumbnail(
-            exercise,
-            photo,
-            photos,
-            Dimens.button,
-            showArtwork
-        )
+        val thumbnail = exerciseThumbnail(exercise, photo, photos, Dimens.button, showArtwork)
         ListRow(
-            exercise.name.exerciseDisplayName(LocalContext.current),
-            subtitle = exercise.category.categoryLabel(LocalContext.current),
+            exercise.name.exerciseDisplayName(context),
+            subtitle = last?.let { "${it.value}, ${it.date.shortDate()}" } ?: exercise.category.categoryLabel(context),
             leading = if (showArtwork || thumbnail != null) {
-                (
-                    {
-                        Box(Modifier.size(Dimens.button), contentAlignment = Alignment.Center) {
-                            thumbnail?.invoke()
-                        }
-                    }
-                    )
+                { Box(Modifier.size(Dimens.button), contentAlignment = Alignment.Center) { thumbnail?.invoke() } }
             } else {
                 null
-            },
-            trailingValue = last?.let {
-                {
-                    val large = LocalDensity.current.fontScale >= 1.3f
-                    val alignment = if (large) Alignment.Start else Alignment.End
-                    val width = if (large) Modifier else Modifier.widthIn(max = maxWidth * .42f)
-                    Column(width, horizontalAlignment = alignment) {
-                        Text(it.value, style = MaterialTheme.typography.bodyMedium, textAlign = if (large) TextAlign.Start else TextAlign.End)
-                        Text(
-                            it.date.shortDate(),
-                            style = InShapeType.nav,
-                            color = colors.textSecondary
-                        )
-                    }
-                }
             },
             onClick = onClick,
             showChevron = false

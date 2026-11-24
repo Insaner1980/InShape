@@ -5,8 +5,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Shapes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.dimensionResource
-import com.emmah.inshape.R
 import androidx.compose.ui.unit.dp
+import com.emmah.inshape.R
 
 object InShapeShapes {
     val chip = RoundedCornerShape(8.dp)

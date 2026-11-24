@@ -25,35 +25,34 @@ class ProgressCalculatorTest {
         quick: Boolean = false,
         basis: MeasurementBasis = MeasurementBasis.Weight,
         duration: Long? = null
-    ): Workout =
-        Workout(
-            WorkoutEntity(
-                id = id,
-                state = "COMPLETED",
-                activeKey = null,
-                journalDate = date,
-                zoneId = "Europe/Helsinki",
-                createdAt = "2026-11-13T08:00:00Z",
-                modifiedAt = "2026-11-13T08:00:00Z"
-            ),
-            listOf(
-                WorkoutItem(
-                    SessionItem(
-                        id = "item-$id",
-                        workoutId = id,
-                        exerciseId = "exercise",
-                        equipmentId = equipment,
-                        name = "Pulldown",
-                        category = "Machine",
-                        basis = basis.key,
-                        quickCompletedAt = if (quick) "2026-11-13T08:00:00Z" else null,
-                        durationSeconds = duration
-                    ),
-                    sets
-                )
-            ),
-            emptyList()
-        )
+    ): Workout = Workout(
+        WorkoutEntity(
+            id = id,
+            state = "COMPLETED",
+            activeKey = null,
+            journalDate = date,
+            zoneId = "Europe/Helsinki",
+            createdAt = "2026-11-13T08:00:00Z",
+            modifiedAt = "2026-11-13T08:00:00Z"
+        ),
+        listOf(
+            WorkoutItem(
+                SessionItem(
+                    id = "item-$id",
+                    workoutId = id,
+                    exerciseId = "exercise",
+                    equipmentId = equipment,
+                    name = "Pulldown",
+                    category = "Machine",
+                    basis = basis.key,
+                    quickCompletedAt = if (quick) "2026-11-13T08:00:00Z" else null,
+                    durationSeconds = duration
+                ),
+                sets
+            )
+        ),
+        emptyList()
+    )
     private fun set(id: String, load: String?, reps: Int?, completed: Boolean = true) = SessionSet(
         id = id,
         itemId = "item",
@@ -88,7 +87,8 @@ class ProgressCalculatorTest {
             workout("timed", "2026-11-09", listOf(set("1", "8", null)), basis = basis, duration = 300),
             workout("unknown", "2026-11-11", emptyList(), quick = true, basis = basis),
             workout(
-                "set-time", "2026-11-13",
+                "set-time",
+                "2026-11-13",
                 listOf(set("2", "4", null), set("3", "6.25", null), set("4", "8", null, completed = false)),
                 basis = basis
             )
@@ -169,9 +169,15 @@ class ProgressCalculatorTest {
         val history =
             listOf(
                 recorded("late", "2026-11-12").let { workout ->
-                    workout.copy(checkIns = workout.checkIns + CheckIn(
-                        "next", workout.row.id, "NEXT_DAY", "2026-11-12T22:30:00Z", "Europe/Helsinki"
-                    ))
+                    workout.copy(
+                        checkIns = workout.checkIns + CheckIn(
+                            "next",
+                            workout.row.id,
+                            "NEXT_DAY",
+                            "2026-11-12T22:30:00Z",
+                            "Europe/Helsinki"
+                        )
+                    )
                 },
                 recorded("early", "2026-11-02"),
                 recorded("before", "2026-11-05", "BEFORE"),

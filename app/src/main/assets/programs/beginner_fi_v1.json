@@ -11,7 +11,7 @@
       "kevyt aerobinen laite"
     ],
     "optionalMobilityMinutes": 2,
-    "note": "Ennen ensimmäistä pääliikettä voidaan tehdä yksi kevyt harjoittelusarja."
+    "note": "Ennen ensimmäistä pääliikettä voi tehdä yhden kevyen lämmittelysarjan."
   },
   "coolDown": {
     "minutes": 3,
@@ -19,7 +19,7 @@
     "optional": true,
     "note": "Rauhallinen liike ja hengityksen tasaaminen haluttaessa."
   },
-  "effort": "Aloita niin, että sarjan päättyessä olisi jäljellä noin 3-4 hallittua toistoa (RIR 3-4). Älä tee maksimisuorituksia tai pakota toistoja.",
+  "effort": "Jätä aluksi 3–4 toistoa varaa ja pidä tekniikka hallittuna. Älä tee maksimisuorituksia tai pakota toistoja.",
   "progression": {
     "method": "double_progression",
     "whenToSuggestMoreLoad": "Ehdota kuorman nostamista vasta, kun toistohaarukan yläraja onnistuu kaikissa työsarjoissa vähintään kahdella peräkkäisellä saman liikkeen suorituskerralla, tekniikka on hallittu, palautuminen on riittävää eikä ilmene kipua tai poikkeavia oireita.",
@@ -62,7 +62,7 @@
       "url": "https://ukkinstituutti.fi/fyysinen-kunto/kunnon-osa-alueet/lihaskunto/"
     },
     {
-      "name": "ACSM: 2026 Resistance Training Guidelines",
+      "name": "American College of Sports Medicine: voimaharjoittelusuositukset 2026",
       "url": "https://acsm.org/resistance-training-guidelines-update-2026/"
     }
   ],
@@ -94,16 +94,16 @@
             2
           ],
           "sets": "1–2 sarjaa",
-          "effort": "RIR 3-4",
-          "goal": "Opettele säädöt ja tekniikka; painot kevyet."
+          "effort": "3–4 toistoa varaa",
+          "goal": "Opettele säädöt ja tekniikka kevyillä painoilla."
         },
         {
           "weeks": [
             3,
             4
           ],
-          "sets": "2 per liike",
-          "effort": "RIR 3-4",
+          "sets": "2 sarjaa liikettä kohti",
+          "effort": "3–4 toistoa varaa",
           "goal": "Toista harjoitus tasaisesti; lisää ensin toistoja."
         },
         {
@@ -111,8 +111,8 @@
             5,
             7
           ],
-          "sets": "2 per liike; halutessa 3. sarja jalkaprässiin",
-          "effort": "RIR 2-3",
+          "sets": "2 sarjaa liikettä kohti, halutessasi kolmas sarja jalkaprässiin",
+          "effort": "2–3 toistoa varaa",
           "goal": "Nosta vastusta vain, jos tekniikka pysyy hyvänä."
         },
         {
@@ -120,9 +120,9 @@
             8,
             8
           ],
-          "sets": "2 per liike",
-          "effort": "RIR 3-4; tarvittaessa kevyemmin",
-          "goal": "Arvioi jaksaminen ja sopiiko seuraavaksi A/B."
+          "sets": "2 sarjaa liikettä kohti",
+          "effort": "3–4 toistoa varaa, tarvittaessa kevyemmin",
+          "goal": "Arvioi jaksaminen ja sopiiko seuraavaksi kahden treenin ohjelma."
         }
       ],
       "sessions": [
@@ -154,7 +154,7 @@
             },
             {
               "exerciseId": "machine_chest_press",
-              "name": "Rintapunnerruslaite",
+              "name": "Rintapunnerrus laitteessa",
               "equipment": "laite",
               "sets": 2,
               "target": {
@@ -216,7 +216,7 @@
                   "label": "Lantionnosto lattialla"
                 }
               ],
-              "instruction": "Jälkimmäinen vaihtoehto kuormittaa enemmän pakaroita kuin takareiden koukistusta."
+              "instruction": "Lantionnosto kuormittaa enemmän pakaroita kuin takareisiä."
             },
             {
               "exerciseId": "lat_pulldown",
@@ -242,7 +242,7 @@
             },
             {
               "exerciseId": "machine_crunch",
-              "name": "Vatsarutistuslaite",
+              "name": "Vatsarutistus laitteessa",
               "equipment": "laite",
               "sets": 2,
               "target": {
@@ -257,7 +257,7 @@
                 {
                   "exerciseId": "dead_bug",
                   "name": "Dead bug",
-                  "label": "Dead bug, 2 x 6-10 per puoli",
+                  "label": "Dead bug, 2 × 6–10 kummallekin puolelle",
                   "sets": 2,
                   "target": {
                     "min": 6,
@@ -304,8 +304,8 @@
             1,
             2
           ],
-          "sets": "2 per liike",
-          "effort": "RIR 3-4",
+          "sets": "2 sarjaa liikettä kohti",
+          "effort": "3–4 toistoa varaa",
           "goal": "Opettele molempien päivien liikkeet ja sopivat painot."
         },
         {
@@ -313,8 +313,8 @@
             3,
             5
           ],
-          "sets": "2 per liike",
-          "effort": "RIR 2-3",
+          "sets": "2 sarjaa liikettä kohti",
+          "effort": "2–3 toistoa varaa",
           "goal": "Lisää toistoja ennen painojen korottamista."
         },
         {
@@ -322,8 +322,8 @@
             6,
             7
           ],
-          "sets": "2 per liike; halutessa 3 sarjaa ensimmäiseen jalkaliikkeeseen ja rintapunnerrukseen",
-          "effort": "RIR 2-3",
+          "sets": "2 sarjaa liikettä kohti, halutessasi 3 sarjaa ensimmäiseen jalkaliikkeeseen ja rintapunnerrukseen",
+          "effort": "2–3 toistoa varaa",
           "goal": "Pidä sama tekniikka ja riittävä palautuminen."
         },
         {
@@ -331,9 +331,9 @@
             8,
             8
           ],
-          "sets": "2 per liike",
-          "effort": "RIR 3-4; tarvittaessa kevennys",
-          "goal": "Arvioi nousujohteisuus ja päätä jatkosta."
+          "sets": "2 sarjaa liikettä kohti",
+          "effort": "3–4 toistoa varaa, tarvittaessa kevyemmin",
+          "goal": "Katso, ovatko painot nousseet, ja päätä jatkosta."
         }
       ],
       "sessions": [
@@ -365,7 +365,7 @@
             },
             {
               "exerciseId": "machine_chest_press",
-              "name": "Rintapunnerruslaite",
+              "name": "Rintapunnerrus laitteessa",
               "equipment": "laite",
               "sets": 2,
               "target": {
@@ -468,7 +468,7 @@
                 {
                   "exerciseId": "dead_bug",
                   "name": "Dead bug",
-                  "label": "Dead bug, 2 x 6-10 per puoli",
+                  "label": "Dead bug, 2 × 6–10 kummallekin puolelle",
                   "sets": 2,
                   "target": {
                     "min": 6,
@@ -537,7 +537,7 @@
             },
             {
               "exerciseId": "machine_shoulder_press",
-              "name": "Pystypunnerruslaite",
+              "name": "Pystypunnerrus laitteessa",
               "equipment": "laite",
               "sets": 2,
               "target": {
@@ -586,7 +586,7 @@
             },
             {
               "exerciseId": "machine_chest_press",
-              "name": "Rintapunnerruslaite",
+              "name": "Rintapunnerrus laitteessa",
               "equipment": "laite",
               "sets": 2,
               "target": {
@@ -622,8 +622,8 @@
               "alternatives": [
                 {
                   "exerciseId": "machine_crunch",
-                  "name": "Vatsarutistuslaite",
-                  "label": "Vatsarutistuslaite, 2 x 10-15",
+                  "name": "Vatsarutistus laitteessa",
+                  "label": "Vatsarutistus laitteessa, 2 × 10–15",
                   "sets": 2,
                   "target": {
                     "min": 10,
@@ -648,7 +648,7 @@
       "id": "kolme-lyhytta-kokovartaloa",
       "name": "Kolme lyhyttä kokovartalotreeniä",
       "tagline": "Lyhyemmät A, B ja C -harjoitukset kolmena päivänä",
-      "description": "Vaihtelua useammalle salikäynnille ilman pitkiä harjoituksia. Jokaisella kerralla tehdään yksi jaloille, yksi punnerrus, yksi veto ja muita tärkeitä liikkeitä.",
+      "description": "Vaihtelua useammalle salikäynnille ilman pitkiä harjoituksia. Jokaisella kerralla tehdään yksi jalkaliike, yksi punnerrus, yksi veto ja muita tärkeitä liikkeitä.",
       "recommendedWeeklySessions": 3,
       "allowedWeeklySessions": [
         3
@@ -671,8 +671,8 @@
             1,
             2
           ],
-          "sets": "1-2 per liike, jaksamisen mukaan",
-          "effort": "RIR 3-4",
+          "sets": "1–2 sarjaa liikettä kohti jaksamisen mukaan",
+          "effort": "3–4 toistoa varaa",
           "goal": "Opettele A, B ja C. Kevennä tarvittaessa kolmatta treeniä."
         },
         {
@@ -680,8 +680,8 @@
             3,
             5
           ],
-          "sets": "2 per liike",
-          "effort": "RIR 3",
+          "sets": "2 sarjaa liikettä kohti",
+          "effort": "3 toistoa varaa",
           "goal": "Pyri tasaiseen tekemiseen, ei maksimisuorituksiin."
         },
         {
@@ -689,8 +689,8 @@
             6,
             7
           ],
-          "sets": "2 per liike; vain halutessa 3 sarjaa ensimmäiseen jalkaliikkeeseen",
-          "effort": "RIR 2-3",
+          "sets": "2 sarjaa liikettä kohti, halutessasi 3 sarjaa ensimmäiseen jalkaliikkeeseen",
+          "effort": "2–3 toistoa varaa",
           "goal": "Lisää toistoja ja tarvittaessa kuormaa."
         },
         {
@@ -698,8 +698,8 @@
             8,
             8
           ],
-          "sets": "2 per liike",
-          "effort": "RIR 3-4, tarvittaessa kevennys",
+          "sets": "2 sarjaa liikettä kohti",
+          "effort": "3–4 toistoa varaa, tarvittaessa kevyemmin",
           "goal": "Arvioi, onko kolme harjoitusta sopiva määrä."
         }
       ],
@@ -732,7 +732,7 @@
             },
             {
               "exerciseId": "machine_chest_press",
-              "name": "Rintapunnerruslaite",
+              "name": "Rintapunnerrus laitteessa",
               "equipment": "laite",
               "sets": 2,
               "target": {
@@ -812,8 +812,8 @@
               "alternatives": [
                 {
                   "exerciseId": "machine_crunch",
-                  "name": "Vatsarutistuslaite",
-                  "label": "Vatsarutistuslaite, 2 x 10-15",
+                  "name": "Vatsarutistus laitteessa",
+                  "label": "Vatsarutistus laitteessa, 2 × 10–15",
                   "sets": 2,
                   "target": {
                     "min": 10,
@@ -882,7 +882,7 @@
             },
             {
               "exerciseId": "machine_shoulder_press",
-              "name": "Pystypunnerruslaite",
+              "name": "Pystypunnerrus laitteessa",
               "equipment": "laite",
               "sets": 2,
               "target": {
@@ -896,8 +896,8 @@
               "alternatives": [
                 {
                   "exerciseId": "machine_chest_press",
-                  "name": "Rintapunnerruslaite",
-                  "label": "Rintapunnerruslaite, jos hartioiden punnerrus ei sovi"
+                  "name": "Rintapunnerrus laitteessa",
+                  "label": "Rintapunnerrus laitteessa, jos pystypunnerrus ei sovi"
                 }
               ],
               "instruction": ""
@@ -941,7 +941,7 @@
                 {
                   "exerciseId": "dead_bug",
                   "name": "Dead bug",
-                  "label": "Dead bug, 2 x 6-10 per puoli",
+                  "label": "Dead bug, 2 × 6–10 kummallekin puolelle",
                   "sets": 2,
                   "target": {
                     "min": 6,
@@ -988,7 +988,7 @@
             },
             {
               "exerciseId": "machine_chest_press",
-              "name": "Rintapunnerruslaite",
+              "name": "Rintapunnerrus laitteessa",
               "equipment": "laite",
               "sets": 2,
               "target": {
@@ -1054,7 +1054,7 @@
             },
             {
               "exerciseId": "machine_crunch",
-              "name": "Vatsarutistuslaite",
+              "name": "Vatsarutistus laitteessa",
               "equipment": "laite",
               "sets": 2,
               "target": {
@@ -1069,7 +1069,7 @@
                 {
                   "exerciseId": "dead_bug",
                   "name": "Dead bug",
-                  "label": "Dead bug, 2 x 6-10 per puoli",
+                  "label": "Dead bug, 2 × 6–10 kummallekin puolelle",
                   "sets": 2,
                   "target": {
                     "min": 6,

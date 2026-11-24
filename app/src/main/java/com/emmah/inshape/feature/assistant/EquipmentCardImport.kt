@@ -1,12 +1,12 @@
 package com.emmah.inshape.feature.assistant
 
-import com.emmah.inshape.R
-import com.emmah.inshape.ui.requireUi
 import android.net.Uri
 import com.emmah.inshape.AppContainer
+import com.emmah.inshape.R
 import com.emmah.inshape.data.AssistantDraft
 import com.emmah.inshape.data.AssistantReceipt
 import com.emmah.inshape.data.Exercise
+import com.emmah.inshape.ui.requireUi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -62,7 +62,11 @@ internal suspend fun AppContainer.confirmEquipmentCard(
             throw DuplicateCard(it.targetId)
         }
         requireUi(dao.assistantDraft(draft.key)?.id == draft.id, R.string.journal_changed_review)
-        if (previous != null) requireUi(dao.exercises().find { it.id == id } == previous && !previous.archived, R.string.exercise_changed_review)
+        if (previous !=
+            null
+        ) {
+            requireUi(dao.exercises().find { it.id == id } == previous && !previous.archived, R.string.exercise_changed_review)
+        }
         requireUi(card.name.isNotBlank(), R.string.exercise_name_required)
         val edited = (previous ?: Exercise(id = id)).copy(
             name = previous?.name ?: card.name.trim(),

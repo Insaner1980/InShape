@@ -1,13 +1,13 @@
 package com.emmah.inshape.feature.workout
 
-import com.emmah.inshape.R
-import com.emmah.inshape.ui
 import android.app.Application
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
+import com.emmah.inshape.R
+import com.emmah.inshape.ui
 import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -27,7 +27,10 @@ class ActiveWorkoutNotifierTest {
     @Test fun contentUsesSystemChronometerAndExplicitActions() {
         val notification = activeWorkoutNotification(context, notice)!!
         assertEquals("Full body A", notification.extras.getString(Notification.EXTRA_TITLE))
-        assertTrue(notification.extras.getString(Notification.EXTRA_TEXT)!! == ui(R.string.started_at, Instant.parse(notice.start).atZone(notice.zone).toLocalTime().toString()))
+        assertTrue(
+            notification.extras.getString(Notification.EXTRA_TEXT)!! ==
+                ui(R.string.started_at, Instant.parse(notice.start).atZone(notice.zone).toLocalTime().toString())
+        )
         assertEquals(Instant.parse(notice.start).toEpochMilli(), notification.`when`)
         assertTrue(notification.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER))
         assertTrue(notification.flags and Notification.FLAG_ONGOING_EVENT != 0)

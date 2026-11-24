@@ -1,7 +1,5 @@
 package com.emmah.inshape.ui.components
 
-import androidx.compose.ui.res.stringResource
-import com.emmah.inshape.R
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -15,9 +13,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import com.emmah.inshape.R
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeTheme
 
@@ -59,22 +59,22 @@ internal fun Modifier.reorderActions(canMoveUp: Boolean, canMoveDown: Boolean, o
     val moveDown = stringResource(R.string.move_down)
     return semantics {
         customActions = buildList {
-        if (canMoveUp) {
-            add(
-                CustomAccessibilityAction(moveUp) {
-                    onMove(-1)
-                    true
-                }
-            )
-        }
-        if (canMoveDown) {
-            add(
-                CustomAccessibilityAction(moveDown) {
-                    onMove(1)
-                    true
-                }
-            )
+            if (canMoveUp) {
+                add(
+                    CustomAccessibilityAction(moveUp) {
+                        onMove(-1)
+                        true
+                    }
+                )
+            }
+            if (canMoveDown) {
+                add(
+                    CustomAccessibilityAction(moveDown) {
+                        onMove(1)
+                        true
+                    }
+                )
+            }
         }
     }
-}
 }

@@ -2,7 +2,7 @@
 
 Offline personal workout journal for Android, Kotlin and Jetpack Compose. The journal follows the [implementation plan](docs/superpowers/plans/2026-11-13-inshape-implementation-plan.md), with the [visual redesign](docs/redesign/implementation-plan.md) and [monochrome redesign and workout clock](docs/redesign-monochrome/implementation-plan.md). See the [implementation verification](docs/verification/implementation-verification.md) and [monochrome verification](docs/verification/monochrome-verification.md) for checks and platform limitations.
 
-Build with Android Studio or run the Gradle Wrapper with JDK 17+ and Android SDK 37. Use `.\gradlew.bat` in Windows PowerShell or `./gradlew` on macOS and Linux. Run `:app:assembleDebug` to build `app/build/outputs/apk/debug/app-debug.apk`. Use `:app:testDebugUnitTest` for unit tests and `:app:lintDebug` for lint.
+Build with Android Studio or run the Gradle Wrapper with JDK 21 and Android SDK 37. Use `.\gradlew.bat` in Windows PowerShell or `./gradlew` on macOS and Linux. Run `:app:assembleDebug` to build `app/build/outputs/apk/debug/app-debug.apk`. Use `:app:testDebugUnitTest` for unit tests and `:app:lintDebug` for lint.
 
 The verified build uses JDK 21. Install with `adb -s <device> install -r app/build/outputs/apk/debug/app-debug.apk` and open InShape. A normal installation starts with an empty journal. No account or internet access is required. The Android build tools download pinned dependencies on the first build.
 

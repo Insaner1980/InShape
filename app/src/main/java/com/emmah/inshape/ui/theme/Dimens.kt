@@ -21,6 +21,9 @@ object Dimens {
     val playIcon = 40.dp
     val playbackBarStride = 7.dp
     val playbackBarBaseline = 40.dp
+    val headerPlaybackBarWidth = 2.dp
+    val headerPlaybackBarStride = 3.dp
+    val headerPlaybackBarBaseline = 17.dp
     val nowPlayingCover = 240.dp
     val workoutArtworkTextWidth = 204.dp
     val pickerThumbnail = 40.dp
@@ -59,7 +62,7 @@ object Dimens {
     val iconLarge = 32.dp
     val bodyHaloWidth = 250.dp
     val bodyHeight = 300.dp
-    const val bodyAreaSheetHeightFraction = .8f
+    const val BODY_AREA_SHEET_HEIGHT_FRACTION = .8f
     val chartLine = 3.dp
     val chartDot = 5.dp
     val chartGap = 6.dp
@@ -90,4 +93,5 @@ object Dimens {
     val playlistCoverSize = 104.dp
     val widgetArtworkWidth = 68.dp
     val playbackBarHeights = listOf(14.dp, 22.dp, 30.dp, 24.dp, 16.dp)
+    val headerPlaybackBarHeights = listOf(8.dp, 12.dp, 16.dp, 12.dp, 8.dp)
 }

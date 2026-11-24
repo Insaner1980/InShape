@@ -1,20 +1,21 @@
 package com.emmah.inshape.feature.assistant
 
-import androidx.compose.ui.res.stringResource
-import com.emmah.inshape.R
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.view.WindowManager
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.TextObfuscationMode
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.maxLengthReject
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedSecureTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,13 +24,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.emmah.inshape.JournalViewModel
+import com.emmah.inshape.R
 import com.emmah.inshape.data.AssistantMemory
 import com.emmah.inshape.ui.components.ActionRow
 import com.emmah.inshape.ui.components.ConfirmDialog
@@ -49,10 +52,9 @@ internal fun AssistantSettings(
     vm: JournalViewModel,
     memories: List<AssistantMemory>
 ) {
-    val context = LocalContext.current
+    val resources = LocalResources.current
     var status by remember { mutableStateOf<KeyStatus?>(null) }
     var editing by remember { mutableStateOf(false) }
-    var input by remember { mutableStateOf("") }
     var feedback by rememberSaveable { mutableStateOf<String?>(null) }
     var isError by rememberSaveable { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
@@ -62,7 +64,11 @@ internal fun AssistantSettings(
     var showMemories by rememberSaveable { mutableStateOf(false) }
     var confirmRemoval by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    LaunchedEffect(credentials) { status = credentials?.status() }
+    val busy = testing || saving
+    LifecycleResumeEffect(credentials) {
+        val refresh = scope.launch { status = credentials?.status() }
+        onPauseOrDispose { refresh.cancel() }
+    }
 
     fun editKey() {
         feedback = null
@@ -77,49 +83,15 @@ internal fun AssistantSettings(
             return@Page
         }
         if (editing) {
-            SecureCredentialEntry()
-            OutlinedTextField(
-                input,
-                { input = it.take(1024) },
-                Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.api_key)) },
-                supportingText = { Text(feedback ?: stringResource(R.string.stored_on_device)) },
-                isError = isError,
-                enabled = !saving,
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false)
-            )
-            ActionRow {
-                PrimaryButton(stringResource(R.string.save_key), enabled = input.isNotBlank() && !saving, onClick = {
-                    val key = input
-                    input = ""
-                    feedback = null
-                    isError = false
-                    saving = true
-                    scope.launch {
-                        try {
-                            credentials.save(key)
-                            status = credentials.status()
-                            editing = false
-                            manage = false
-                        } catch (cancelled: CancellationException) {
-                            throw cancelled
-                        } catch (_: Exception) {
-                            feedback = context.getString(R.string.key_save_failed)
-                            isError = true
-                        } finally {
-                            saving = false
-                        }
-                    }
-                })
-                OutlineButton(stringResource(R.string.cancel), enabled = !saving, onClick = {
-                    input = ""
-                    feedback = null
-                    isError = false
+            CredentialEditor(
+                credentials,
+                onSaved = {
+                    status = it
                     editing = false
-                })
-            }
+                    manage = false
+                },
+                onCancel = { editing = false }
+            )
             return@Page
         }
         val connection = when {
@@ -136,45 +108,37 @@ internal fun AssistantSettings(
             color = if (isError) InShapeTheme.colors.error else InShapeTheme.colors.text,
             style = MaterialTheme.typography.titleMedium
         )
-        if (status == KeyStatus.SAVED) {
-            PrimaryButton(stringResource(R.string.test_connection), enabled = !testing && !saving, onClick = {
+        CredentialAction(
+            status,
+            busy = busy,
+            onEdit = ::editKey,
+            onTest = {
                 feedback = null
                 isError = false
                 testing = true
                 scope.launch {
                     try {
-                        gateway.checkConnection()
-                        feedback = context.getString(R.string.connected_openai)
-                    } catch (failure: AssistantFailure) {
-                        feedback = context.getString(failure.kind.message)
-                        isError = true
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (_: Exception) {
-                        feedback = context.getString(R.string.connection_test_failed)
-                        isError = true
+                        val failure = connectionFailure(gateway)
+                        feedback = resources.getString(failure ?: R.string.connected_openai)
+                        isError = failure != null
+                        if (failure == R.string.assistant_error_unreadable_key) status = KeyStatus.UNREADABLE
                     } finally {
                         testing = false
                     }
                 }
-            })
-            Text(stringResource(R.string.test_credits), style = MaterialTheme.typography.bodySmall, color = InShapeTheme.colors.textSecondary)
-        } else if (status != null) {
-            PrimaryButton(stringResource(R.string.enter_key), onClick = ::editKey)
-        }
+            }
+        )
 
         ListCard {
-            if (status == KeyStatus.SAVED) item {
-                ListRow(
-                    stringResource(R.string.manage_api_key),
-                    subtitle = stringResource(R.string.stored_on_device),
-                    onClick = { manage = !manage }
-                )
-                if (manage) {
-                    ActionRow {
-                        OutlineButton(stringResource(R.string.replace_key), enabled = !testing && !saving, onClick = ::editKey)
-                        OutlineButton(stringResource(R.string.remove_key), enabled = !testing && !saving, onClick = { confirmRemoval = true })
-                    }
+            if (status == KeyStatus.SAVED) {
+                item {
+                    CredentialManagement(
+                        manage,
+                        busy,
+                        onToggle = { manage = !manage },
+                        onEdit = ::editKey,
+                        onRemove = { confirmRemoval = true }
+                    )
                 }
             }
             item { AssistantVoiceSettings() }
@@ -205,7 +169,7 @@ internal fun AssistantSettings(
                             throw cancelled
                         } catch (_: Exception) {
                             status = credentials.status()
-                            feedback = context.getString(R.string.key_remove_failed)
+                            feedback = resources.getString(R.string.key_remove_failed)
                             isError = true
                         } finally {
                             saving = false
@@ -219,22 +183,118 @@ internal fun AssistantSettings(
 }
 
 @Composable
+private fun CredentialEditor(credentials: AssistantCredentials, onSaved: (KeyStatus) -> Unit, onCancel: () -> Unit) {
+    val resources = LocalResources.current
+    val scope = rememberCoroutineScope()
+    val input = remember { TextFieldState() }
+    var feedback by remember { mutableStateOf<String?>(null) }
+    var saving by remember { mutableStateOf(false) }
+
+    fun save() {
+        val key = input.text.toString()
+        feedback = null
+        saving = true
+        scope.launch {
+            try {
+                credentials.save(key)
+                input.clearText()
+                onSaved(credentials.status())
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                input.clearText()
+                feedback = resources.getString(R.string.key_save_failed)
+            } finally {
+                saving = false
+            }
+        }
+    }
+    SecureCredentialEntry()
+    OutlinedSecureTextField(
+        input,
+        Modifier.fillMaxWidth(),
+        enabled = !saving,
+        label = { Text(stringResource(R.string.api_key)) },
+        supportingText = feedback?.let { { Text(it) } },
+        isError = feedback != null,
+        inputTransformation = InputTransformation.maxLengthReject(1024),
+        textObfuscationMode = TextObfuscationMode.Hidden
+    )
+    ActionRow {
+        PrimaryButton(stringResource(R.string.save_key), enabled = input.text.isNotBlank() && !saving, onClick = ::save)
+        OutlineButton(stringResource(R.string.cancel), enabled = !saving, onClick = {
+            input.clearText()
+            onCancel()
+        })
+    }
+}
+
+@Composable
+private fun CredentialManagement(
+    manage: Boolean,
+    busy: Boolean,
+    onToggle: () -> Unit,
+    onEdit: () -> Unit,
+    onRemove: () -> Unit
+) {
+    ListRow(stringResource(R.string.manage_api_key), subtitle = stringResource(R.string.stored_on_device), onClick = onToggle)
+    if (manage) {
+        ActionRow {
+            OutlineButton(stringResource(R.string.replace_key), enabled = !busy, onClick = onEdit)
+            OutlineButton(stringResource(R.string.remove_key), enabled = !busy, onClick = onRemove)
+        }
+    }
+}
+
+@Composable
+private fun CredentialAction(
+    status: KeyStatus?,
+    busy: Boolean,
+    onEdit: () -> Unit,
+    onTest: () -> Unit
+) {
+    when (status) {
+        KeyStatus.SAVED -> PrimaryButton(stringResource(R.string.test_connection), enabled = !busy, onClick = onTest)
+        KeyStatus.MISSING, KeyStatus.UNREADABLE -> PrimaryButton(stringResource(R.string.enter_key), onClick = onEdit)
+        null -> Unit
+    }
+}
+
+private suspend fun connectionFailure(gateway: AssistantGateway): Int? = try {
+    gateway.checkConnection()
+    null
+} catch (failure: AssistantFailure) {
+    failure.kind.message
+} catch (cancelled: CancellationException) {
+    throw cancelled
+} catch (_: Exception) {
+    R.string.connection_test_failed
+}
+
+@Composable
 private fun AssistantUsageDetails(entries: List<UsageEntry>) {
     val links = LocalUriHandler.current
     OutlineButton(stringResource(R.string.open_usage_dashboard), { links.openUri("https://platform.openai.com/usage") })
     entries.take(5).forEach { entry ->
-        val tokens = if (entry.input != null && entry.output != null) stringResource(R.string.usage_tokens, entry.input, entry.output)
-        else stringResource(R.string.usage_unavailable)
-        val operation = stringResource(when (entry.operation) {
-            "Connection test" -> R.string.assistant_usage_connection
-            "Text" -> R.string.assistant_usage_text
-            "Image import" -> R.string.assistant_usage_images
-            "Transcription" -> R.string.assistant_usage_transcription
-            "Speech" -> R.string.assistant_usage_speech
-            else -> R.string.assistant_usage_unknown
-        })
-        Text("$operation, ${entry.at.take(16).replace('T', ' ')} UTC\n${entry.model}\n$tokens",
-            style = MaterialTheme.typography.bodySmall)
+        val tokens = if (entry.input != null && entry.output != null) {
+            stringResource(R.string.usage_tokens, entry.input, entry.output)
+        } else {
+            stringResource(R.string.usage_unavailable)
+        }
+        val operation = stringResource(
+            when (entry.operation) {
+                "Connection test" -> R.string.assistant_usage_connection
+                "Text" -> R.string.assistant_usage_text
+                "Image import" -> R.string.assistant_usage_images
+                "Transcription" -> R.string.assistant_usage_transcription
+                "Speech" -> R.string.assistant_usage_speech
+                else -> R.string.assistant_usage_unknown
+            }
+        )
+        Text(
+            "$operation, ${entry.at.take(16).replace('T', ' ')} UTC\n${entry.model}\n$tokens",
+            style = MaterialTheme.typography.bodySmall
+        )
     }
 }
 

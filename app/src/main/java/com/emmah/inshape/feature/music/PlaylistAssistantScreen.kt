@@ -1,11 +1,6 @@
 package com.emmah.inshape.feature.music
 
-import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxWidth
-import com.emmah.inshape.ui.requireUi
-import com.emmah.inshape.ui.uiMessage
-import androidx.compose.ui.res.stringResource
-import com.emmah.inshape.R
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,8 +10,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.emmah.inshape.AppContainer
+import com.emmah.inshape.R
 import com.emmah.inshape.data.Workout
 import com.emmah.inshape.data.newId
 import com.emmah.inshape.feature.assistant.AssistantFailure
@@ -28,8 +26,11 @@ import com.emmah.inshape.ui.components.OutlineButton
 import com.emmah.inshape.ui.components.Page
 import com.emmah.inshape.ui.components.PrimaryButton
 import com.emmah.inshape.ui.components.TextField
+import com.emmah.inshape.ui.requireUi
 import com.emmah.inshape.ui.theme.formatDuration
+import com.emmah.inshape.ui.uiMessage
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -41,7 +42,8 @@ internal fun PlaylistAssistantScreen(
     previousWorkout: Workout?,
     playlistId: String?,
     onSettings: () -> Unit,
-    onSaved: (String) -> Unit
+    planningDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    onSave: (String) -> Unit
 ) {
     val store = app.music
     val catalog by store.catalog.collectAsStateWithLifecycle()
@@ -64,7 +66,7 @@ internal fun PlaylistAssistantScreen(
         val workout = previousWorkout
         val heard = if (request.excludePrevious && workout != null) store.heardInWorkout(workout.row.id) else null
         val tracks = catalog.songs
-        suggestion = withContext(Dispatchers.Default) { planPlaylist(app.context, tracks, request, heard) }
+        suggestion = withContext(planningDispatcher) { planPlaylist(app.context, tracks, request, heard) }
         requirements = request
         name = activePlaylist?.name ?: request.name ?: ""
         command = newId()
@@ -73,97 +75,149 @@ internal fun PlaylistAssistantScreen(
         previewWorkout = workout?.let { it.row.id to it.row.revision }
     }
 
+    fun buildPreview() {
+        message = null
+        working = scope.launch {
+            try {
+                val answer = app.assistant.interpret(PLAYLIST_INSTRUCTIONS, question.trim(), playlistSchema)
+                suggest(playlistRequest(answer.proposal))
+            } catch (failure: AssistantFailure) {
+                message = app.context.getString(failure.kind.message)
+                needsKey = failure.kind in setOf(AssistantFailureKind.NO_KEY, AssistantFailureKind.UNREADABLE_KEY)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                message = app.context.getString(R.string.playlist_request_failed)
+            } finally {
+                working = null
+            }
+        }
+    }
+
+    fun savePreview(reviewed: PlaylistPlan, request: PlaylistRequest) {
+        saving = true
+        message = null
+        scope.launch {
+            try {
+                if (request.excludePrevious) requireCurrentPlaylistWorkout(app, previewWorkout)
+                requireUi(playlistId == null || reviewedPlaylist?.id == playlistId, R.string.playlist_removed)
+                onSave(store.confirmPlaylist(command, tree, reviewedPlaylist, name, reviewed.tracks))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: IllegalArgumentException) {
+                message = failure.uiMessage(app.context, R.string.review_playlist_again)
+            } catch (_: Exception) {
+                message = app.context.getString(R.string.playlist_save_failed)
+            } finally {
+                saving = false
+            }
+        }
+    }
+
     val reviewed = suggestion
     val request = requirements
     Page(bottomBar = {
         if (reviewed == null || request == null) {
-            PrimaryButton(stringResource(R.string.build_playlist_preview), modifier = Modifier.fillMaxWidth(), enabled = working == null && question.isNotBlank() && catalog.songs.isNotEmpty(), onClick = {
-                message = null
-                working = scope.launch {
-                    try {
-                        suggest(playlistRequest(app.assistant.interpret(PLAYLIST_INSTRUCTIONS, question.trim(), playlistSchema).proposal))
-                    } catch (failure: AssistantFailure) {
-                        message = app.context.getString(failure.kind.message)
-                        needsKey = failure.kind in setOf(AssistantFailureKind.NO_KEY, AssistantFailureKind.UNREADABLE_KEY)
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (_: Exception) {
-                        message = app.context.getString(R.string.playlist_request_failed)
-                    } finally {
-                        working = null
-                    }
-                }
-            })
+            PrimaryButton(
+                stringResource(R.string.build_playlist_preview),
+                modifier = Modifier.fillMaxWidth(),
+                enabled = working == null && question.isNotBlank() && catalog.songs.isNotEmpty(),
+                onClick = ::buildPreview
+            )
         } else {
-            PrimaryButton(stringResource(R.string.save_playlist), modifier = Modifier.fillMaxWidth(), enabled = !saving && name.isNotBlank() && reviewed.tracks.isNotEmpty(), onClick = {
-                saving = true
-                message = null
-                scope.launch {
-                    try {
-                        if (request.excludePrevious) {
-                            val former = previewWorkout
-                            val latest = app.repository.snapshot().history.filter { it.qualifiesForAttendance }
-                                .maxWithOrNull(compareBy({ it.row.journalDate }, { it.row.createdAt }, { it.row.id }))
-                            requireUi(former != null && latest?.row?.id == former.first && latest.row.revision == former.second, R.string.playlist_history_changed)
-                        }
-                        requireUi(playlistId == null || reviewedPlaylist?.id == playlistId, R.string.playlist_removed)
-                        onSaved(store.confirmPlaylist(command, tree, reviewedPlaylist, name, reviewed.tracks))
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (failure: IllegalArgumentException) {
-                        message = failure.uiMessage(app.context, R.string.review_playlist_again)
-                    } catch (_: Exception) {
-                        message = app.context.getString(R.string.playlist_save_failed)
-                    } finally {
-                        saving = false
-                    }
-                }
-            })
+            PrimaryButton(
+                stringResource(R.string.save_playlist),
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !saving && name.isNotBlank() && reviewed.tracks.isNotEmpty(),
+                onClick = { savePreview(reviewed, request) }
+            )
         }
     }) {
         if (reviewed == null || request == null) {
-            TextField(question, stringResource(R.string.write_request), { question = it.take(4000) }, placeholder = stringResource(R.string.playlist_request_hint))
-            if (working != null) OutlineButton(stringResource(R.string.cancel_request), modifier = Modifier.fillMaxWidth(), onClick = { working?.cancel() })
+            TextField(question, stringResource(R.string.write_request), { question = it.take(4000) })
+            if (working != null) {
+                OutlineButton(stringResource(R.string.cancel_request), modifier = Modifier.fillMaxWidth(), onClick = {
+                    working?.cancel()
+                })
+            }
         } else {
             TextField(name, stringResource(R.string.playlist_name), { name = it.take(120) })
-            if (request.allowedArtists.isNotEmpty()) Text(stringResource(R.string.only_artists, request.allowedArtists.joinToString()))
-            if (request.excludedArtists.isNotEmpty()) Text(stringResource(R.string.excluded_artists, request.excludedArtists.joinToString()))
-            if (request.stages.isNotEmpty()) Text(stringResource(R.string.energy_order, request.stages.map { stringResource(it.energyLabel()) }.joinToString(" → ")))
-            val durations = reviewed.tracks.mapNotNull { it.durationMs }
-            val total = durations.sum()
-            Text(stringResource(R.string.known_duration, formatDuration(total / 1000)))
-            if (durations.size != reviewed.tracks.size) Text(stringResource(R.string.unknown_track_lengths, reviewed.tracks.size - durations.size))
-            request.minutes?.let {
-                val difference = total - it * 60_000L
-                if (difference != 0L) Text(stringResource(if (difference < 0) R.string.shorter_playlist else R.string.longer_playlist, formatDuration(kotlin.math.abs(difference) / 1000)))
-            }
+            PlaylistPreviewSummary(request, reviewed.tracks)
             reviewed.messages.forEach { Text(it) }
             if (request.excludePrevious && reviewed.tracks.isEmpty()) {
-                OutlineButton(stringResource(R.string.skip_previous_workout_filter), modifier = Modifier.fillMaxWidth(), onClick = { scope.launch { suggest(request.copy(excludePrevious = false)) } })
+                OutlineButton(stringResource(R.string.skip_previous_workout_filter), modifier = Modifier.fillMaxWidth(), onClick = {
+                    scope.launch { suggest(request.copy(excludePrevious = false)) }
+                })
             }
-            ListCard {
-                reviewed.tracks.forEachIndexed { index, track ->
-                    item {
-                        ListRow(track.title, subtitle = listOfNotNull(track.artist, track.durationMs?.let { formatDuration(it / 1000) }).joinToString(", "))
-                        ActionRow {
-                            if (index > 0) OutlineButton(stringResource(R.string.move_up), {
-                                val reorder = reviewed.tracks.toMutableList().apply { add(index - 1, removeAt(index)) }
-                                suggestion = reviewed.copy(tracks = reorder)
-                            })
-                            OutlineButton(stringResource(R.string.remove), { suggestion = reviewed.copy(tracks = reviewed.tracks.filterNot { it.id == track.id }) })
-                        }
-                    }
-                }
+            PlaylistPreviewTracks(reviewed.tracks) { tracks ->
+                suggestion = reviewed.copy(tracks = tracks)
             }
-            OutlineButton(stringResource(R.string.edit_request), modifier = Modifier.fillMaxWidth(), enabled = !saving, onClick = { suggestion = null })
+            OutlineButton(stringResource(R.string.edit_request), modifier = Modifier.fillMaxWidth(), enabled = !saving, onClick = {
+                suggestion = null
+            })
         }
         message?.let { Text(it) }
         if (needsKey) OutlineButton(stringResource(R.string.assistant_settings), onSettings, Modifier.fillMaxWidth())
     }
 }
 
+private suspend fun requireCurrentPlaylistWorkout(app: AppContainer, previewWorkout: Pair<String, Long>?) {
+    val latest = app.repository.snapshot().history.filter { it.qualifiesForAttendance }
+        .maxWithOrNull(compareBy({ it.row.journalDate }, { it.row.createdAt }, { it.row.id }))
+    requireUi(
+        previewWorkout != null && latest?.row?.id == previewWorkout.first && latest.row.revision == previewWorkout.second,
+        R.string.playlist_history_changed
+    )
+}
+
 @Composable
-internal fun TrackEnergyScreen(store: MusicStore, id: String, onSaved: () -> Unit) {
+private fun PlaylistPreviewSummary(request: PlaylistRequest, tracks: List<MusicTrack>) {
+    if (request.allowedArtists.isNotEmpty()) Text(stringResource(R.string.only_artists, request.allowedArtists.joinToString()))
+    if (request.excludedArtists.isNotEmpty()) Text(stringResource(R.string.excluded_artists, request.excludedArtists.joinToString()))
+    if (request.stages.isNotEmpty()) {
+        val stages = request.stages.map { stringResource(it.energyLabel()) }.joinToString(" → ")
+        Text(stringResource(R.string.energy_order, stages))
+    }
+    val durations = tracks.mapNotNull { it.durationMs }
+    val total = durations.sum()
+    Text(stringResource(R.string.known_duration, formatDuration(total / 1000)))
+    if (durations.size != tracks.size) {
+        Text(stringResource(R.string.unknown_track_lengths, tracks.size - durations.size))
+    }
+    request.minutes?.let { minutes ->
+        val difference = total - minutes * 60_000L
+        if (difference != 0L) {
+            val label = if (difference < 0) R.string.shorter_playlist else R.string.longer_playlist
+            Text(stringResource(label, formatDuration(kotlin.math.abs(difference) / 1000)))
+        }
+    }
+}
+
+@Composable
+private fun PlaylistPreviewTracks(tracks: List<MusicTrack>, onChange: (List<MusicTrack>) -> Unit) {
+    ListCard {
+        tracks.forEachIndexed { index, track ->
+            item {
+                val duration = track.durationMs?.let { formatDuration(it / 1000) }
+                ListRow(track.title, subtitle = listOfNotNull(track.artist, duration).joinToString(", "))
+                ActionRow {
+                    if (index > 0) {
+                        OutlineButton(stringResource(R.string.move_up), {
+                            onChange(buildList {
+                                addAll(tracks)
+                                add(index - 1, removeAt(index))
+                            })
+                        })
+                    }
+                    OutlineButton(stringResource(R.string.remove), { onChange(tracks.filterNot { it.id == track.id }) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun TrackEnergyScreen(store: MusicStore, id: String, onSave: () -> Unit) {
     val catalog by store.catalog.collectAsStateWithLifecycle()
     val track = catalog.songs.find { it.id == id }
     val scope = rememberCoroutineScope()
@@ -172,12 +226,15 @@ internal fun TrackEnergyScreen(store: MusicStore, id: String, onSaved: () -> Uni
         Text(stringResource(R.string.current_energy, stringResource(track?.energy.energyLabel())))
         if (track?.available == true) {
             (playlistEnergyLabels.toList() + null).forEach { label ->
-                OutlineButton(stringResource(label.energyLabel())?.replaceFirstChar(Char::uppercase) ?: stringResource(R.string.clear_label), onClick = {
-                    scope.launch {
-                        store.setEnergy(id, label)
-                        onSaved()
+                OutlineButton(
+                    stringResource(label.energyLabel()).replaceFirstChar(Char::uppercase),
+                    onClick = {
+                        scope.launch {
+                            store.setEnergy(id, label)
+                            onSave()
+                        }
                     }
-                })
+                )
             }
         }
     }

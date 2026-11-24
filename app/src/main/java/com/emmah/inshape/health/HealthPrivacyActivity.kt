@@ -1,6 +1,5 @@
 package com.emmah.inshape.health
 
-import com.emmah.inshape.ui.theme.withFinnishLocale
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -20,6 +19,7 @@ import com.emmah.inshape.ui.components.PushedHeader
 import com.emmah.inshape.ui.components.SectionHeader
 import com.emmah.inshape.ui.theme.ActivityTheme
 import com.emmah.inshape.ui.theme.InShapeTheme
+import com.emmah.inshape.ui.theme.withFinnishLocale
 
 class HealthPrivacyActivity : ComponentActivity() {
     override fun attachBaseContext(newBase: Context) {

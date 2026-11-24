@@ -1,6 +1,5 @@
 package com.emmah.inshape.feature.music
 
-import com.emmah.inshape.R
 import android.content.ComponentName
 import android.content.Context
 import android.os.Bundle
@@ -16,6 +15,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionToken
 import com.emmah.inshape.AppContainer
+import com.emmah.inshape.R
 import com.google.common.util.concurrent.ListenableFuture
 import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,7 +49,15 @@ data class PlaybackState(
     val error: String? = null
 )
 
-interface MusicPlayback {
+fun interface AssistantAudioDucking {
+    fun assistantGain(owner: String, reduction: Float?)
+}
+
+interface MusicPlayback : AssistantAudioDucking {
+    override fun assistantGain(owner: String, reduction: Float?) {
+        // Playback without a media session has no audio output to duck.
+    }
+
     val state: StateFlow<PlaybackState>
     fun start(tracks: List<MusicTrack>, startId: String? = null, shuffle: Boolean = false)
     fun playAfterCurrent(track: MusicTrack)
@@ -61,7 +69,6 @@ interface MusicPlayback {
     fun toggleShuffle()
     fun cycleRepeat()
     fun stop()
-    fun assistantGain(owner: String, reduction: Float?) {}
 }
 
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -392,10 +399,13 @@ internal class SessionPlayback(private val context: Context) : MusicPlayback {
     override fun stop() = send(endPlayback)
 
     override fun assistantGain(owner: String, reduction: Float?) {
-        send(assistantGainChange, Bundle().apply {
-            putString("owner", owner)
-            if (reduction != null) putFloat("gain", reduction)
-        })
+        send(
+            assistantGainChange,
+            Bundle().apply {
+                putString("owner", owner)
+                if (reduction != null) putFloat("gain", reduction)
+            }
+        )
     }
 }
 

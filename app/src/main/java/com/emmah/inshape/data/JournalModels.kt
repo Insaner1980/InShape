@@ -1,7 +1,7 @@
 package com.emmah.inshape.data
 
-import java.time.LocalDate
 import com.emmah.inshape.feature.program.ProgramVisit
+import java.time.LocalDate
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -21,7 +21,8 @@ data class JournalSnapshot(
     val outbox: List<HealthOutbox> = emptyList(),
     val programEnrollment: ProgramEnrollment? = null,
     val programLinks: List<ProgramExerciseLink> = emptyList(),
-    val assistantMemories: List<AssistantMemory> = emptyList()
+    val assistantMemories: List<AssistantMemory> = emptyList(),
+    val programDayOverrides: List<ProgramDayOverride> = emptyList()
 ) {
     private fun hydrate(rows: List<WorkoutEntity>): List<Workout> {
         if (rows.isEmpty()) return emptyList()
@@ -68,6 +69,7 @@ data class Workout(val row: WorkoutEntity, val items: List<WorkoutItem>, val che
     internal fun currentItem(pending: List<WorkoutItem> = pendingItems): WorkoutItem? =
         pending.find { it.row.id == row.currentItemId } ?: pending.firstOrNull()
 }
+
 // An incomplete item in an open workout was deferred and can still be performed.
 internal val SessionItem.isPending: Boolean
     get() = disposition in setOf("PLANNED", "IN_PROGRESS", "INCOMPLETE")

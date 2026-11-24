@@ -1,15 +1,15 @@
 package com.emmah.inshape.health
 
-import com.emmah.inshape.R
-import com.emmah.inshape.ui.requireUi
-import com.emmah.inshape.ui.uiMessage
 import android.content.Context
 import androidx.room.withTransaction
+import com.emmah.inshape.R
 import com.emmah.inshape.data.HealthOutbox
 import com.emmah.inshape.data.HealthShareState
 import com.emmah.inshape.data.JournalRepository
 import com.emmah.inshape.data.Workout
 import com.emmah.inshape.data.WorkoutEntity
+import com.emmah.inshape.ui.requireUi
+import com.emmah.inshape.ui.uiMessage
 import java.time.Instant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.withLock

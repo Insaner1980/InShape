@@ -46,6 +46,7 @@ private val catalog = buildMap {
         Strength,
         "Chest press",
         "Rintapunnerruslaite",
+        "Rintapunnerrus laitteessa",
         "Seated chest press",
         "Rintaprässi"
     )
@@ -90,6 +91,7 @@ private val catalog = buildMap {
         "Shoulder press machine",
         "Seated machine shoulder press",
         "Olkapääprässi",
+        "Pystypunnerruslaite",
         "Pystypunnerrus laitteessa"
     )
     add(
@@ -234,7 +236,8 @@ private val catalog = buildMap {
         Strength,
         "Abdominal crunch machine",
         "Ab crunch machine",
-        "Vatsarutistuslaite"
+        "Vatsarutistuslaite",
+        "Vatsarutistus laitteessa"
     )
     add(
         R.drawable.art_exercises_back_extension,
@@ -346,7 +349,8 @@ private val catalog = buildMap {
         "Home band pulldown",
         "Resistance band pulldown",
         "Vastuskuminauhatalja",
-        "Ylätalja kuminauhalla"
+        "Ylätalja kuminauhalla",
+        "Alasveto kuminauhalla"
     )
     add(
         R.drawable.art_exercises_shoulder_mobility,

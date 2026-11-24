@@ -1,8 +1,5 @@
 package com.emmah.inshape.transfer
 
-import com.emmah.inshape.R
-import com.emmah.inshape.ui
-import com.emmah.inshape.testContext
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
@@ -12,6 +9,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
 import com.emmah.inshape.AppContainer
+import com.emmah.inshape.R
 import com.emmah.inshape.data.BodyObservation
 import com.emmah.inshape.data.CheckIn
 import com.emmah.inshape.data.Exercise
@@ -21,6 +19,8 @@ import com.emmah.inshape.data.SessionSet
 import com.emmah.inshape.data.WorkoutEntity
 import com.emmah.inshape.data.WorkoutTiming
 import com.emmah.inshape.data.newId
+import com.emmah.inshape.testContext
+import com.emmah.inshape.ui
 import java.io.File
 import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
@@ -113,9 +113,24 @@ class ExportFlowTest {
             }
             verify(
                 ExportSelection(ids, includeNotes = true, includeCheckIns = true),
-                privateNotes + checkInDetails + listOf("42 min", ui(R.string.weight_value, "22,5"), ui(R.string.note_only_workout), ui(R.string.export_no_reps),
-                    ui(R.string.export_workout_count, 2), ui(R.string.export_page, 1), ui(R.string.export_workout_note), "($otherZone)"),
-                listOf("Unselected session", ui(R.string.duration_not_recorded), "(${workout.zoneId})", "Muistiinpanot mukana", "Vointi mukana")
+                privateNotes + checkInDetails +
+                    listOf(
+                        "42 min",
+                        ui(R.string.weight_value, "22,5"),
+                        ui(R.string.note_only_workout),
+                        ui(R.string.export_no_reps),
+                        ui(R.string.export_workout_count, 2),
+                        ui(R.string.export_page, 1),
+                        ui(R.string.export_workout_note),
+                        "($otherZone)"
+                    ),
+                listOf(
+                    "Unselected session",
+                    ui(R.string.duration_not_recorded),
+                    "(${workout.zoneId})",
+                    "Muistiinpanot mukana",
+                    "Vointi mukana"
+                )
             )
             verify(ExportSelection(ids, includeCheckIns = true), checkInDetails, privateNotes)
             verify(ExportSelection(ids), listOf("Strength training", "Recovery day"), privateNotes + checkInDetails)
@@ -129,7 +144,9 @@ class ExportFlowTest {
         val name = "export-test-${newId()}.db"
         val container = AppContainer(context, databaseName = name)
         val captureLabel = androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("captureLabel")
-        val directory = if (captureLabel == null) "verification" else {
+        val directory = if (captureLabel == null) {
+            "verification"
+        } else {
             require(captureLabel.matches(Regex("[a-zA-Z0-9-]+")))
             "verification/reference/$captureLabel"
         }

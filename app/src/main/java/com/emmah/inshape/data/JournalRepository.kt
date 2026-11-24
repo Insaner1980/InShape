@@ -1,11 +1,15 @@
 package com.emmah.inshape.data
 
-import com.emmah.inshape.ui.UiException
-import com.emmah.inshape.ui.requireUi
-import com.emmah.inshape.R
 import android.content.Context
 import androidx.room.withTransaction
+import com.emmah.inshape.R
+import com.emmah.inshape.feature.program.ProgramCatalog
+import com.emmah.inshape.feature.program.ProgramDay
+import com.emmah.inshape.feature.program.ProgramVisit
+import com.emmah.inshape.feature.program.localExerciseId
 import com.emmah.inshape.health.HealthSharing
+import com.emmah.inshape.ui.UiException
+import com.emmah.inshape.ui.requireUi
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -46,7 +50,7 @@ class JournalRepository(val db: JournalDatabase, val clock: Clock, private val c
             dao.checkIns(),
             dao.observations(),
             dao.preferences() ?: Preferences(), dao.drafts(), dao.healthStates(), dao.outbox(),
-            dao.programEnrollment(), dao.programLinks(), dao.assistantMemories()
+            dao.programEnrollment(), dao.programLinks(), dao.assistantMemories(), dao.programDayOverrides()
         )
     }
     val changes: Flow<JournalSnapshot> = db.invalidationTracker.createFlow(
@@ -65,6 +69,7 @@ class JournalRepository(val db: JournalDatabase, val clock: Clock, private val c
         "HealthOutbox",
         "ProgramEnrollment",
         "ProgramExerciseLink",
+        "ProgramDayOverride",
         "AssistantMemory"
     ).map {
         snapshot()
@@ -89,8 +94,11 @@ class JournalRepository(val db: JournalDatabase, val clock: Clock, private val c
     suspend fun saveExercise(exercise: Exercise, draftId: String = "exercise:${exercise.id}", preserveFavorite: Boolean = false): String =
         db.withTransaction {
             requireUi(exercise.name.isNotBlank(), R.string.exercise_name_required)
-            requireUi(exercise.alternatives.distinct().size == exercise.alternatives.size &&
-                    exercise.id !in exercise.alternatives, R.string.distinct_alternatives)
+            requireUi(
+                exercise.alternatives.distinct().size == exercise.alternatives.size &&
+                    exercise.id !in exercise.alternatives,
+                R.string.distinct_alternatives
+            )
             val exercises = dao.exercises()
             val ids = exercises.map { it.id }.toSet()
             requireUi(exercise.alternatives.all { it in ids }, R.string.alternative_missing)
@@ -153,14 +161,60 @@ class JournalRepository(val db: JournalDatabase, val clock: Clock, private val c
     }
     suspend fun removeRoutine(id: String) = dao.deleteRoutine(id)
 
+    suspend fun saveProgramDays(
+        catalog: ProgramCatalog,
+        programId: String,
+        edited: List<ProgramDay>,
+        expected: List<ProgramDayOverride>,
+        created: List<Exercise>
+    ) = db.withTransaction {
+        val base = requireNotNull(catalog.program(programId))
+        val current = dao.programDayOverrides()
+        val exercises = dao.exercises().associateBy { it.id }
+        val used = edited.flatMap { day -> day.exercises.mapNotNull { it.localExerciseId } }.toSet()
+        val added = created.filter { it.id in used }
+        require(added.distinctBy { it.id }.size == added.size && edited.distinctBy { it.id }.size == edited.size)
+        added.forEach { exercise ->
+            require(exercise.id !in exercises && !exercise.archived && exercise.name.isNotBlank())
+            saveExercise(exercise)
+        }
+        edited.forEach { day ->
+            val original = base.sessions.single { it.id == day.id }
+            val prior = expected.singleOrNull {
+                it.catalogVersion == catalog.schemaVersion && it.programId == programId && it.dayId == day.id
+            }
+            verifyProgramDay(current, catalog.schemaVersion, programId, day.id, prior)
+            val record = ProgramDayOverride(catalog.schemaVersion, programId, day.id, day)
+            record.validate(exercises.keys + added.map { it.id })
+            val previousLocalIds = prior?.day?.exercises.orEmpty().mapNotNull { it.localExerciseId }
+            val newlySelected = day.exercises.mapNotNull { it.localExerciseId } - previousLocalIds.toSet()
+            requireUi(newlySelected.none { exercises[it]?.archived == true }, R.string.exercise_changed_choices)
+            if (day == original) dao.deleteProgramDayOverride(catalog.schemaVersion, programId, day.id) else dao.put(record)
+        }
+    }
+
+    private fun verifyProgramDay(
+        overrides: List<ProgramDayOverride>,
+        version: Int,
+        programId: String,
+        dayId: String,
+        expected: ProgramDayOverride?
+    ) {
+        val stored = overrides.singleOrNull { it.catalogVersion == version && it.programId == programId && it.dayId == dayId }
+        requireUi(stored == expected, R.string.program_day_changed)
+    }
+
     suspend fun enrollProgram(
         catalogVersion: Int,
         program: com.emmah.inshape.feature.program.TrainingProgram,
         choices: Map<String, String?>,
-        expectedEnrollment: ProgramEnrollment? = null
+        expectedEnrollment: ProgramEnrollment? = null,
+        expectedOverride: ProgramDayOverride? = null
     ) = db.withTransaction {
         requireUi(dao.programEnrollment() == expectedEnrollment, R.string.program_changed_equipment)
         val day = program.sessions.first { it.id == program.sequence.first() }
+        verifyProgramDay(dao.programDayOverrides(), catalogVersion, program.id, day.id, expectedOverride)
+        requireUi(expectedOverride == null || expectedOverride.day == day, R.string.program_day_changed)
         resolveProgramChoices(day.exercises, choices)
         dao.put(ProgramEnrollment(programId = program.id, catalogVersion = catalogVersion, baselineDate = LocalDate.now(clock).toString()))
     }
@@ -179,12 +233,13 @@ class JournalRepository(val db: JournalDatabase, val clock: Clock, private val c
         val existing = dao.exercises().associateBy { it.id }
         return slots.associate { slot ->
             val selected = choices.getValue(slot.exerciseId)
+            requireUi(slot.localExerciseId == null || selected == slot.localExerciseId, R.string.exercise_changed_choices)
             val exercise = if (selected == null) {
                 com.emmah.inshape.feature.program.newProgramExercise(slot).also { dao.put(it) }
             } else {
                 existing[selected]?.takeUnless { it.archived } ?: throw UiException(R.string.exercise_changed_choices)
             }
-            dao.put(ProgramExerciseLink(slot.exerciseId, exercise.id))
+            if (slot.localExerciseId == null) dao.put(ProgramExerciseLink(slot.exerciseId, exercise.id))
             slot.exerciseId to exercise.id
         }
     }
@@ -212,81 +267,107 @@ class JournalRepository(val db: JournalDatabase, val clock: Clock, private val c
         requireUi(repeated == null || repeated.row.state == "COMPLETED", R.string.repeat_saved_only)
         val visit = (source as? StartSource.Program)?.visit
         val program = visit?.let {
-            requireUi(data.programEnrollment == it.enrollment && it.day.id == it.sequence.getOrNull(it.enrollment.nextDayIndex), R.string.program_day_changed)
+            verifyProgramDay(
+                data.programDayOverrides,
+                it.enrollment.catalogVersion,
+                it.enrollment.programId,
+                it.day.id,
+                it.expectedOverride
+            )
+            requireUi(it.expectedOverride == null || it.expectedOverride.day == it.day, R.string.program_day_changed)
+            requireUi(
+                data.programEnrollment == it.enrollment && it.day.id == it.sequence.getOrNull(it.enrollment.nextDayIndex),
+                R.string.program_day_changed
+            )
             ProgramWorkoutSource(
-                it.enrollment.id, it.enrollment.programId, it.enrollment.catalogVersion,
-                it.day.id, it.enrollment.nextDayIndex, it.sequence.size, it.mode.name
+                it.enrollment.id,
+                it.enrollment.programId,
+                it.enrollment.catalogVersion,
+                it.day.id,
+                it.enrollment.nextDayIndex,
+                it.sequence.size,
+                it.mode.name
             )
         }
         val time = ZonedDateTime.now(clock)
         val timestamp = time.toInstant().toString()
-        val row =
-            WorkoutEntity(
-                title = visit?.day?.name ?: routine?.title ?: repeated?.row?.title ?: context.getString(R.string.workout), sourceRoutineId = routine?.id,
-                sourceWorkoutId = repeated?.row?.id, journalDate = time.toLocalDate().toString(), start = timestamp, zoneId = time.zone.id,
-                startOffset = time.offset.id, createdAt = timestamp, modifiedAt = timestamp, program = program
-            )
+        val row = WorkoutEntity(
+            title = visit?.day?.name ?: routine?.title ?: repeated?.row?.title ?: context.getString(R.string.workout),
+            sourceRoutineId = routine?.id,
+            sourceWorkoutId = repeated?.row?.id,
+            journalDate = time.toLocalDate().toString(),
+            start = timestamp,
+            zoneId = time.zone.id,
+            startOffset = time.offset.id,
+            createdAt = timestamp,
+            modifiedAt = timestamp,
+            program = program
+        )
         dao.insertWorkout(row)
-        if (routine !=
-            null
-        ) {
-            data.routineItems.filter {
-                it.routineId == routine.id
-            }.sortedBy { it.position }.forEach { plan ->
-                val itemId = addExercise(row.id, plan.exerciseId, allowArchived = true)
-                val item = dao.items().first { it.id == itemId }
+        if (routine != null) addRoutineItems(row.id, data.routineItems.filter { it.routineId == routine.id })
+        if (visit != null) addProgramItems(row.id, visit)
+        copyWorkoutItems(repeated, row)
+        val latest = dao.workouts().first { it.id == row.id }
+        dao.put(latest.copy(currentItemId = dao.items().firstOrNull { it.workoutId == row.id }?.id))
+        row.id
+    }
+
+    private suspend fun addRoutineItems(workoutId: String, plans: List<RoutineItem>) {
+        plans.sortedBy { it.position }.forEach { plan ->
+            val itemId = addExercise(workoutId, plan.exerciseId, allowArchived = true)
+            val item = dao.items().first { it.id == itemId }
+            dao.put(
+                item.copy(
+                    note = plan.note,
+                    targetDurationSeconds = plan.durationSeconds,
+                    mode = plan.mode,
+                    plan = plan.plan
+                )
+            )
+            plan.sets.forEachIndexed { index, target ->
                 dao.put(
-                    item.copy(
-                        note = plan.note,
-                        targetDurationSeconds = plan.durationSeconds,
-                        mode = plan.mode,
-                        plan = plan.plan
+                    SessionSet(
+                        itemId = itemId,
+                        position = index,
+                        suggestedLoad = target.load,
+                        suggestedReps = target.reps,
+                        plannedReps = target.plannedReps,
+                        rawLoad = target.load ?: "",
+                        rawReps = target.reps?.toString() ?: ""
                     )
                 )
-                plan.sets.forEachIndexed { i, target ->
-                    dao.put(
-                        SessionSet(
-                            itemId = itemId,
-                            position = i,
-                            suggestedLoad = target.load,
-                            suggestedReps = target.reps,
-                            plannedReps = target.plannedReps,
-                            rawLoad =
-                                target.load ?: "",
-                            rawReps = target.reps?.toString() ?: ""
-                        )
-                    )
-                }
             }
         }
-        if (visit != null) {
-            val slots = visit.slots
-            val links = resolveProgramChoices(slots, visit.choices)
-            slots.forEach { slot ->
-                val itemId = addExercise(row.id, links.getValue(slot.exerciseId), allowArchived = false)
-                dao.put(item(itemId).copy(
+    }
+
+    private suspend fun addProgramItems(workoutId: String, visit: ProgramVisit) {
+        val slots = visit.slots
+        val links = resolveProgramChoices(slots, visit.choices)
+        slots.forEach { slot ->
+            val itemId = addExercise(workoutId, links.getValue(slot.exerciseId), allowArchived = false)
+            dao.put(
+                item(itemId).copy(
                     note = slot.instruction,
                     plan = ExercisePlan(
                         restSeconds = slot.restSeconds,
                         catalogExerciseId = slot.exerciseId,
                         originalCatalogExerciseId = slot.exerciseId,
                         slotKey = "${visit.day.id}:${slot.exerciseId}",
-                        optional = slot.optional
+                        optional = slot.optional,
+                        sourceSlot = slot
                     )
-                ))
-                repeat(visit.setCount(slot.sets)) { index ->
-                    dao.put(SessionSet(
+                )
+            )
+            repeat(visit.setCount(slot.sets)) { index ->
+                dao.put(
+                    SessionSet(
                         itemId = itemId,
                         position = index,
                         plannedReps = PlannedReps(slot.target.min, slot.target.max, slot.target.perSide)
-                    ))
-                }
+                    )
+                )
             }
         }
-        copyWorkoutItems(repeated, row)
-        val latest = dao.workouts().first { it.id == row.id }
-        dao.put(latest.copy(currentItemId = dao.items().firstOrNull { it.workoutId == row.id }?.id))
-        row.id
     }
 
     private suspend fun copyWorkoutItems(repeated: Workout?, row: WorkoutEntity) {
@@ -304,7 +385,13 @@ class JournalRepository(val db: JournalDatabase, val clock: Clock, private val c
             dao.put(item)
             old.sets.forEachIndexed { index, set ->
                 val load = if (set.completedAt != null) set.load else set.suggestedLoad
-                val reps = if (set.plannedReps != null) null else if (set.completedAt != null) set.reps else set.suggestedReps
+                val reps = if (set.plannedReps != null) {
+                    null
+                } else if (set.completedAt != null) {
+                    set.reps
+                } else {
+                    set.suggestedReps
+                }
                 dao.put(
                     SessionSet(
                         itemId = item.id,
@@ -422,10 +509,12 @@ class JournalRepository(val db: JournalDatabase, val clock: Clock, private val c
         requireUi(original.exerciseId != exerciseId, R.string.choose_different_exercise)
         val next = addExercise(original.workoutId, exerciseId)
         dao.put(original.copy(disposition = "SKIPPED"))
-        dao.put(item(next).copy(
-            alternativeOf = itemId,
-            plan = original.plan?.copy(catalogExerciseId = null)
-        ))
+        dao.put(
+            item(next).copy(
+                alternativeOf = itemId,
+                plan = original.plan?.copy(catalogExerciseId = null)
+            )
+        )
         dao.sets().filter { it.itemId == itemId && it.completedAt == null }.forEachIndexed { index, target ->
             dao.put(SessionSet(itemId = next, position = index, suggestedReps = target.suggestedReps, plannedReps = target.plannedReps))
         }
@@ -447,7 +536,10 @@ class JournalRepository(val db: JournalDatabase, val clock: Clock, private val c
         exerciseId: String?
     ): String = db.withTransaction {
         val original = item(itemId)
-        requireUi(original.plan?.originalCatalogExerciseId == planned.exerciseId && selection in planned.alternatives, R.string.program_exercise_changed)
+        requireUi(
+            original.plan?.originalCatalogExerciseId == planned.exerciseId && selection in planned.alternatives,
+            R.string.program_exercise_changed
+        )
         val chosen = if (exerciseId == null) {
             com.emmah.inshape.feature.program.newAlternativeExercise(selection).also { dao.put(it) }
         } else {
@@ -578,14 +670,17 @@ class JournalRepository(val db: JournalDatabase, val clock: Clock, private val c
             val disposition = if (it.row.disposition == "INCOMPLETE") "SKIPPED" else "INCOMPLETE"
             dao.put(it.row.copy(disposition = disposition))
         }
+        advanceProgram(workout)
+        changed(id)
+    }
+
+    private suspend fun advanceProgram(workout: Workout) {
         val source = workout.row.program
         val enrollment = dao.programEnrollment()
-        if (source != null && enrollment != null && enrollment.id == source.enrollmentId &&
-            enrollment.nextDayIndex == source.dayIndex && workout.hasPerformedWork
-        ) {
+        if (source == null || enrollment == null) return
+        if (enrollment.id == source.enrollmentId && enrollment.nextDayIndex == source.dayIndex && workout.hasPerformedWork) {
             dao.put(enrollment.copy(nextDayIndex = (source.dayIndex + 1) % source.rotationSize))
         }
-        changed(id)
     }
 
     private fun WorkoutEntity.endOnFinish(timing: WorkoutTiming): String? = when {

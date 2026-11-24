@@ -1,6 +1,7 @@
 package com.emmah.inshape.feature.program
 
 import com.emmah.inshape.data.Exercise
+import com.emmah.inshape.data.ProgramDayOverride
 import com.emmah.inshape.data.ProgramEnrollment
 
 enum class ProgramVisitMode { STANDARD, SHORT, LIGHT }
@@ -14,7 +15,8 @@ data class ProgramVisit(
     val mode: ProgramVisitMode,
     val shortSets: Int = 1,
     val choices: Map<String, String?>,
-    val sequence: List<String>
+    val sequence: List<String>,
+    val expectedOverride: ProgramDayOverride? = null
 ) {
     val slots: List<ProgramSlot>
         get() = day.slotsFor(mode)
@@ -42,9 +44,12 @@ internal fun newAlternativeExercise(alternative: ProgramAlternative): Exercise {
     val bodyweight = alternative.exerciseId in setOf("dead_bug", "supported_bench_squat", "wall_push_up", "floor_glute_bridge")
     val category = when {
         bodyweight -> "Bodyweight"
+
         alternative.exerciseId.startsWith("dumbbell_") || alternative.exerciseId.contains("_dumbbell_") ||
             alternative.exerciseId == "bench_goblet_squat" -> "Free weights"
+
         alternative.exerciseId == "low_cable_row" -> "Cable"
+
         else -> "Machine"
     }
     return Exercise(name = alternative.name, category = category, basis = if (bodyweight) "bodyweight" else "kg")

@@ -1,8 +1,5 @@
 package com.emmah.inshape.feature.assistant
 
-import com.emmah.inshape.ui.requireUi
-import androidx.compose.ui.res.stringResource
-import com.emmah.inshape.R
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -10,18 +7,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
 import androidx.room.withTransaction
 import com.emmah.inshape.JournalViewModel
+import com.emmah.inshape.R
 import com.emmah.inshape.data.AssistantMemory
 import com.emmah.inshape.data.JournalRepository
 import com.emmah.inshape.ui.components.ActionRow
 import com.emmah.inshape.ui.components.OutlineButton
 import com.emmah.inshape.ui.components.TextField
+import com.emmah.inshape.ui.requireUi
 
 @Composable
 internal fun AssistantMemories(memories: List<AssistantMemory>, vm: JournalViewModel, acknowledge: Boolean = false) {
     if (memories.isEmpty()) return
-    Text(if (acknowledge) stringResource(R.string.next_use_reminders) else stringResource(R.string.assistant_memories), style = MaterialTheme.typography.titleMedium)
+    Text(
+        if (acknowledge) stringResource(R.string.next_use_reminders) else stringResource(R.string.assistant_memories),
+        style = MaterialTheme.typography.titleMedium
+    )
     memories.forEach { memory ->
         var edited by rememberSaveable(memory.id, memory.revision) { mutableStateOf<String?>(null) }
         val current = edited

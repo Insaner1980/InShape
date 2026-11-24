@@ -5,20 +5,10 @@ import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 
 @Entity
-data class AssistantDraft(
-    @PrimaryKey val key: String,
-    val id: String,
-    val input: String,
-    val review: String? = null
-)
+data class AssistantDraft(@PrimaryKey val key: String, val id: String, val input: String, val review: String? = null)
 
 @Entity
-data class AssistantReceipt(
-    @PrimaryKey val id: String,
-    val digest: String,
-    val targetId: String,
-    val resultIds: String
-)
+data class AssistantReceipt(@PrimaryKey val id: String, val digest: String, val targetId: String, val resultIds: String)
 
 @Serializable
 @Entity

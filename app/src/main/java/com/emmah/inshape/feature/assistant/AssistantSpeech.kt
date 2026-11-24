@@ -1,8 +1,5 @@
 package com.emmah.inshape.feature.assistant
 
-import com.emmah.inshape.feature.library.exerciseDisplayName
-import androidx.compose.ui.res.stringResource
-import com.emmah.inshape.R
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -14,6 +11,7 @@ import android.media.AudioTrack
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
@@ -27,12 +25,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import com.emmah.inshape.R
 import com.emmah.inshape.data.WorkoutItem
 import com.emmah.inshape.data.newId
+import com.emmah.inshape.feature.library.exerciseDisplayName
 import com.emmah.inshape.feature.music.MusicPlayback
 import com.emmah.inshape.ui.components.ListRow
 import com.emmah.inshape.ui.components.OutlineButton
@@ -45,7 +47,9 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 
 private enum class SpeechMode(val label: Int) {
-    SILENT(R.string.off), REQUEST(R.string.assistant_voice_request), INTRO(R.string.assistant_voice_intro)
+    SILENT(R.string.off),
+    REQUEST(R.string.assistant_voice_request),
+    INTRO(R.string.assistant_voice_intro)
 }
 
 private fun Context.speechSettings() = getSharedPreferences("assistant_voice", Context.MODE_PRIVATE)
@@ -73,13 +77,9 @@ internal fun AssistantVoiceSettings() {
 }
 
 @Composable
-internal fun WorkoutSpeech(
-    workoutId: String,
-    item: WorkoutItem,
-    gateway: AssistantGateway,
-    music: MusicPlayback?
-) {
+internal fun ColumnScope.WorkoutSpeech(workoutId: String, item: WorkoutItem, gateway: AssistantGateway, music: MusicPlayback?) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val mode = remember(context) { context.speechMode() }
     val scope = rememberCoroutineScope()
     var running by remember(item.row.id) { mutableStateOf<Job?>(null) }
@@ -89,9 +89,9 @@ internal fun WorkoutSpeech(
     val introduction = stringResource(R.string.spoken_next, item.row.name.exerciseDisplayName(context))
     val exact = buildList {
         add(introduction)
-        item.row.setup.takeIf(String::isNotBlank)?.let { add(context.getString(R.string.spoken_setup, it)) }
+        item.row.setup.takeIf(String::isNotBlank)?.let { add(resources.getString(R.string.spoken_setup, it)) }
         item.sets.firstOrNull()?.plannedReps?.let {
-            add(context.getString(R.string.spoken_target, it.localizedDisplay(context)))
+            add(resources.getString(R.string.spoken_target, it.localizedDisplay(context)))
         }
         item.completedSets.lastOrNull()?.let { set ->
             val loadFormat = when (item.row.basis) {
@@ -101,14 +101,17 @@ internal fun WorkoutSpeech(
                 else -> null
             }
             if (set.load != null && loadFormat != null) {
-                add(context.getString(loadFormat, set.load.replace('.', ',')))
+                add(resources.getString(loadFormat, set.load.replace('.', ',')))
             }
             set.reps?.let {
-                val reps = context.getString(if (set.perSide == true) R.string.rep_target_per_side else R.string.rep_value, it)
-                add(context.getString(R.string.spoken_reps, reps))
+                val reps = resources.getString(if (set.perSide == true) R.string.rep_target_per_side else R.string.rep_value, it.toString())
+                add(resources.getString(R.string.spoken_reps, reps))
             }
         }
-        item.row.durationSeconds?.let { add(context.getString(R.string.spoken_time, it)) }
+        item.row.durationSeconds?.let { seconds ->
+            val quantity = seconds.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
+            add(resources.getQuantityString(R.plurals.spoken_time, quantity, seconds))
+        }
     }.joinToString(" ").take(400)
 
     fun play(text: String, cloud: Boolean) {
@@ -124,14 +127,14 @@ internal fun WorkoutSpeech(
                     playPcm(pcm)
                 } else {
                     val spoken = readFinnish(context, text) { music?.assistantGain(owner, 0.25f) }
-                    if (!spoken) error = context.getString(R.string.offline_voice_missing)
+                    if (!spoken) error = resources.getString(R.string.offline_voice_missing)
                 }
             } catch (failure: AssistantFailure) {
-                error = context.getString(failure.kind.message)
+                error = resources.getString(failure.kind.message)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                error = context.getString(R.string.speech_failed)
+                error = resources.getString(R.string.speech_failed)
             } finally {
                 music?.assistantGain(owner, null)
             }
@@ -156,7 +159,10 @@ internal fun WorkoutSpeech(
             }
         }
         ContextCompat.registerReceiver(
-            context, receiver, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY), ContextCompat.RECEIVER_NOT_EXPORTED
+            context,
+            receiver,
+            IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY),
+            ContextCompat.RECEIVER_NOT_EXPORTED
         )
         onDispose {
             running?.cancel()
@@ -164,8 +170,9 @@ internal fun WorkoutSpeech(
         }
     }
     if (mode != SpeechMode.SILENT) {
-        if (running != null) OutlineButton(stringResource(R.string.stop_speech), { running?.cancel() })
-        else {
+        if (running != null) {
+            OutlineButton(stringResource(R.string.stop_speech), { running?.cancel() })
+        } else {
             OutlineButton(stringResource(R.string.read_aloud), { play(exact, cloud = false) })
             OutlineButton(stringResource(R.string.openai_narration), { cloudReview = !cloudReview })
         }
@@ -187,43 +194,53 @@ private suspend fun readFinnish(context: Context, text: String, onPlayback: () -
                 }
             }
         } == true
-        val tts = engine ?: return false
-        if (!ready) return false
-        val finnish = tts.voices.orEmpty().firstOrNull { it.locale.language == "fi" && !it.isNetworkConnectionRequired }
-            ?: return false
-        if (tts.setVoice(finnish) != TextToSpeech.SUCCESS) return false
-        tts.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
-        return withTimeoutOrNull(30_000) {
-            suspendCancellableCoroutine { caller ->
-                val id = newId()
-                tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                    override fun onStart(utteranceId: String?) = Unit
-                    override fun onDone(utteranceId: String?) {
-                        if (utteranceId == id && caller.isActive) caller.resume(true)
-                    }
-                    @Deprecated("Platform callback")
-                    override fun onError(utteranceId: String?) {
-                        if (utteranceId == id && caller.isActive) caller.resume(false)
-                    }
-                })
-                onPlayback()
-                if (tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, id) == TextToSpeech.ERROR && caller.isActive) caller.resume(false)
-            }
-        } == true
+        val tts = engine?.takeIf { ready && it.selectOfflineFinnishVoice() } ?: return false
+        tts.setAudioAttributes(
+            AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()
+        )
+        return withTimeoutOrNull(30_000) { tts.awaitUtterance(text, onPlayback) } == true
     } finally {
         engine?.stop()
         engine?.shutdown()
     }
 }
 
+private suspend fun TextToSpeech.awaitUtterance(text: String, onPlayback: () -> Unit): Boolean =
+    suspendCancellableCoroutine { caller ->
+        val id = newId()
+        setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) = Unit
+
+            override fun onDone(utteranceId: String?) {
+                if (utteranceId == id && caller.isActive) caller.resume(true)
+            }
+
+            @Deprecated("Platform callback")
+            override fun onError(utteranceId: String?) {
+                if (utteranceId == id && caller.isActive) caller.resume(false)
+            }
+        })
+        onPlayback()
+        if (speak(text, TextToSpeech.QUEUE_FLUSH, null, id) == TextToSpeech.ERROR && caller.isActive) caller.resume(false)
+    }
+
+private fun TextToSpeech.selectOfflineFinnishVoice(): Boolean {
+    val voice = voices.orEmpty().firstOrNull { it.locale.language == "fi" && !it.isNetworkConnectionRequired } ?: return false
+    return setVoice(voice) == TextToSpeech.SUCCESS
+}
+
 private suspend fun playPcm(samples: ByteArray) {
     require(samples.isNotEmpty() && samples.size % 2 == 0 && samples.size <= NARRATION_RATE * 60)
     val track = AudioTrack.Builder()
-        .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
-        .setAudioFormat(AudioFormat.Builder().setSampleRate(NARRATION_RATE).setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-            .setEncoding(AudioFormat.ENCODING_PCM_16BIT).build())
+        .setAudioAttributes(
+            AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()
+        )
+        .setAudioFormat(
+            AudioFormat.Builder().setSampleRate(NARRATION_RATE).setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                .setEncoding(AudioFormat.ENCODING_PCM_16BIT).build()
+        )
         .setTransferMode(AudioTrack.MODE_STATIC)
         .setBufferSizeInBytes(samples.size)
         .build()

@@ -63,7 +63,12 @@ fun activeWorkoutNotification(context: Context, notice: ActiveNotice?): Notifica
         .build()
     val builder = timerBuilder()
         .setContentTitle(notice.title.ifBlank { context.getString(R.string.workout) })
-        .setContentText(context.getString(R.string.started_at, Instant.ofEpochMilli(whenMillis).workoutTime(notice.zone, DateFormat.is24HourFormat(context))))
+        .setContentText(
+            context.getString(
+                R.string.started_at,
+                Instant.ofEpochMilli(whenMillis).workoutTime(notice.zone, DateFormat.is24HourFormat(context))
+            )
+        )
         .setVisibility(Notification.VISIBILITY_PRIVATE).setPublicVersion(publicVersion).setLocalOnly(false)
         .setContentIntent(content).setDeleteIntent(delete)
         .addAction(Notification.Action.Builder(null, context.getString(R.string.open), content).build())

@@ -3,17 +3,14 @@
 
 package com.emmah.inshape.feature.checkin
 
-import androidx.compose.ui.res.stringResource
-import com.emmah.inshape.R
+import android.text.format.DateFormat
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material3.MaterialTheme
-import com.emmah.inshape.ui.components.GroupLabel
-import java.time.Clock
-import android.text.format.DateFormat
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,12 +20,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import com.emmah.inshape.JournalViewModel
+import com.emmah.inshape.R
 import com.emmah.inshape.data.BodyObservation
 import com.emmah.inshape.data.CheckIn
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.ui.components.ButtonSize
 import com.emmah.inshape.ui.components.DisclosureRow
+import com.emmah.inshape.ui.components.GroupLabel
 import com.emmah.inshape.ui.components.Page
 import com.emmah.inshape.ui.components.PrimaryButton
 import com.emmah.inshape.ui.components.PushedHeader
@@ -37,6 +37,7 @@ import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.components.TextField
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.dateTime
+import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
 import kotlinx.serialization.Serializable
@@ -127,10 +128,18 @@ fun CheckInScreen(
     Page(
         modifier,
         bottomBar = {
-            PrimaryButton(stringResource(R.string.save), ::save, Modifier.fillMaxWidth(), enabled = !saving && !legacyNoteConflict, size = ButtonSize.Large)
+            PrimaryButton(
+                stringResource(R.string.save),
+                ::save,
+                Modifier.fillMaxWidth(),
+                enabled = !saving && !legacyNoteConflict,
+                size = ButtonSize.Large
+            )
         },
         topBar = {
-            PushedHeader(onBack = onSave, trailingText = true, titleContent = { Text(title, style = MaterialTheme.typography.titleMedium) }) {
+            PushedHeader(onBack = onSave, trailingText = true, titleContent = {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+            }) {
                 TextAction(stringResource(R.string.skip), onSave, icon = Icons.AutoMirrored.Outlined.ArrowForward)
             }
         }
@@ -185,7 +194,7 @@ internal fun EffortChoices(effort: Int?, onChange: (Int) -> Unit) {
 }
 
 @Composable
-internal fun EnergyChoices(energy: String?, onChange: (String?) -> Unit) {
+internal fun ColumnScope.EnergyChoices(energy: String?, onChange: (String?) -> Unit) {
     GroupLabel(stringResource(R.string.energy))
     val energies = EnergyLevel.entries
     SegmentedControl(energies.map { stringResource(it.label) }, energies.indexOfFirst { it.key == energy }, {
@@ -194,7 +203,7 @@ internal fun EnergyChoices(energy: String?, onChange: (String?) -> Unit) {
 }
 
 @Composable
-private fun LegacyNoteConflict(sessionNote: String, onKeepDraft: () -> Unit, onKeepCurrent: () -> Unit) {
+private fun ColumnScope.LegacyNoteConflict(sessionNote: String, onKeepDraft: () -> Unit, onKeepCurrent: () -> Unit) {
     Text(
         stringResource(R.string.check_in_note_changed),
         color = InShapeTheme.colors.error

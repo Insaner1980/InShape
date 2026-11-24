@@ -93,7 +93,6 @@ object WidgetUpdater {
             Log.w("InShapeWidget", "Could not publish launcher preview", failure)
         }
     }
-
 }
 class WidgetRefreshWorker(context: Context, parameters: WorkerParameters) : CoroutineWorker(context, parameters) {
     override suspend fun doWork(): Result = try {

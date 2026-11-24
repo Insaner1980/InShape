@@ -1,17 +1,13 @@
 package com.emmah.inshape.transfer
 
-import androidx.compose.ui.res.stringResource
-import com.emmah.inshape.R
-import com.emmah.inshape.ui.theme.Dimens
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Arrangement
-import com.emmah.inshape.data.DateRange
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.LinearProgressIndicator
@@ -26,8 +22,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.emmah.inshape.JournalViewModel
+import com.emmah.inshape.R
+import com.emmah.inshape.data.DateRange
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.ui.components.InShapeSwitch
 import com.emmah.inshape.ui.components.KeyValueRow
@@ -38,6 +38,7 @@ import com.emmah.inshape.ui.components.Page
 import com.emmah.inshape.ui.components.PrimaryButton
 import com.emmah.inshape.ui.components.RecordedDateRangePicker
 import com.emmah.inshape.ui.components.SegmentedControl
+import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.shortDate
 import java.time.LocalDate
@@ -56,6 +57,7 @@ fun ExportScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifier
     val state by transfers.state.collectAsStateWithLifecycle()
     val snackbar = LocalPageSnackbar.current
     val context = LocalContext.current
+    val resources = LocalResources.current
     fun onSaveResult(destination: Uri?, format: String) {
         val id = pendingExportId
         pendingExportId = null
@@ -88,8 +90,8 @@ fun ExportScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifier
                     .setType(prepared.mime)
                     .putExtra(Intent.EXTRA_STREAM, uri)
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                intent.clipData = ClipData.newRawUri(context.getString(R.string.export_share_title), uri)
-                context.startActivity(Intent.createChooser(intent, context.getString(R.string.export_share_picker)))
+                intent.clipData = ClipData.newRawUri(resources.getString(R.string.export_share_title), uri)
+                context.startActivity(Intent.createChooser(intent, resources.getString(R.string.export_share_picker)))
             } catch (_: Exception) {
                 transfers.shareFailed()
             }
@@ -98,7 +100,7 @@ fun ExportScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifier
     LaunchedEffect(transfers, snackbar) {
         if (snackbar == null) return@LaunchedEffect
         transfers.state.collect { result ->
-            if (result.message == context.getString(R.string.export_cancelled) && transfers.consumeMessage(result)) {
+            if (result.message == resources.getString(R.string.export_cancelled) && transfers.consumeMessage(result)) {
                 snackbar.showSnackbar(result.message)
             }
         }
@@ -119,7 +121,8 @@ fun ExportScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifier
     }) {
         KeyValueRow(
             stringResource(R.string.period),
-            range?.let { stringResource(R.string.date_range, it.start.shortDate(), it.end.shortDate()) } ?: stringResource(R.string.all_workouts),
+            range?.let { stringResource(R.string.date_range, it.start.shortDate(), it.end.shortDate()) }
+                ?: stringResource(R.string.all_workouts),
             onClick = { rangePicker = true }
         )
         if (current.isEmpty()) Text(stringResource(R.string.no_workouts_period))
@@ -151,9 +154,9 @@ fun ExportScreen(data: JournalSnapshot, vm: JournalViewModel, modifier: Modifier
 
 @Composable
 private fun ColumnScope.ExportStatus(state: TransferState) {
-    val context = LocalContext.current
+    val resources = LocalResources.current
     if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-    if (state.isError || listOf("PDF", "CSV").any { state.message == context.getString(R.string.export_saved, it) }) {
+    if (state.isError || listOf("PDF", "CSV").any { state.message == resources.getString(R.string.export_saved, it) }) {
         Text(
             state.message,
             style = MaterialTheme.typography.bodyMedium,

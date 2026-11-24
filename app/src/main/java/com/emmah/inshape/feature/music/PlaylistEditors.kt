@@ -1,6 +1,5 @@
 package com.emmah.inshape.feature.music
 
-import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +44,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -52,16 +52,16 @@ import com.emmah.inshape.R
 import com.emmah.inshape.ui.components.AppMenu
 import com.emmah.inshape.ui.components.BottomActionBar
 import com.emmah.inshape.ui.components.ButtonSize
-import com.emmah.inshape.ui.components.EditorSheet
 import com.emmah.inshape.ui.components.DialogAction
+import com.emmah.inshape.ui.components.EditorSheet
 import com.emmah.inshape.ui.components.EmptyState
 import com.emmah.inshape.ui.components.ListRow
 import com.emmah.inshape.ui.components.MenuAction
 import com.emmah.inshape.ui.components.PrimaryButton
 import com.emmah.inshape.ui.components.PushedHeader
 import com.emmah.inshape.ui.components.ReorderHandle
-import com.emmah.inshape.ui.components.TextField
 import com.emmah.inshape.ui.components.SearchField
+import com.emmah.inshape.ui.components.TextField
 import com.emmah.inshape.ui.components.reorderActions
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeTheme
@@ -101,7 +101,7 @@ internal fun PlaylistEditor(
     onClose: () -> Unit,
     playlist: SavedPlaylist? = null,
     firstSong: String? = null,
-    onCreated: (String) -> Unit = { onClose() }
+    onCreate: (String) -> Unit = { onClose() }
 ) {
     var name by rememberSaveable { mutableStateOf("") }
     var search by rememberSaveable { mutableStateOf("") }
@@ -121,7 +121,7 @@ internal fun PlaylistEditor(
     val selectedIds = selected.filter { it in addableIds }
     val count = selectedIds.size
     val scope = rememberCoroutineScope()
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val saveFailed = stringResource(R.string.playlist_save_failed)
     val snackbar = remember { SnackbarHostState() }
     var saving by remember { mutableStateOf(false) }
     val canEdit = { !saving }
@@ -142,7 +142,7 @@ internal fun PlaylistEditor(
                         scope.launch {
                             try {
                                 if (playlist == null) {
-                                    onCreated(store.create(name, selectedIds))
+                                    onCreate(store.create(name, selectedIds))
                                 } else {
                                     store.add(playlist.id, selectedIds)
                                     onClose()
@@ -150,7 +150,7 @@ internal fun PlaylistEditor(
                             } catch (cancelled: CancellationException) {
                                 throw cancelled
                             } catch (_: Exception) {
-                                launch { snackbar.showSnackbar(context.getString(R.string.playlist_save_retry)) }
+                                launch { snackbar.showSnackbar(saveFailed) }
                             } finally {
                                 saving = false
                             }
@@ -198,14 +198,15 @@ private fun PlaylistEditorFields(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)) {
         if (name != null) {
-            TextField(name, stringResource(R.string.playlist_name), { if (canEdit()) onNameChange(it) }, singleLine = true, enabled = canEdit())
+            TextField(name, stringResource(R.string.playlist_name), {
+                if (canEdit()) onNameChange(it)
+            }, singleLine = true, enabled = canEdit())
         }
         if (hasAvailableSongs) {
             SearchField(search, { if (canEdit()) onSearchChange(it) }, stringResource(R.string.search_songs), enabled = canEdit())
         }
         if (shownEmpty) {
-            val message = if (search.isBlank()) stringResource(R.string.choose_more_songs_folder) else stringResource(R.string.try_another_word)
-            EmptyState(stringResource(R.string.no_songs_to_add), message, Modifier.padding(vertical = Dimens.inner))
+            EmptyState(stringResource(R.string.no_songs_to_add), Modifier.padding(vertical = Dimens.inner))
         }
     }
 }
@@ -249,7 +250,9 @@ internal fun EditSavedPlaylist(store: MusicStore, playlist: SavedPlaylist, onClo
     val saveError = stringResource(R.string.playlist_save_failed)
     LaunchedEffect(saveFailed) {
         while (saveFailed && snackbar.showSnackbar(
-                saveError, actionLabel = retry, duration = SnackbarDuration.Indefinite
+                saveError,
+                actionLabel = retry,
+                duration = SnackbarDuration.Indefinite
             ) == SnackbarResult.ActionPerformed
         ) {
             saveLatest()
@@ -265,8 +268,12 @@ internal fun EditSavedPlaylist(store: MusicStore, playlist: SavedPlaylist, onClo
     }
     val nameField: @Composable () -> Unit = {
         TextField(
-            name, stringResource(R.string.playlist_name), { if (!closing) name = it }, singleLine = true,
-            error = stringResource(R.string.playlist_name_required).takeIf { name.isBlank() }, enabled = !closing
+            name,
+            stringResource(R.string.playlist_name),
+            { if (!closing) name = it },
+            singleLine = true,
+            error = stringResource(R.string.playlist_name_required).takeIf { name.isBlank() },
+            enabled = !closing
         )
     }
     if (renameOnly) {

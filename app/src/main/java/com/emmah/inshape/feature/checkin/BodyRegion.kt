@@ -1,7 +1,7 @@
 package com.emmah.inshape.feature.checkin
 
-import com.emmah.inshape.R
 import androidx.annotation.StringRes
+import com.emmah.inshape.R
 
 data class BodyRegion(val id: String, @StringRes val label: Int)
 

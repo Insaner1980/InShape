@@ -1,16 +1,16 @@
 package com.emmah.inshape.ui.theme
 
-import com.emmah.inshape.data.WorkoutEntity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.produceState
+import com.emmah.inshape.data.WorkoutEntity
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
-import java.time.temporal.ChronoUnit
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.delay
 
 fun elapsedSeconds(start: Instant, now: Instant): Long = Duration.between(start, now).seconds.coerceAtLeast(0)
@@ -18,12 +18,11 @@ fun elapsedSeconds(start: Instant, now: Instant): Long = Duration.between(start,
 internal fun displayedIntervalSeconds(start: Instant, end: Instant): Long =
     Duration.between(start.truncatedTo(ChronoUnit.MINUTES), end.truncatedTo(ChronoUnit.MINUTES)).seconds
 
-internal fun WorkoutEntity.displayedDurationSeconds(): Long? =
-    if (start != null && end != null) {
-        displayedIntervalSeconds(Instant.parse(start), Instant.parse(end)).coerceAtLeast(0)
-    } else {
-        durationSeconds
-    }
+internal fun WorkoutEntity.displayedDurationSeconds(): Long? = if (start != null && end != null) {
+    displayedIntervalSeconds(Instant.parse(start), Instant.parse(end)).coerceAtLeast(0)
+} else {
+    durationSeconds
+}
 
 fun formatElapsed(seconds: Long): String {
     val value = seconds.coerceAtLeast(0)

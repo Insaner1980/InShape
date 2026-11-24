@@ -1,9 +1,10 @@
 package com.emmah.inshape.data
 
 import com.emmah.inshape.R
-import com.emmah.inshape.ui.UiException
-import com.emmah.inshape.ui
+import com.emmah.inshape.feature.assistant.adaptActiveWorkout
 import com.emmah.inshape.testContext
+import com.emmah.inshape.ui
+import com.emmah.inshape.ui.UiException
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -108,6 +109,29 @@ class JournalRepositoryTest {
         val updated = repo.snapshot().items.single { it.id == item }
         assertFalse(updated.discomfort)
         assertEquals("Keep shoulders down", updated.note)
+    }
+
+    @Test fun adaptationAppliesPendingOrderAndBindsItToTheReceipt() = runBlocking {
+        val exercise = Exercise(name = "Row")
+        repo.saveExercise(exercise)
+        val workoutId = repo.startWorkout(StartSource.Empty)
+        val completed = repo.addExercise(workoutId, exercise.id)
+        val (first, omitted, last) = List(3) { repo.addExercise(workoutId, exercise.id) }
+        repo.markItemDone(completed, 60)
+        val preview = requireNotNull(repo.snapshot().workout(workoutId))
+        val selection = listOf(last, first)
+
+        repo.adaptActiveWorkout(preview, selection, "adaptation")
+        val saved = requireNotNull(repo.snapshot().workout(workoutId))
+        assertEquals(listOf(completed, last, omitted, first), saved.items.map { it.row.id })
+        assertEquals(preview.items.first(), saved.items.first())
+        assertEquals("SKIPPED", saved.items[2].row.disposition)
+        assertEquals(last, saved.row.currentItemId)
+
+        repo.adaptActiveWorkout(preview, selection, "adaptation")
+        assertEquals(saved, repo.snapshot().workout(workoutId))
+        assertTrue(runCatching { repo.adaptActiveWorkout(preview, selection.reversed(), "adaptation") }.exceptionOrNull() is UiException)
+        assertEquals(saved, repo.snapshot().workout(workoutId))
     }
 
     @Test fun staleCheckInNoteCannotOverwriteAnotherPhaseAndRollsBack() = runBlocking {
@@ -431,9 +455,11 @@ class JournalRepositoryTest {
         assertNull(performed.reps)
         assertEquals(
             R.string.edit_completed_set,
-            (runCatching {
-                repo.saveSetDraft(set, "10", "10")
-            }.exceptionOrNull() as? UiException)?.text
+            (
+                runCatching {
+                    repo.saveSetDraft(set, "10", "10")
+                }.exceptionOrNull() as? UiException
+                )?.text
         )
         repo.markItemDone(original.row.id, null)
         assertNull(requireNotNull(repo.snapshot().active).items.single().row.quickCompletedAt)
@@ -494,9 +520,11 @@ class JournalRepositoryTest {
         val id = repo.startWorkout(StartSource.Empty)
         assertEquals(
             R.string.empty_workout_save,
-            (runCatching {
-                repo.finishWorkout(id, WorkoutTiming())
-            }.exceptionOrNull() as? UiException)?.text
+            (
+                runCatching {
+                    repo.finishWorkout(id, WorkoutTiming())
+                }.exceptionOrNull() as? UiException
+                )?.text
         )
         repo.saveWorkoutNote(id, "Training notes")
         val before = repo.snapshot()
@@ -537,9 +565,11 @@ class JournalRepositoryTest {
         assertTrue(db.journal().workouts().single().timingNeedsReview)
         assertEquals(
             R.string.review_resumed_timing,
-            (runCatching {
-                nextDay.finishWorkout(id, WorkoutTiming(end = nextDay.clock.instant().toString()), confirmCurrentTiming = true)
-            }.exceptionOrNull() as? UiException)?.text
+            (
+                runCatching {
+                    nextDay.finishWorkout(id, WorkoutTiming(end = nextDay.clock.instant().toString()), confirmCurrentTiming = true)
+                }.exceptionOrNull() as? UiException
+                )?.text
         )
         nextDay.finishWorkout(id, WorkoutTiming(clearTimes = true, acknowledged = true))
         val saved = nextDay.snapshot().history.single().row
@@ -592,9 +622,11 @@ class JournalRepositoryTest {
         assertNull(saved.endOffset)
         assertEquals(
             R.string.timing_changed,
-            (runCatching {
-                repo.correctWorkout(id, before.revision, "Stale title", before.journalDate, "", WorkoutTiming())
-            }.exceptionOrNull() as? UiException)?.text
+            (
+                runCatching {
+                    repo.correctWorkout(id, before.revision, "Stale title", before.journalDate, "", WorkoutTiming())
+                }.exceptionOrNull() as? UiException
+                )?.text
         )
         assertEquals(saved, repo.snapshot().workout(id)?.row)
     }

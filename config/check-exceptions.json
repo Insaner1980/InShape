@@ -19,23 +19,6 @@
       ]
     },
     {
-      "id": "inshape-workout-note-submission-identity",
-      "tool": "mobsfscan",
-      "rule": "android_kotlin_hardcoded",
-      "scope": "app/src/main/java/com/emmah/inshape/feature/history/HistoryScreen.kt",
-      "reason": "This local submission ID is derived from the workout ID and tracks the note save in the view model.",
-      "owner": "InShape maintainers",
-      "added": "2026-11-19",
-      "expires": "2027-11-19",
-      "tracking": "Android check: verified local submission and draft identifiers in current source",
-      "sourcePath": "app/src/main/java/com/emmah/inshape/feature/history/HistoryScreen.kt",
-      "selector": "val noteKey = \"workout-note:$id\"",
-      "findingPath": "app/src/main/java/com/emmah/inshape/feature/history/HistoryScreen.kt",
-      "findingSelectors": [
-        "key = \"workout-note:$id\""
-      ]
-    },
-    {
       "id": "inshape-duration-draft-identity",
       "tool": "mobsfscan",
       "rule": "android_kotlin_hardcoded",
@@ -118,6 +101,127 @@
       "findingPath": "app/src/main/java/com/emmah/inshape/feature/workout/FinishScreen.kt",
       "findingSelectors": [
         "key = \"finish:$id\""
+      ]
+    },
+    {
+      "id": "inshape-program-visit-slot-identity",
+      "tool": "mobsfscan",
+      "rule": "android_kotlin_hardcoded",
+      "scope": "app/src/main/java/com/emmah/inshape/data/JournalRepository.kt",
+      "reason": "The slot key combines the program day and exercise IDs to identify a planned exercise within a workout.",
+      "owner": "InShape maintainers",
+      "added": "2026-11-23",
+      "expires": "2027-11-23",
+      "tracking": "Android check: verified against the source and test fixtures",
+      "sourcePath": "app/src/main/java/com/emmah/inshape/data/JournalRepository.kt",
+      "selector": "slotKey = \"${visit.day.id}:${slot.exerciseId}\"",
+      "findingPath": "app/src/main/java/com/emmah/inshape/data/JournalRepository.kt",
+      "findingSelectors": [
+        "key = \"${visit.day.id}:${slot.exerciseId}\""
+      ]
+    },
+    {
+      "id": "inshape-workout-review-draft-identity",
+      "tool": "mobsfscan",
+      "rule": "android_kotlin_hardcoded",
+      "scope": "app/src/main/java/com/emmah/inshape/feature/assistant/AssistantReview.kt",
+      "reason": "The key identifies local assistant review state for a workout item using the workout and item IDs.",
+      "owner": "InShape maintainers",
+      "added": "2026-11-23",
+      "expires": "2027-11-23",
+      "tracking": "Android check: verified against the source and test fixtures",
+      "sourcePath": "app/src/main/java/com/emmah/inshape/feature/assistant/AssistantReview.kt",
+      "selector": "val key = \"workout:${workout.row.id}:${item.row.id}\"",
+      "findingPath": "app/src/main/java/com/emmah/inshape/feature/assistant/AssistantReview.kt",
+      "findingSelectors": [
+        "key = \"workout:${workout.row.id}:${item.row.id}\""
+      ]
+    },
+    {
+      "id": "inshape-exercise-editor-submission-identity",
+      "tool": "mobsfscan",
+      "rule": "android_kotlin_hardcoded",
+      "scope": "app/src/main/java/com/emmah/inshape/feature/library/ExerciseEditor.kt",
+      "reason": "The exercise editor uses this local key to track its current save submission.",
+      "owner": "InShape maintainers",
+      "added": "2026-11-23",
+      "expires": "2027-11-23",
+      "tracking": "Android check: verified against the source and test fixtures",
+      "sourcePath": "app/src/main/java/com/emmah/inshape/feature/library/ExerciseEditor.kt",
+      "selector": "val key = \"exercise:$id\"",
+      "findingPath": "app/src/main/java/com/emmah/inshape/feature/library/ExerciseEditor.kt",
+      "findingSelectors": [
+        "key = \"exercise:$id\""
+      ]
+    },
+    {
+      "id": "inshape-routine-editor-submission-identity",
+      "tool": "mobsfscan",
+      "rule": "android_kotlin_hardcoded",
+      "scope": "app/src/main/java/com/emmah/inshape/feature/library/RoutineEditor.kt",
+      "reason": "The routine editor uses this local key to track its current save submission.",
+      "owner": "InShape maintainers",
+      "added": "2026-11-23",
+      "expires": "2027-11-23",
+      "tracking": "Android check: verified against the source and test fixtures",
+      "sourcePath": "app/src/main/java/com/emmah/inshape/feature/library/RoutineEditor.kt",
+      "selector": "val key = \"routine:$id\"",
+      "findingPath": "app/src/main/java/com/emmah/inshape/feature/library/RoutineEditor.kt",
+      "findingSelectors": [
+        "key = \"routine:$id\""
+      ]
+    },
+    {
+      "id": "inshape-past-workout-editor-identities",
+      "tool": "mobsfscan",
+      "rule": "android_kotlin_hardcoded",
+      "scope": "app/src/main/java/com/emmah/inshape/feature/workout/WorkoutScreen.kt",
+      "reason": "The timing and save keys track local drafts and submissions for a past workout by its ID.",
+      "owner": "InShape maintainers",
+      "added": "2026-11-23",
+      "expires": "2027-11-23",
+      "tracking": "Android check: verified against the source and test fixtures",
+      "sourcePath": "app/src/main/java/com/emmah/inshape/feature/workout/WorkoutScreen.kt",
+      "selector": "val savePastKey = \"save-past:$id\"",
+      "findingPath": "app/src/main/java/com/emmah/inshape/feature/workout/WorkoutScreen.kt",
+      "findingSelectors": [
+        "key = \"timing:$id\"",
+        "key = \"save-past:$id\""
+      ]
+    },
+    {
+      "id": "inshape-program-backup-fixture-slot-identity",
+      "tool": "mobsfscan",
+      "rule": "android_kotlin_hardcoded",
+      "scope": "app/src/test/java/com/emmah/inshape/feature/program/ProgramBackupTest.kt",
+      "reason": "The backup test constructs a local exercise slot from the fixture exercise ID.",
+      "owner": "InShape maintainers",
+      "added": "2026-11-23",
+      "expires": "2027-11-23",
+      "tracking": "Android check: verified against the source and test fixtures",
+      "sourcePath": "app/src/test/java/com/emmah/inshape/feature/program/ProgramBackupTest.kt",
+      "selector": "val key = \"local_${exercise.id}\"",
+      "findingPath": "app/src/test/java/com/emmah/inshape/feature/program/ProgramBackupTest.kt",
+      "findingSelectors": [
+        "key = \"local_${exercise.id}\""
+      ]
+    },
+    {
+      "id": "inshape-room-migration-test-fixtures",
+      "tool": "mobsfscan",
+      "rule": "android_kotlin_sql_raw_query",
+      "scope": "app/src/test/java/com/emmah/inshape/data/ProgramMigrationTest.kt",
+      "reason": "The Robolectric migration tests create legacy databases from versioned Room schema files and populate them using fixed SQL and bound fixture values.",
+      "owner": "InShape maintainers",
+      "added": "2026-11-23",
+      "expires": "2027-11-23",
+      "tracking": "Android check: verified against the source and test fixtures",
+      "sourcePath": "app/src/test/java/com/emmah/inshape/data/ProgramMigrationTest.kt",
+      "selector": "private fun createLegacyDatabase(",
+      "findingPath": "app/src/test/java/com/emmah/inshape/data/ProgramMigrationTest.kt",
+      "findingSelectors": [
+        "android.database.sqlite",
+        "execSQL("
       ]
     },
     {

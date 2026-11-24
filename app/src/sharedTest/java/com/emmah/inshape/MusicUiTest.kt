@@ -1,14 +1,7 @@
 package com.emmah.inshape
 
-import androidx.compose.ui.test.performSemanticsAction
-import androidx.compose.ui.semantics.SemanticsActions
-import kotlinx.coroutines.runBlocking
-import com.emmah.inshape.ui.theme.InShapeTheme
-import com.emmah.inshape.navigation.AppNavigation
-import com.emmah.inshape.demo.DemoMusic
-import com.emmah.inshape.demo.DemoFixtures
-import com.emmah.inshape.data.newId
 import android.content.Context
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
@@ -27,11 +20,18 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.emmah.inshape.data.newId
+import com.emmah.inshape.demo.DemoFixtures
+import com.emmah.inshape.demo.DemoMusic
+import com.emmah.inshape.navigation.AppNavigation
+import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.ThemeMode
 import com.emmah.inshape.ui.theme.ThemeSettings
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Rule

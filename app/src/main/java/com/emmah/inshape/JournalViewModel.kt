@@ -1,12 +1,12 @@
 package com.emmah.inshape
 
-import com.emmah.inshape.ui.uiMessage
 import android.database.sqlite.SQLiteException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.emmah.inshape.data.EditorDraft
 import com.emmah.inshape.data.JournalRepository
 import com.emmah.inshape.data.JournalSnapshot
+import com.emmah.inshape.ui.uiMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow

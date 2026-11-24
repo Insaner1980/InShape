@@ -1,16 +1,17 @@
 package com.emmah.inshape.feature.music
 
-import com.emmah.inshape.R
 import android.content.Intent
 import android.os.Bundle
 import android.provider.DocumentsContract
 import androidx.room.Room
+import com.emmah.inshape.R
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -107,6 +108,99 @@ class MusicStoreTest {
         } finally {
             job.cancelAndJoin()
             store.close()
+            context.deleteDatabase(databaseName)
+        }
+    }
+
+    @Test
+    fun confirmingPlaylistIsIdempotentAndRejectsStaleReviews() = runBlocking {
+        withMusicStore { store, _, tracks ->
+            val (first, second) = tracks
+            val id = store.confirmPlaylist("confirm", first.tree, null, "Initial", tracks)
+            assertEquals(id, store.confirmPlaylist("confirm", first.tree, null, "Initial", tracks))
+            val reviewed = withTimeout(10_000) { store.catalog.first { it.playlists.isNotEmpty() } }.playlists.single()
+
+            val changedCommand = runCatching { store.confirmPlaylist("confirm", first.tree, null, "Different", tracks) }
+            assertTrue(changedCommand.exceptionOrNull() is IllegalArgumentException)
+
+            store.rename(id, "Edited elsewhere")
+            val stalePlaylist = runCatching { store.confirmPlaylist("update", first.tree, reviewed, "Revision", listOf(second)) }
+            assertTrue(stalePlaylist.exceptionOrNull() is IllegalArgumentException)
+
+            store.setEnergy(first.id, "calm")
+            val staleTrack = runCatching { store.confirmPlaylist("new", first.tree, null, "Out of date", tracks) }
+            assertTrue(staleTrack.exceptionOrNull() is IllegalArgumentException)
+
+            val latest = withTimeout(10_000) {
+                store.catalog.first { catalog ->
+                    catalog.playlists.any { it.name == "Edited elsewhere" && it.tracks.first().energy == "calm" }
+                }
+            }.playlists.single()
+            assertEquals(id, latest.id)
+            assertEquals(tracks.map { it.id }, latest.tracks.map { it.id })
+
+            val reordered = latest.tracks.reversed()
+            assertEquals(id, store.confirmPlaylist("fresh-review", first.tree, latest, "Approved", reordered))
+            val saved = withTimeout(10_000) {
+                store.catalog.first { catalog -> catalog.playlists.singleOrNull()?.name == "Approved" }
+            }.playlists.single()
+            assertEquals(reordered, saved.tracks)
+        }
+    }
+
+    @Test
+    fun listeningCheckpointsKeepTheHigherProgressAndHonorTrackDuration() = runBlocking {
+        withMusicStore { store, dao, tracks ->
+            val (short, long) = tracks
+            fun event(id: String, trackId: String, playedMs: Long) =
+                ListeningEvent(id, trackId, "workout", "2026-11-23T10:00:00Z", playedMs)
+
+            assertNull(store.heardInWorkout("workout"))
+            store.recordListening(event("short", short.id, 2_000))
+            store.recordListening(event("long-one", long.id, 6_000))
+            store.recordListening(event("long-two", long.id, 3_999))
+            withTimeout(10_000) {
+                while (dao.listening("workout").size != 3) delay(10)
+            }
+            assertEquals(setOf(short.id), store.heardInWorkout("workout"))
+
+            store.recordListening(event("short", short.id, 1_000))
+            store.recordListening(event("long-two", long.id, 4_000))
+            withTimeout(10_000) {
+                while (store.heardInWorkout("workout") != setOf(short.id, long.id)) delay(10)
+            }
+            assertEquals(2_000L, dao.listeningEvent("short")?.playedMs)
+        }
+    }
+
+    private suspend fun withMusicStore(test: suspend (MusicStore, MusicDao, List<MusicTrack>) -> Unit) {
+        val context = RuntimeEnvironment.getApplication()
+        val databaseName = "music-playlist-store-test.db"
+        val resolver = context.contentResolver
+        val tree = DocumentsContract.buildTreeDocumentUri("com.emmah.inshape.test.documents", "music")
+        val first = MusicTrack("first", tree.toString(), "content://com.emmah.inshape.test.documents/first", "First", "Artist", 2_000)
+        val second = first.copy(
+            id = "second",
+            uri = "content://com.emmah.inshape.test.documents/second",
+            title = "Second",
+            durationMs = 90_000
+        )
+        val tracks = listOf(first, second)
+        val readPermission = Intent.FLAG_GRANT_READ_URI_PERMISSION
+        resolver.takePersistableUriPermission(tree, readPermission)
+        val database = Room.databaseBuilder(context, MusicDatabase::class.java, databaseName).build()
+        val job = Job()
+        val store = MusicStore(context, databaseName, CoroutineScope(job + Dispatchers.IO))
+        try {
+            val dao = database.music()
+            dao.saveSource(MusicSource(tree = tree.toString()))
+            dao.saveTracks(tracks)
+            test(store, dao, tracks)
+        } finally {
+            job.cancelAndJoin()
+            store.close()
+            database.close()
+            resolver.releasePersistableUriPermission(tree, readPermission)
             context.deleteDatabase(databaseName)
         }
     }

@@ -1,8 +1,9 @@
 package com.emmah.inshape.feature.program
 
-import androidx.test.core.app.ApplicationProvider
 import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -31,8 +32,28 @@ class ProgramCatalogTest {
         val keys = slots.flatMap { slot -> listOf(slot.exerciseId) + slot.alternatives.map { it.exerciseId } }.toSet()
         assertEquals(19, keys.size)
         assertTrue(keys.all { programArtwork(it) != null })
-        assertTrue(days.all { day ->
-            day.miniExerciseIds.size == 4 && day.miniExerciseIds.all { key -> day.exercises.any { it.exerciseId == key } }
-        })
+        assertEquals("Rintapunnerrus laitteessa", catalog.guideName("machine_chest_press"))
+        assertEquals("Vatsarutistus laitteessa", catalog.guideName("machine_crunch"))
+        assertEquals("Pystypunnerrus laitteessa", catalog.guideName("machine_shoulder_press"))
+        mapOf(
+            "machine_chest_press" to "Rintapunnerruslaite",
+            "machine_crunch" to "Vatsarutistuslaite",
+            "machine_shoulder_press" to "Pystypunnerruslaite"
+        ).forEach { (id, oldName) ->
+            val slot = slots.first { it.exerciseId == id }
+            assertTrue(slot.matchesExerciseName(oldName))
+            assertTrue(slot.matchesExerciseName(slot.name))
+            assertFalse(slot.matchesExerciseName("$oldName, oma"))
+        }
+        assertEquals("Dead bug, 2 × 6–10 kummallekin puolelle", days.first().exercises.last().alternatives.single().label)
+        assertEquals(
+            listOf("3–4 toistoa varaa", "3–4 toistoa varaa", "2–3 toistoa varaa", "3–4 toistoa varaa, tarvittaessa kevyemmin"),
+            catalog.programs.first().phases.map { it.effort }
+        )
+        assertTrue(
+            days.all { day ->
+                day.miniExerciseIds.size == 4 && day.miniExerciseIds.all { key -> day.exercises.any { it.exerciseId == key } }
+            }
+        )
     }
 }

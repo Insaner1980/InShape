@@ -1,9 +1,5 @@
 package com.emmah.inshape.feature.music
 
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.ui.res.stringResource
-import androidx.compose.material.icons.outlined.Close
-import com.emmah.inshape.ui.components.HeaderIconButton
 import android.app.Activity
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -35,6 +31,8 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.HorizontalDivider
@@ -60,6 +58,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -72,6 +71,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.emmah.inshape.R
 import com.emmah.inshape.ui.components.AppMenu
 import com.emmah.inshape.ui.components.EmptyState
+import com.emmah.inshape.ui.components.HeaderIconButton
 import com.emmah.inshape.ui.components.MenuAction
 import com.emmah.inshape.ui.components.OutlineButton
 import com.emmah.inshape.ui.components.PrimaryButton
@@ -166,11 +166,7 @@ internal fun MusicHome(
         ) {
             item(key = "music-header") {
                 ScreenTabs(listOf(stringResource(R.string.playlists), stringResource(R.string.songs)), selected, { selected = it })
-                if (scanning) {
-                    LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = Dimens.itemGap))
-                    Text(stringResource(R.string.scanning_music), Modifier.padding(top = Dimens.innerSmall))
-                    com.emmah.inshape.ui.components.TextAction(stringResource(R.string.cancel_scan), store::cancelScan, icon = Icons.Outlined.Close)
-                }
+                MusicScanningStatus(scanning, store::cancelScan)
                 MusicStatus(message)
                 MusicStatus(playing.error)
                 if (selected == 1 && !needsFolder) {
@@ -202,7 +198,9 @@ internal fun MusicHome(
                     SongRow(song, {
                         playback.start(songs, song.id)
                     }) {
-                        SongMenu(song, { playback.playAfterCurrent(song) }, { addSong = song.id }, onEnergy?.let { choose -> { choose(song.id) } })
+                        SongMenu(song, {
+                            playback.playAfterCurrent(song)
+                        }, { addSong = song.id }, onEnergy?.let { choose -> { choose(song.id) } })
                     }
                     MusicDivider()
                 }
@@ -210,7 +208,7 @@ internal fun MusicHome(
         }
     }
     if (editor == "new") {
-        PlaylistEditor(store, catalog.songs, onClose = { editor = null }, firstSong = firstSong, onCreated = { editor = it })
+        PlaylistEditor(store, catalog.songs, onClose = { editor = null }, firstSong = firstSong, onCreate = { editor = it })
     } else {
         observedCatalog.playlists.firstOrNull { it.id == editor }?.let { playlist ->
             EditSavedPlaylist(store, playlist, onClose = { editor = null })
@@ -222,6 +220,14 @@ internal fun MusicHome(
             firstSong = id
         })
     }
+}
+
+@Composable
+private fun MusicScanningStatus(scanning: Boolean, onCancel: () -> Unit) {
+    if (!scanning) return
+    LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = Dimens.itemGap))
+    Text(stringResource(R.string.scanning_music), Modifier.padding(top = Dimens.innerSmall))
+    com.emmah.inshape.ui.components.TextAction(stringResource(R.string.cancel_scan), onCancel, icon = Icons.Outlined.Close)
 }
 
 @Composable
@@ -262,7 +268,6 @@ private fun MusicHomeEmptyState(
     when {
         needsFolder -> EmptyState(
             stringResource(R.string.add_music),
-            stringResource(R.string.choose_folder_hint),
             padding,
             stringResource(R.string.choose_music_folder),
             onChooseFolder,
@@ -271,15 +276,15 @@ private fun MusicHomeEmptyState(
 
         selectedTab == 0 && playlistsEmpty -> EmptyState(
             stringResource(R.string.no_playlists),
-            stringResource(R.string.create_workout_playlist),
             padding,
             stringResource(R.string.new_playlist),
             onNewPlaylist,
             Icons.Filled.Add
         )
 
-        selectedTab == 1 && songsEmpty && hasSearch -> EmptyState(stringResource(R.string.no_matching_songs), stringResource(R.string.try_another_word), padding)
-        selectedTab == 1 && songsEmpty -> EmptyState(stringResource(R.string.no_songs_found), stringResource(R.string.choose_audio_folder), padding)
+        selectedTab == 1 && songsEmpty && hasSearch -> EmptyState(stringResource(R.string.no_matching_songs), padding)
+
+        selectedTab == 1 && songsEmpty -> EmptyState(stringResource(R.string.no_songs_found), padding)
     }
 }
 
@@ -359,7 +364,6 @@ internal fun PlaylistDetail(
                 if (playlist.tracks.isEmpty()) {
                     EmptyState(
                         stringResource(R.string.empty_playlist),
-                        stringResource(R.string.add_songs_hint),
                         Modifier.padding(bottom = Dimens.itemGap),
                         stringResource(R.string.add_songs),
                         { edit = "add" },
@@ -492,7 +496,9 @@ private fun PlaylistMenu(onAssistant: (() -> Unit)?, onAction: (String) -> Unit)
 private fun SongMenu(song: MusicTrack, next: () -> Unit, add: () -> Unit, onEnergy: (() -> Unit)? = null) {
     var open by remember { mutableStateOf(false) }
     Box {
-        IconButton({ open = true }, Modifier.size(Dimens.touch)) { Icon(Icons.Filled.MoreVert, stringResource(R.string.named_options, song.title)) }
+        IconButton({
+            open = true
+        }, Modifier.size(Dimens.touch)) { Icon(Icons.Filled.MoreVert, stringResource(R.string.named_options, song.title)) }
         AppMenu(open, { open = false }) {
             if (song.available) {
                 MenuAction(stringResource(R.string.play_next), Icons.AutoMirrored.Filled.QueueMusic, {
@@ -504,10 +510,12 @@ private fun SongMenu(song: MusicTrack, next: () -> Unit, add: () -> Unit, onEner
                 open = false
                 add()
             })
-            if (onEnergy != null) MenuAction(stringResource(R.string.set_energy_label), Icons.AutoMirrored.Filled.QueueMusic, {
-                open = false
-                onEnergy()
-            })
+            if (onEnergy != null) {
+                MenuAction(stringResource(R.string.set_energy_label), Icons.AutoMirrored.Filled.QueueMusic, {
+                    open = false
+                    onEnergy()
+                })
+            }
         }
     }
 }
@@ -517,13 +525,17 @@ internal fun SongRow(track: MusicTrack, play: () -> Unit, actions: (@Composable 
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Row(
             Modifier.weight(1f).heightIn(min = Dimens.rowMinTwoLine)
-                .clickable(enabled = track.available, onClickLabel = stringResource(R.string.play_named, track.title), role = Role.Button, onClick = play)
+                .clickable(
+                    enabled = track.available,
+                    onClickLabel = stringResource(R.string.play_named, track.title),
+                    role = Role.Button,
+                    onClick = play
+                )
                 .padding(vertical = Dimens.innerSmall),
             horizontalArrangement = Arrangement.spacedBy(Dimens.innerSmall),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TrackLabels(track, Modifier.weight(1f), Arrangement.spacedBy(Dimens.innerTiny))
-            Text(songTime(track.durationMs), style = MaterialTheme.typography.bodyMedium)
         }
         actions?.invoke()
     }
@@ -533,10 +545,13 @@ internal fun SongRow(track: MusicTrack, play: () -> Unit, actions: (@Composable 
 internal fun TrackLabels(track: MusicTrack, modifier: Modifier = Modifier, arrangement: Arrangement.Vertical = Arrangement.Top) {
     Column(modifier, verticalArrangement = arrangement) {
         Text(track.title, style = MaterialTheme.typography.bodyLarge)
+        val artist = if (track.available) track.artist else stringResource(R.string.unavailable_artist, track.artist)
         Text(
-            if (track.available) track.artist else stringResource(R.string.unavailable_artist, track.artist),
+            listOfNotNull(artist, track.durationMs?.let(::songTime)).joinToString(", "),
             style = MaterialTheme.typography.bodyMedium,
-            color = InShapeTheme.colors.textSecondary
+            color = InShapeTheme.colors.textSecondary,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
         )
     }
 }

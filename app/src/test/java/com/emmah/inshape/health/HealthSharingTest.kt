@@ -1,9 +1,6 @@
 package com.emmah.inshape.health
 
-import com.emmah.inshape.ui
 import com.emmah.inshape.R
-import com.emmah.inshape.ui.UiException
-import com.emmah.inshape.testContext
 import com.emmah.inshape.data.Exercise
 import com.emmah.inshape.data.JournalDatabase
 import com.emmah.inshape.data.JournalRepository
@@ -12,6 +9,9 @@ import com.emmah.inshape.data.StartSource
 import com.emmah.inshape.data.WorkoutEntity
 import com.emmah.inshape.data.WorkoutTiming
 import com.emmah.inshape.data.createTestDatabase
+import com.emmah.inshape.testContext
+import com.emmah.inshape.ui
+import com.emmah.inshape.ui.UiException
 import java.io.IOException
 import java.time.Clock
 import java.time.Instant

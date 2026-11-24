@@ -1,9 +1,7 @@
 package com.emmah.inshape.demo
 
-import com.emmah.inshape.R
-import com.emmah.inshape.ui.theme.withFinnishLocale
-import android.content.Context
 import android.app.Application
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -24,8 +22,10 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.emmah.inshape.AppContainer
 import com.emmah.inshape.JournalViewModel
+import com.emmah.inshape.R
 import com.emmah.inshape.navigation.AppNavigation
 import com.emmah.inshape.ui.theme.ActivityTheme
+import com.emmah.inshape.ui.theme.withFinnishLocale
 import kotlinx.coroutines.launch
 
 class DemoHost(application: Application) : AndroidViewModel(application) {
@@ -84,23 +84,27 @@ class DemoActivity : ComponentActivity() {
 private fun DemoScreen(host: DemoHost, requested: String) {
     LaunchedEffect(requested) { host.load(requested) }
     if (host.loaded == requested) {
-        val vm: JournalViewModel = viewModel { JournalViewModel(host.container) }
-        LaunchedEffect(requested) {
-            if (requested == "FailedSave") {
-                vm.write { throw java.io.IOException() }
-            }
-        }
-        AppNavigation(
-            host.container,
-            initialRoute = DemoFixtures.route(requested),
-            musicFixture = DemoMusic.catalog.takeIf { requested in DemoMusic.states },
-            initialMusic = if (requested == "WorkoutWithMusic") DemoMusic.catalog.playlists.first().tracks else emptyList(),
-            vm = vm
-        )
+        LoadedDemoScreen(host, requested)
     } else {
         val error = host.error
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             if (error == null) CircularProgressIndicator() else Text(error)
         }
     }
+}
+
+@Composable
+private fun LoadedDemoScreen(host: DemoHost, requested: String, vm: JournalViewModel = viewModel { JournalViewModel(host.container) }) {
+    LaunchedEffect(requested) {
+        if (requested == "FailedSave") {
+            vm.write { throw java.io.IOException() }
+        }
+    }
+    AppNavigation(
+        host.container,
+        initialRoute = DemoFixtures.route(requested),
+        musicFixture = DemoMusic.catalog.takeIf { requested in DemoMusic.states },
+        initialMusic = if (requested == "WorkoutWithMusic") DemoMusic.catalog.playlists.first().tracks else emptyList(),
+        vm = vm
+    )
 }

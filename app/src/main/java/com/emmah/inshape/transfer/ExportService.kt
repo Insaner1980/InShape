@@ -24,10 +24,7 @@ data class PreparedExport(val file: File, val format: String, val count: Int, va
     val id: String get() = file.parentFile!!.name
     val mime: String get() = if (format == "PDF") "application/pdf" else "application/zip"
 }
-class ExportService(
-    private val container: AppContainer,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
-) {
+class ExportService(private val container: AppContainer, private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
     private val context = container.context
     private val root = File(context.cacheDir, "exports")
     suspend fun prepare(format: String, selection: ExportSelection): PreparedExport = withContext(ioDispatcher) {

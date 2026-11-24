@@ -1,13 +1,9 @@
 package com.emmah.inshape.feature.music
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.material.icons.outlined.ClearAll
-import com.emmah.inshape.ui.components.TextAction
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -24,6 +20,8 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.outlined.ClearAll
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -31,6 +29,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SliderState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -55,6 +54,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.emmah.inshape.R
 import com.emmah.inshape.ui.components.ListRow
 import com.emmah.inshape.ui.components.PushedHeader
+import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
@@ -117,7 +117,10 @@ internal fun MiniPlayer(playback: MusicPlayback, openLabel: String, onOpen: () -
 private fun PlayPause(playback: MusicPlayback, state: PlaybackState) {
     val pause = state.playing || state.playRequested
     IconButton(playback::toggle, Modifier.size(Dimens.touch), enabled = state.song != null) {
-        Icon(if (pause) Icons.Filled.Pause else Icons.Filled.PlayArrow, if (pause) stringResource(R.string.pause) else stringResource(R.string.play))
+        Icon(
+            if (pause) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+            if (pause) stringResource(R.string.pause) else stringResource(R.string.play)
+        )
     }
 }
 
@@ -141,7 +144,11 @@ internal fun NowPlaying(playback: MusicPlayback, onBack: () -> Unit) {
             }
             if (state.queue.isNotEmpty()) {
                 item {
-                    Text(stringResource(R.string.queue), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = Dimens.innerSmall))
+                    Text(
+                        stringResource(R.string.queue),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(vertical = Dimens.innerSmall)
+                    )
                 }
                 items(state.queue, key = { it.occurrence }) { entry ->
                     val current = entry.occurrence == state.song?.occurrence
@@ -160,7 +167,12 @@ internal fun NowPlaying(playback: MusicPlayback, onBack: () -> Unit) {
                 }
                 if (!state.playing && !state.playRequested) {
                     item {
-                        TextAction(stringResource(R.string.clear_queue), playback::stop, color = InShapeTheme.colors.error, icon = Icons.Outlined.ClearAll)
+                        TextAction(
+                            stringResource(R.string.clear_queue),
+                            playback::stop,
+                            color = InShapeTheme.colors.error,
+                            icon = Icons.Outlined.ClearAll
+                        )
                     }
                 }
             }
@@ -225,11 +237,13 @@ private fun NowPlayingControls(state: PlaybackState, playback: MusicPlayback) {
         IconButton(playback::skip, Modifier.size(Dimens.touch), enabled = state.canSkip) {
             Icon(Icons.Filled.SkipNext, stringResource(R.string.next_song), Modifier.size(Dimens.transportIcon))
         }
-        val repeatStatus = stringResource(when (state.repeat) {
-            MusicRepeat.Off -> R.string.off
-            MusicRepeat.All -> R.string.all
-            MusicRepeat.One -> R.string.one
-        })
+        val repeatStatus = stringResource(
+            when (state.repeat) {
+                MusicRepeat.Off -> R.string.off
+                MusicRepeat.All -> R.string.all
+                MusicRepeat.One -> R.string.one
+            }
+        )
         IconButton(
             playback::cycleRepeat,
             Modifier.size(Dimens.touch).semantics { stateDescription = repeatStatus }

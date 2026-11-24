@@ -36,10 +36,7 @@ class ValidatedBackup internal constructor(val staged: StagedBackup, internal va
     }
 }
 
-class BackupService(
-    private val container: AppContainer,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
-) {
+class BackupService(private val container: AppContainer, private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO) {
     private val root = File(container.storageRoot, "transfer-staging")
     private val transferLock = Mutex()
     suspend fun createBackup(destination: Uri) = withContext(ioDispatcher) {
@@ -191,12 +188,14 @@ class BackupService(
             dao.clearOutbox()
             dao.clearProgramEnrollment()
             dao.clearProgramLinks()
+            dao.clearProgramDayOverrides()
             dao.clearAssistantDrafts()
             dao.clearAssistantReceipts()
             dao.clearAssistantMemories()
             data.exercises.forEach { dao.put(it) }
             data.programEnrollment?.let { dao.put(it) }
             data.programLinks.forEach { dao.put(it) }
+            data.programDayOverrides.forEach { dao.put(it) }
             data.assistantMemories.forEach { dao.put(it) }
             data.routines.forEach { dao.put(it) }
             data.routineItems.forEach { dao.put(it) }
@@ -223,6 +222,9 @@ class BackupService(
                 dao.put(state.copy(restoredHold = true))
             }
             deletions.forEach { dao.put(it) }
+            // Insert can succeed even when SQLite cannot read a row into a cursor window.
+            // Read every restored record through the normal DAO queries before committing.
+            container.repository.snapshot()
         }
     }
 

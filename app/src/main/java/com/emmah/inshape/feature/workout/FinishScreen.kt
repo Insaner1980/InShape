@@ -1,17 +1,5 @@
 package com.emmah.inshape.feature.workout
 
-import androidx.compose.ui.res.pluralStringResource
-import com.emmah.inshape.ui.uiMessage
-import com.emmah.inshape.ui.requireUi
-import androidx.compose.ui.res.stringResource
-import androidx.compose.material.icons.outlined.EditNote
-import com.emmah.inshape.feature.checkin.checkInDraft
-import com.emmah.inshape.feature.checkin.CheckInDraft
-import com.emmah.inshape.ui.theme.durationParts
-import com.emmah.inshape.ui.components.DisclosureRow
-import com.emmah.inshape.feature.checkin.PainInput
-import com.emmah.inshape.feature.checkin.EnergyChoices
-import com.emmah.inshape.feature.checkin.EffortChoices
 import android.text.format.DateFormat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -30,15 +18,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,6 +41,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.health.connect.client.HealthConnectClient
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,10 +55,16 @@ import com.emmah.inshape.data.Workout
 import com.emmah.inshape.data.WorkoutTiming
 import com.emmah.inshape.data.newId
 import com.emmah.inshape.data.resolveRecordedTime
-import com.emmah.inshape.ui.components.ArtworkHeader
+import com.emmah.inshape.feature.checkin.CheckInDraft
+import com.emmah.inshape.feature.checkin.EffortChoices
 import com.emmah.inshape.feature.checkin.EffortLevel
+import com.emmah.inshape.feature.checkin.EnergyChoices
+import com.emmah.inshape.feature.checkin.PainInput
+import com.emmah.inshape.feature.checkin.checkInDraft
+import com.emmah.inshape.ui.components.ArtworkHeader
 import com.emmah.inshape.ui.components.ButtonSize
 import com.emmah.inshape.ui.components.ConfirmDialog
+import com.emmah.inshape.ui.components.DisclosureRow
 import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListRow
 import com.emmah.inshape.ui.components.NumberField
@@ -77,21 +75,23 @@ import com.emmah.inshape.ui.components.RecordedTimePicker
 import com.emmah.inshape.ui.components.ResponsiveRow
 import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.components.TextField
+import com.emmah.inshape.ui.requireUi
 import com.emmah.inshape.ui.theme.ArtworkWash
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.dateTime
+import com.emmah.inshape.ui.theme.durationParts
 import com.emmah.inshape.ui.theme.formatDuration
 import com.emmah.inshape.ui.theme.shortDate
 import com.emmah.inshape.ui.theme.workoutTime
+import com.emmah.inshape.ui.uiMessage
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlinx.serialization.json.Json
-
 
 @Composable
 fun WorkoutMetrics(workout: Workout, modifier: Modifier = Modifier) {
@@ -103,7 +103,11 @@ fun WorkoutMetrics(workout: Workout, modifier: Modifier = Modifier) {
             Surface(Modifier.weight(1f), shape = InShapeShapes.field, color = InShapeTheme.colors.surface) {
                 Column(Modifier.padding(Dimens.rowPadding), verticalArrangement = Arrangement.spacedBy(Dimens.innerTiny)) {
                     Text(value.toString(), style = MaterialTheme.typography.titleLarge)
-                    Text(pluralStringResource(label, value), style = MaterialTheme.typography.labelSmall, color = InShapeTheme.colors.textSecondary)
+                    Text(
+                        pluralStringResource(label, value),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = InShapeTheme.colors.textSecondary
+                    )
                 }
             }
         }
@@ -158,7 +162,9 @@ fun FinishScreen(
     val uses24Hours = DateFormat.is24HourFormat(LocalContext.current)
     var after by remember(id) {
         val draft = data.checkInDraft(id, "AFTER", vm.container.clock, uses24Hours)
-        mutableStateOf(if (draft.checkIn.effort == null) draft.copy(checkIn = draft.checkIn.copy(effort = EffortLevel.JustRight.stored)) else draft)
+        mutableStateOf(
+            draft.copy(checkIn = draft.checkIn.copy(effort = draft.checkIn.effort ?: EffortLevel.JustRight.stored))
+        )
     }
     var savedForm by remember(id) {
         val payload = data.drafts.find { it.id == key && it.kind == "finish" }?.payload
@@ -215,31 +221,15 @@ fun FinishScreen(
     Page(modifier, scrollState = pageScroll, bottomBar = {
         val reviewRequired = workout.row.timingNeedsReview && !timingReviewed
         FinishActions(empty, submitting, noteConflict || reviewRequired, ::back, {
-            saveWorkout(vm, id, key, origin, workout, form, after, timingReviewed)
+            saveWorkout(vm, key, origin, workout, form, after, timingReviewed)
         }) {
             discard = true
         }
     }, topBar = { PushedHeader(onBack = ::back) }) {
         FinishHeader(workout, form, empty, zone, uses24Hours)
         if (!empty) {
-            if (data.preferences.shareWorkouts && !form.unknownTimes &&
-                vm.container.healthGateway.availability() == HealthConnectClient.SDK_AVAILABLE
-            ) {
-                Text(stringResource(R.string.shared_after_save), style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
-            }
-            Column(
-                Modifier.padding(top = Dimens.sectionGap - Dimens.itemGap),
-                verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)
-            ) {
-                Text(stringResource(R.string.check_in_after_question), style = MaterialTheme.typography.titleMedium)
-                EffortChoices(after.checkIn.effort) { editAfter(after.copy(checkIn = after.checkIn.copy(effort = it))) }
-            }
-            Column(
-                Modifier.padding(top = Dimens.sectionGap - Dimens.itemGap),
-                verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)
-            ) {
-                PainInput(after.checkIn.id, after.observations, submitting, onChange = { editAfter(after.copy(observations = it)) })
-            }
+            val sharingEnabled = data.preferences.shareWorkouts && !form.unknownTimes
+            AfterWorkoutCheckIn(after, submitting, sharingEnabled, vm, ::editAfter)
         }
         DisclosureRow(stringResource(R.string.energy_and_notes), more, { more = !more })
         if (more) {
@@ -256,10 +246,14 @@ fun FinishScreen(
             Text(stringResource(R.string.workout_note_conflict), color = colors.error)
             Text(stringResource(R.string.current_note_text, currentNote.ifBlank { stringResource(R.string.no_note) }))
             TextAction(
-                stringResource(R.string.keep_current_note), { edit(form.copy(note = currentNote, originalNote = currentNote)) },
-                icon = Icons.Outlined.Check, enabled = !submitting
+                stringResource(R.string.keep_current_note),
+                { edit(form.copy(note = currentNote, originalNote = currentNote)) },
+                icon = Icons.Outlined.Check,
+                enabled = !submitting
             )
-            TextAction(stringResource(R.string.use_draft_note), { edit(form.copy(originalNote = currentNote)) }, icon = Icons.Outlined.EditNote, enabled = !submitting)
+            TextAction(stringResource(R.string.use_draft_note), {
+                edit(form.copy(originalNote = currentNote))
+            }, icon = Icons.Outlined.EditNote, enabled = !submitting)
         }
     }
     if (fixTime && !submitting) {
@@ -267,19 +261,51 @@ fun FinishScreen(
             edit(
                 if (workout.row.timingNeedsReview) {
                     it.copy(fixedStart = it.fixedStart ?: workout.row.start, endMode = FinishDraft.EndMode.Manual)
-                } else it
+                } else {
+                    it
+                }
             )
             fixTime = false
         }, { fixTime = false })
     }
     if (discard && !submitting) {
-        ConfirmDialog(stringResource(R.string.discard_workout_question), stringResource(R.string.discard_workout_message), stringResource(R.string.discard), destructive = true, {
+        ConfirmDialog(stringResource(R.string.discard_workout_question), null, stringResource(R.string.discard), destructive = true, {
             discard = false
             vm.submit(key, origin) {
                 deleteWorkout(id)
                 "discard"
             }
         }, { discard = false })
+    }
+}
+
+@Composable
+private fun AfterWorkoutCheckIn(
+    after: CheckInDraft,
+    submitting: Boolean,
+    sharingEnabled: Boolean,
+    vm: JournalViewModel,
+    onEdit: (CheckInDraft) -> Unit
+) {
+    if (sharingEnabled && vm.container.healthGateway.availability() == HealthConnectClient.SDK_AVAILABLE) {
+        Text(
+            stringResource(R.string.shared_after_save),
+            style = MaterialTheme.typography.bodyMedium,
+            color = InShapeTheme.colors.textSecondary
+        )
+    }
+    Column(
+        Modifier.padding(top = Dimens.sectionGap - Dimens.itemGap),
+        verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)
+    ) {
+        Text(stringResource(R.string.check_in_after_question), style = MaterialTheme.typography.titleMedium)
+        EffortChoices(after.checkIn.effort) { onEdit(after.copy(checkIn = after.checkIn.copy(effort = it))) }
+    }
+    Column(
+        Modifier.padding(top = Dimens.sectionGap - Dimens.itemGap),
+        verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)
+    ) {
+        PainInput(after.checkIn.id, after.observations, submitting, onChange = { onEdit(after.copy(observations = it)) })
     }
 }
 
@@ -303,7 +329,10 @@ private fun FixTimeSheet(initial: FinishDraft, recordedStart: String?, zone: Zon
     val colors = InShapeTheme.colors
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = rememberBottomSheetState(
+            initialValue = SheetValue.Hidden,
+            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded)
+        ),
         containerColor = colors.background,
         scrimColor = colors.scrim,
         dragHandle = { BottomSheetDefaults.DragHandle(color = colors.divider) }
@@ -358,7 +387,10 @@ private fun FixTimeSheet(initial: FinishDraft, recordedStart: String?, zone: Zon
                 }
                 item {
                     ListRow(stringResource(R.string.duration), trailingValue = {
-                        Text(finishDuration(draft, recordedStart)?.let(::formatDuration) ?: stringResource(R.string.not_recorded), color = colors.textSecondary)
+                        Text(
+                            finishDuration(draft, recordedStart)?.let(::formatDuration) ?: stringResource(R.string.not_recorded),
+                            color = colors.textSecondary
+                        )
                     })
                 }
             }
@@ -369,8 +401,9 @@ private fun FixTimeSheet(initial: FinishDraft, recordedStart: String?, zone: Zon
                 error = null
             }, icon = Icons.Outlined.Schedule)
             if (draft.unknownTimes) {
-                NumberField(draft.minutes, { draft = draft.copy(minutes = it) }, stringResource(R.string.duration_minutes_optional), Modifier.fillMaxWidth())
-
+                NumberField(draft.minutes, {
+                    draft = draft.copy(minutes = it)
+                }, stringResource(R.string.duration_minutes_optional), Modifier.fillMaxWidth())
             }
             PrimaryButton(stringResource(R.string.done), {
                 error = finishTimeError(draft, start, recordedStart)?.let(context::getString)
@@ -403,7 +436,10 @@ private fun ColumnScope.FinishHeader(workout: Workout, form: FinishDraft, empty:
             Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Check, null, tint = colors.onInk) }
         }
     }
-    Text(if (empty) stringResource(R.string.nothing_recorded) else stringResource(R.string.workout_done), style = MaterialTheme.typography.headlineLarge)
+    Text(
+        if (empty) stringResource(R.string.nothing_recorded) else stringResource(R.string.workout_done),
+        style = MaterialTheme.typography.headlineLarge
+    )
     val dateLabel = LocalDate.parse(workout.row.journalDate).shortDate()
     if (empty) {
         Text("${workout.row.title}, $dateLabel", style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
@@ -447,7 +483,6 @@ private fun ColumnScope.FinishHeader(workout: Workout, form: FinishDraft, empty:
 
 private fun saveWorkout(
     vm: JournalViewModel,
-    id: String,
     key: String,
     origin: String,
     workout: Workout,
@@ -455,6 +490,7 @@ private fun saveWorkout(
     after: CheckInDraft,
     timingReviewed: Boolean
 ) {
+    val id = workout.row.id
     vm.submit(key, origin) {
         val duration = finishDuration(value, workout.row.start)
         requireUi(!value.unknownTimes || value.minutes.isBlank() || duration != null, R.string.positive_whole_minutes)
@@ -474,9 +510,12 @@ private fun saveWorkout(
                 confirmCurrentTiming = true
             )
             val check = after.checkIn
-            if (workout.checkIns.any { it.phase == "AFTER" } || check.effort != null || check.energy != null ||
-                check.feelings.isNotBlank() || check.note.isNotBlank() || after.observations.isNotEmpty() || value.note.isNotBlank()
-            ) {
+            val hadCheckIn = workout.checkIns.any { it.phase == "AFTER" }
+            val hasRatings = check.effort != null || check.energy != null
+            val hasNotes = check.feelings.isNotBlank() || check.note.isNotBlank() || value.note.isNotBlank()
+            val hasObservations = after.observations.isNotEmpty()
+            val hasCheckInContent = hasRatings || hasNotes || hasObservations
+            if (hadCheckIn || hasCheckInContent) {
                 saveCheckIn(check, after.observations)
             } else {
                 deleteEditorDraft("checkin:$id:AFTER")
@@ -554,24 +593,28 @@ private fun FinishActions(
             size = ButtonSize.Large
         )
         if (empty) {
-            TextAction(stringResource(R.string.discard_workout), onDiscard, color = InShapeTheme.colors.error, icon = Icons.Outlined.Delete, enabled = !submitting)
+            TextAction(
+                stringResource(R.string.discard_workout),
+                onDiscard,
+                color = InShapeTheme.colors.error,
+                icon = Icons.Outlined.Delete,
+                enabled = !submitting
+            )
         }
     }
 }
 
-private fun finishTimeError(draft: FinishDraft, start: String?, recordedStart: String?): Int? {
-    return when {
-        !draft.unknownTimes && (
-            start == null || !Instant.parse(
-                draft.end
-            ).isAfter(Instant.parse(start))
-            ) -> R.string.finish_after_start
+private fun finishTimeError(draft: FinishDraft, start: String?, recordedStart: String?): Int? = when {
+    !draft.unknownTimes && (
+        start == null || !Instant.parse(
+            draft.end
+        ).isAfter(Instant.parse(start))
+        ) -> R.string.finish_after_start
 
-        draft.unknownTimes && draft.minutes.isNotBlank() && finishDuration(
-            draft,
-            recordedStart
-        ) == null -> R.string.positive_whole_minutes
+    draft.unknownTimes && draft.minutes.isNotBlank() && finishDuration(
+        draft,
+        recordedStart
+    ) == null -> R.string.positive_whole_minutes
 
-        else -> null
-    }
+    else -> null
 }

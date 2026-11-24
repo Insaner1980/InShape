@@ -37,7 +37,10 @@ class AssistantKeyStoreTest {
             assertArrayEquals(original, stored.readBytes())
             reopened.save("synthetic-key-marker")
             assertFalse(original.copyOfRange(1, 13).contentEquals(stored.readBytes().copyOfRange(1, 13)))
-            KeyStore.getInstance("AndroidKeyStore").apply { load(null); deleteEntry(alias) }
+            KeyStore.getInstance("AndroidKeyStore").apply {
+                load(null)
+                deleteEntry(alias)
+            }
             assertEquals(KeyStatus.UNREADABLE, reopened.status())
             reopened.remove()
             assertEquals(KeyStatus.MISSING, first.status())

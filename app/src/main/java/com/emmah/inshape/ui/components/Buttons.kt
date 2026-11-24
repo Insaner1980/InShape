@@ -41,11 +41,18 @@ private fun RowScope.ButtonLabel(text: String, icon: ImageVector?, textAlign: Te
 }
 
 @Composable
-fun HeaderIconButton(icon: ImageVector, label: String, onClick: () -> Unit, primaryAdd: Boolean = false, enabled: Boolean = true) {
+fun HeaderIconButton(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    primaryAdd: Boolean = false,
+    enabled: Boolean = true
+) {
     if (primaryAdd) {
-        IconCircleButton(icon, label, onClick, enabled = enabled)
+        IconCircleButton(icon, label, onClick, modifier, enabled = enabled)
     } else {
-        IconButton(onClick, Modifier.size(Dimens.touch), enabled = enabled) {
+        IconButton(onClick, modifier.size(Dimens.touch), enabled = enabled) {
             Icon(icon, label, Modifier.size(Dimens.icon))
         }
     }
@@ -119,7 +126,7 @@ fun TextAction(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     color: Color = InShapeTheme.colors.text,
-    icon: ImageVector?,
+    icon: ImageVector? = null,
     enabled: Boolean = true
 ) {
     TextButton(
@@ -129,7 +136,9 @@ fun TextAction(
         colors = ButtonDefaults.textButtonColors(contentColor = color),
         contentPadding = PaddingValues(horizontal = Dimens.zero, vertical = Dimens.innerSmall)
     ) {
-        ProvideTextStyle(MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium)) { ButtonLabel(text, icon, TextAlign.Start) }
+        ProvideTextStyle(MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium)) {
+            ButtonLabel(text, icon, TextAlign.Start)
+        }
     }
 }
 

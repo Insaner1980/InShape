@@ -1,15 +1,10 @@
 package com.emmah.inshape.feature.progress
 
-import androidx.compose.foundation.layout.FlowRow
-import com.emmah.inshape.feature.checkin.bodyRegionLabel
-import com.emmah.inshape.ui.theme.finnishLocale
-import androidx.compose.ui.platform.LocalContext
 import android.content.Context
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -18,12 +13,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import com.emmah.inshape.R
 import com.emmah.inshape.data.BodyObservation
@@ -34,6 +34,7 @@ import com.emmah.inshape.data.MeasurementBasis
 import com.emmah.inshape.data.Workout
 import com.emmah.inshape.data.WorkoutItem
 import com.emmah.inshape.data.weekStart
+import com.emmah.inshape.feature.checkin.bodyRegionLabel
 import com.emmah.inshape.feature.checkin.bodyRegions
 import com.emmah.inshape.ui.components.ArtworkHeader
 import com.emmah.inshape.ui.components.DisclosureRow
@@ -53,6 +54,7 @@ import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.axisDate
+import com.emmah.inshape.ui.theme.finnishLocale
 import com.emmah.inshape.ui.theme.formatDuration
 import com.emmah.inshape.ui.theme.observationSummary
 import com.emmah.inshape.ui.theme.shortDate
@@ -96,7 +98,6 @@ fun ProgressScreen(
 
 @Composable
 private fun ProgressAttendance(history: List<Workout>, range: DateRange, today: LocalDate, weeklyGoal: Int?) {
-    val context = LocalContext.current
     val colors = InShapeTheme.colors
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
         val weeks = weeklyAttendance(history, range)
@@ -128,7 +129,7 @@ private fun ProgressAttendance(history: List<Workout>, range: DateRange, today: 
             }
             if (weeks.first().week > range.start) {
                 Text(
-                    stringResource(R.string.chart_latest_weeks, weeks.size),
+                    pluralStringResource(R.plurals.chart_latest_weeks, weeks.size, weeks.size),
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.textSecondary
                 )
@@ -139,12 +140,7 @@ private fun ProgressAttendance(history: List<Workout>, range: DateRange, today: 
 }
 
 @Composable
-private fun ProgressExercises(
-    exercises: List<Exercise>,
-    history: List<Workout>,
-    range: DateRange,
-    initialExerciseId: String?
-) {
+private fun ProgressExercises(exercises: List<Exercise>, history: List<Workout>, range: DateRange, initialExerciseId: String?) {
     val available = history.flatMap { it.items }
         .filter { it.hasPerformedWork }
         .distinctBy { Triple(it.row.exerciseId, it.row.equipmentId, it.row.basis) }
@@ -167,7 +163,7 @@ private fun ProgressExercises(
     val item = bases.find { it.comparisonKey() == basisChoice }
         ?: defaultComparison(exercises.find { it.id == selectedId }, bases)
     if (item == null) {
-        EmptyState(stringResource(R.string.recorded_progress), stringResource(R.string.record_for_chart))
+        EmptyState(stringResource(R.string.no_performed_exercise))
         return
     }
 
@@ -177,7 +173,10 @@ private fun ProgressExercises(
         query,
         exerciseSelector = {
             ProgressExerciseSelector(
-                exercises, available, exerciseChoices, item.row.exerciseId,
+                exercises,
+                available,
+                exerciseChoices,
+                item.row.exerciseId,
                 onSelect = { selected = it },
                 modifier = Modifier.weight(1f).align(Alignment.CenterVertically)
             )
@@ -205,6 +204,7 @@ private fun ProgressExerciseList(
 ) {
     if (available.isEmpty()) return
     val context = LocalContext.current
+    val resources = LocalResources.current
     SectionHeader(stringResource(R.string.exercises))
     ListCard {
         available.groupBy { it.row.exerciseId }.forEach { (exerciseId, recorded) ->
@@ -220,9 +220,15 @@ private fun ProgressExerciseList(
                 val current = basis.progressValue(context, it)
                 when {
                     change == null || change.signum() == 0 -> current
-                    else -> context.getString(R.string.progress_change, current, context.getString(change.direction()), basis.progressChange(context, change.abs()))
+
+                    else -> resources.getString(
+                        R.string.progress_change,
+                        current,
+                        resources.getString(change.direction()),
+                        basis.progressChange(context, change.abs())
+                    )
                 }
-            } ?: context.getString(R.string.done).takeIf { series.isNotEmpty() }
+            } ?: resources.getString(R.string.done).takeIf { series.isNotEmpty() }
             item {
                 ListRow(
                     exercise?.name ?: representative.row.name,
@@ -266,9 +272,11 @@ private fun ProgressExerciseSelector(
 @Composable
 private fun ProgressComparisonSelector(item: WorkoutItem, bases: List<WorkoutItem>, onSelect: (String) -> Unit) {
     if (bases.size <= 1) return
-    val context = LocalContext.current
+    val resources = LocalResources.current
     val basisLabels = bases.map {
-        "${it.row.equipmentName.ifBlank { context.getString(R.string.recorded_equipment) }}, ${context.getString(MeasurementBasis.fromKey(it.row.basis).optionLabel)}"
+        "${it.row.equipmentName.ifBlank {
+            resources.getString(R.string.recorded_equipment)
+        }}, ${resources.getString(MeasurementBasis.fromKey(it.row.basis).optionLabel)}"
     }
     SelectField(
         stringResource(R.string.compare),
@@ -313,8 +321,11 @@ private fun ProgressExerciseDetail(
                     itemVerticalAlignment = Alignment.CenterVertically
                 ) {
                     Pill(sign + basis.progressChange(context, change.abs()), tone = PillTone.Accent)
-                    Text(stringResource(R.string.progress_since_date, checkNotNull(baseline).first.axisDate()),
-                        style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+                    Text(
+                        stringResource(R.string.progress_since_date, checkNotNull(baseline).first.axisDate()),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textSecondary
+                    )
                 }
             }
         }
@@ -348,10 +359,9 @@ private fun MeasurementBasis.progressChange(context: Context, value: BigDecimal)
     progressValue(context, value)
 }
 
-
 @Composable
 private fun ProgressBodyObservations(observations: List<BodyObservation>, history: List<Workout>, range: DateRange) {
-    val context = LocalContext.current
+    val resources = LocalResources.current
     val colors = InShapeTheme.colors
     var region by rememberSaveable { mutableStateOf(observations.firstOrNull()?.region ?: "lower_back") }
     var showBody by rememberSaveable { mutableStateOf(false) }
@@ -361,8 +371,12 @@ private fun ProgressBodyObservations(observations: List<BodyObservation>, histor
         Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
             val area = bodyRegions.firstOrNull { it.id == region } ?: bodyRegions.first()
             SelectField(
-                stringResource(R.string.body_area), area.id, bodyRegions.map { it.id }, { region = it }, inline = true,
-                optionLabel = { id -> context.getString(bodyRegionLabel(id)) }
+                stringResource(R.string.body_area),
+                area.id,
+                bodyRegions.map { it.id },
+                { region = it },
+                inline = true,
+                optionLabel = { id -> resources.getString(bodyRegionLabel(id)) }
             )
             val points = observationSeries(history, observations, area.id, range)
             if (points.isEmpty()) {
@@ -389,7 +403,11 @@ private fun ProgressBodyObservations(observations: List<BodyObservation>, histor
                         }
                     }
                 }
-                if (!showAll && points.size > INITIAL_OBSERVATION_COUNT) TextAction(stringResource(R.string.show_all), { showAll = true }, icon = Icons.AutoMirrored.Outlined.List)
+                if (!showAll &&
+                    points.size > INITIAL_OBSERVATION_COUNT
+                ) {
+                    TextAction(stringResource(R.string.show_all), { showAll = true }, icon = Icons.AutoMirrored.Outlined.List)
+                }
             }
         }
     }

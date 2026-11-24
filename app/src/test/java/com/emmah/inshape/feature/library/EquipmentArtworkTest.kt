@@ -1,13 +1,13 @@
 package com.emmah.inshape.feature.library
 
-import com.emmah.inshape.ui
-import org.robolectric.RobolectricTestRunner
-import org.junit.runner.RunWith
 import com.emmah.inshape.R
 import com.emmah.inshape.data.Exercise
+import com.emmah.inshape.ui
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
 class EquipmentArtworkTest {
@@ -84,6 +84,23 @@ class EquipmentArtworkTest {
         )
         finnish.zip(cases.values).forEach { (text, drawable) ->
             assertEquals(drawable, equipmentArtwork("", ui(text))?.drawable)
+        }
+    }
+
+    @Test fun renamedExercisesKeepTheirArtworkForBothNames() {
+        assertEquals("Kuntopyörä", ui(R.string.exercise_warm_up_bike))
+        assertEquals("Rintapunnerrus laitteessa", ui(R.string.exercise_chest_press))
+        assertEquals("Alasveto kuminauhalla", ui(R.string.exercise_band_pulldown))
+        assertEquals("Oma paino", ui(R.string.category_bodyweight))
+        val aliases = mapOf(
+            R.drawable.art_exercises_stationary_bike to listOf("Lämmittelypyörä", "Kuntopyörä"),
+            R.drawable.art_exercises_chest_press to listOf("Rintapunnerruslaite", "Rintapunnerrus laitteessa"),
+            R.drawable.art_exercises_band_pulldown to listOf("Ylätalja kuminauhalla", "Alasveto kuminauhalla"),
+            R.drawable.art_exercises_abdominal_crunch to listOf("Vatsarutistuslaite", "Vatsarutistus laitteessa"),
+            R.drawable.art_exercises_shoulder_press to listOf("Pystypunnerruslaite", "Pystypunnerrus laitteessa")
+        )
+        aliases.forEach { (drawable, names) ->
+            names.forEach { name -> assertEquals(name, drawable, equipmentArtwork("", name)?.drawable) }
         }
     }
 

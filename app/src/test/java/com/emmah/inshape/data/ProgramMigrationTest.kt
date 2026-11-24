@@ -4,6 +4,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.emmah.inshape.demo.DemoFixtures
 import com.emmah.inshape.feature.music.MusicDatabase
 import com.emmah.inshape.feature.music.musicMigration1To2
 import java.io.File
@@ -26,7 +27,7 @@ class ProgramMigrationTest {
 
     @Test fun opensARealV1JournalAndKeepsLegacyValues() = runBlocking {
         val name = "journal-migration-${newId()}"
-        createV1(name, "com.emmah.inshape.data.JournalDatabase") { legacy ->
+        createLegacyDatabase(name, "com.emmah.inshape.data.JournalDatabase", 1) { legacy ->
             legacy.execSQL(
                 "INSERT INTO Exercise VALUES(?, ?, '', 'Machine', '', 'Gym', 0, 0, '', '', ?, '', 'kg', '[]', '[]', '[]')",
                 arrayOf("old-exercise", "Legacy leg press", "actual-machine")
@@ -48,7 +49,8 @@ class ProgramMigrationTest {
                 "INSERT INTO SessionSet VALUES('old-set', 'old-item', 0, '35', 12, '42,5', '12', '42.5', 12, '2026-11-20T08:00:00Z')"
             )
         }
-        val db = Room.databaseBuilder(context, JournalDatabase::class.java, name).addMigrations(journalMigration1To2).build()
+        val db = Room.databaseBuilder(context, JournalDatabase::class.java, name)
+            .addMigrations(journalMigration1To2, journalMigration2To3, journalMigration3To4).build()
         try {
             val dao = db.journal()
             assertEquals("actual-machine", dao.exercises().single().equipmentId)
@@ -63,11 +65,54 @@ class ProgramMigrationTest {
         }
     }
 
+    @Test fun renamesOnlyUneditedDemoDefaultsInAV2Journal() = runBlocking {
+        val name = "exercise-name-migration-${newId()}"
+        val bike = DemoFixtures.id("Lämmittelypyörä")
+        val chestPress = DemoFixtures.id("Rintapunnerruslaite")
+        val pulldown = DemoFixtures.id("Ylätalja kuminauhalla")
+        val custom = newId()
+        val original = mapOf(
+            bike to "Lämmittelypyörä",
+            chestPress to "Oma rintapunnerrus",
+            pulldown to "Ylätalja kuminauhalla",
+            custom to "Rintapunnerruslaite"
+        )
+        createLegacyDatabase(name, "com.emmah.inshape.data.JournalDatabase", 2) { legacy ->
+            for ((id, exerciseName) in original) {
+                legacy.execSQL(
+                    "INSERT INTO Exercise VALUES(?, ?, '', 'Machine', '', 'Gym', 0, 0, '', '', ?, '', 'kg', '[]', '[]', '[]')",
+                    arrayOf(id, exerciseName, "equipment-$id")
+                )
+            }
+            legacy.execSQL("INSERT INTO ProgramEnrollment VALUES(1, 'saved-id', 'program', 1, '2026-11-20', 3, 1)")
+            legacy.execSQL("INSERT INTO ProgramExerciseLink VALUES('machine_chest_press', ?)", arrayOf(custom))
+        }
+        val db = Room.databaseBuilder(context, JournalDatabase::class.java, name)
+            .addMigrations(journalMigration2To3, journalMigration3To4).build()
+        try {
+            val dao = db.journal()
+            val exercises = dao.exercises()
+            assertEquals(
+                original + mapOf(bike to "Kuntopyörä", pulldown to "Alasveto kuminauhalla"),
+                exercises.associate { it.id to it.name }
+            )
+            assertEquals(original.keys.associateWith { "equipment-$it" }, exercises.associate { it.id to it.equipmentId })
+            assertEquals(ProgramEnrollment(1, "saved-id", "program", 1, "2026-11-20", 3, 1), dao.programEnrollment())
+            assertEquals(emptyList<ProgramDayOverride>(), dao.programDayOverrides())
+            assertEquals(custom, dao.programLinks().single().exerciseId)
+        } finally {
+            db.close()
+            context.deleteDatabase(name)
+        }
+    }
+
     @Test fun opensARealV1MusicCatalogAndKeepsThePlaylistOrder() = runBlocking {
         val name = "music-migration-${newId()}"
-        createV1(name, "com.emmah.inshape.feature.music.MusicDatabase") { legacy ->
+        createLegacyDatabase(name, "com.emmah.inshape.feature.music.MusicDatabase", 1) { legacy ->
             legacy.execSQL("INSERT INTO MusicSource VALUES(0, 'content://fixture/music')")
-            legacy.execSQL("INSERT INTO MusicTrack VALUES('track', 'content://fixture/music', 'content://fixture/song', 'Name', 'Artist', 3000, 1)")
+            legacy.execSQL(
+                "INSERT INTO MusicTrack VALUES('track', 'content://fixture/music', 'content://fixture/song', 'Name', 'Artist', 3000, 1)"
+            )
             legacy.execSQL("INSERT INTO MusicPlaylist VALUES('playlist', 'Playlist')")
             legacy.execSQL("INSERT INTO MusicMembership VALUES('playlist', 'track', 0)")
         }
@@ -82,8 +127,8 @@ class ProgramMigrationTest {
         }
     }
 
-    private fun createV1(name: String, schemaDirectory: String, populate: (SQLiteDatabase) -> Unit) {
-        val schema = File("schemas/$schemaDirectory/1.json")
+    private fun createLegacyDatabase(name: String, schemaDirectory: String, version: Int, populate: (SQLiteDatabase) -> Unit) {
+        val schema = File("schemas/$schemaDirectory/$version.json")
         require(schema.isFile) { "Run this test from the app module." }
         val definition = Json.parseToJsonElement(schema.readText()) as JsonObject
         val database = definition.getValue("database") as JsonObject
@@ -100,7 +145,7 @@ class ProgramMigrationTest {
                 (entity["indices"] as? JsonArray).orEmpty().forEach { statement(it as JsonObject) }
             }
             (database.getValue("setupQueries") as JsonArray).forEach { db.execSQL(it.jsonPrimitive.content) }
-            db.version = 1
+            db.version = version
             populate(db)
         }
     }

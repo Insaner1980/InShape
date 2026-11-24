@@ -1,10 +1,8 @@
 package com.emmah.inshape.data
 
-import com.emmah.inshape.testContext
-import android.content.Context
 import androidx.room.Room
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.emmah.inshape.testContext
 import java.time.Clock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -20,7 +18,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class JournalPersistenceTest {
     @Test fun committedSessionAndDraftSurviveFileDatabaseReopen() = runBlocking {
-        val context = ApplicationProvider.getApplicationContext<Context>()
+        val context = testContext()
         val name = "persistence-${newId()}.db"
         var db = Room.databaseBuilder(context, JournalDatabase::class.java, name).build()
         try {
@@ -65,7 +63,7 @@ class JournalPersistenceTest {
     }
 
     @Test fun databaseRejectsSecondActiveButAllowsPastDraft() = runBlocking {
-        val context = ApplicationProvider.getApplicationContext<Context>()
+        val context = testContext()
         val db = Room.inMemoryDatabaseBuilder(context, JournalDatabase::class.java).build()
         try {
             val first =

@@ -2,6 +2,7 @@ package com.emmah.inshape.feature.assistant
 
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.Protocol
@@ -38,15 +39,24 @@ class OpenAiGatewayTest {
                 override fun cancel() = Unit
             }
             listener.onOpen(socket, Response.Builder().request(request).protocol(Protocol.HTTP_1_1).code(101).message("Test").build())
-            listener.onMessage(socket, """{"type":"session.updated","session":{"audio":{"output":{"format":{"type":"audio/pcm","rate":24000}}}}}""")
+            listener.onMessage(
+                socket,
+                """{"type":"session.updated","session":{"audio":{"output":{"format":{"type":"audio/pcm","rate":24000}}}}}"""
+            )
             listener.onClosing(socket, 1001, "Interrupted")
             socket
         }
         val failure = runCatching { openAiNarration("synthetic-test-credential", "Hei", fake) }.exceptionOrNull() as AssistantFailure
         assertEquals(AssistantFailureKind.CONNECTION, failure.kind)
-        assertEquals(listOf("session.update", "conversation.item.create", "response.create"), sent.map {
-            Json.parseToJsonElement(it).jsonObject.getValue("type").jsonPrimitive.content
-        })
+        assertEquals(
+            listOf("session.update", "conversation.item.create", "response.create"),
+            sent.map {
+                Json.parseToJsonElement(it).jsonObject.getValue("type").jsonPrimitive.content
+            }
+        )
+        val item = Json.parseToJsonElement(sent[1]).jsonObject.getValue("item").jsonObject
+        val content = item.getValue("content").jsonArray.single().jsonObject
+        assertEquals("Hei", content.getValue("text").jsonPrimitive.content)
     }
 
     @Test fun responsesAreExplicitBoundedAndOptOutOfApplicationStorage() = runBlocking {

@@ -1,32 +1,6 @@
 package com.emmah.inshape.feature.workout
 
-import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.material3.Surface
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
-import androidx.compose.material.icons.outlined.Mic
-import com.emmah.inshape.feature.library.locationLabel
-import com.emmah.inshape.feature.library.categoryLabel
-import com.emmah.inshape.feature.library.exerciseDisplayName
 import android.content.Context
-import com.emmah.inshape.ui.UiException
-import androidx.compose.ui.res.stringResource
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Flag
-import com.emmah.inshape.data.parseWholeMinutesToSeconds
-import com.emmah.inshape.data.resolveRecordedTime
-import kotlinx.serialization.json.Json
-import com.emmah.inshape.ui.theme.formatDuration
-import com.emmah.inshape.ui.components.KeyValueRow
-import com.emmah.inshape.ui.components.EditorSheet
-import com.emmah.inshape.ui.components.DialogAction
-import androidx.room.withTransaction
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.foundation.layout.FlowRow
 import android.text.format.DateFormat
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
@@ -39,6 +13,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -47,8 +22,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
@@ -57,11 +30,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.MusicNote
-import com.emmah.inshape.feature.music.PlaybackBars
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SwapHoriz
@@ -72,6 +49,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -81,6 +59,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -99,28 +78,49 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.room.withTransaction
 import com.emmah.inshape.JournalViewModel
 import com.emmah.inshape.R
 import com.emmah.inshape.data.JournalSnapshot
-import com.emmah.inshape.data.Workout
 import com.emmah.inshape.data.Setting
+import com.emmah.inshape.data.Workout
 import com.emmah.inshape.data.WorkoutItem
+import com.emmah.inshape.data.parseWholeMinutesToSeconds
+import com.emmah.inshape.data.resolveRecordedTime
+import com.emmah.inshape.feature.assistant.WorkoutSpeech
 import com.emmah.inshape.feature.library.ExercisePicker
 import com.emmah.inshape.feature.library.ExercisePickerList
+import com.emmah.inshape.feature.library.categoryLabel
+import com.emmah.inshape.feature.library.exerciseDisplayName
+import com.emmah.inshape.feature.library.locationLabel
 import com.emmah.inshape.feature.music.MusicPlayback
+import com.emmah.inshape.feature.music.PlaybackBars
+import com.emmah.inshape.feature.program.ProgramProgressionReview
+import com.emmah.inshape.ui.UiException
 import com.emmah.inshape.ui.components.ActionRow
 import com.emmah.inshape.ui.components.AppMenu
 import com.emmah.inshape.ui.components.ButtonSize
 import com.emmah.inshape.ui.components.ConfirmDialog
+import com.emmah.inshape.ui.components.DialogAction
+import com.emmah.inshape.ui.components.EditorSheet
+import com.emmah.inshape.ui.components.HeaderIconButton
 import com.emmah.inshape.ui.components.InShapeCard
+import com.emmah.inshape.ui.components.KeyValueRow
 import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListRow
 import com.emmah.inshape.ui.components.MenuAction
 import com.emmah.inshape.ui.components.NumberField
 import com.emmah.inshape.ui.components.Page
-import com.emmah.inshape.ui.components.HeaderIconButton
 import com.emmah.inshape.ui.components.PrimaryButton
 import com.emmah.inshape.ui.components.PushedHeader
 import com.emmah.inshape.ui.components.SectionHeader
@@ -131,6 +131,7 @@ import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.InShapeType
+import com.emmah.inshape.ui.theme.formatDuration
 import com.emmah.inshape.ui.theme.formatElapsed
 import com.emmah.inshape.ui.theme.hasArtworkColumns
 import com.emmah.inshape.ui.theme.rememberElapsedSeconds
@@ -142,7 +143,7 @@ import java.time.ZoneId
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
-
+import kotlinx.serialization.json.Json
 
 @Suppress("LongParameterList")
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -170,13 +171,17 @@ fun WorkoutScreen(
     var remove by remember { mutableStateOf<String?>(null) }
     var routineSave by remember { mutableStateOf(false) }
     var routineSaveRevision by remember { mutableStateOf<Long?>(null) }
-    var showRemoveSetHint by remember { mutableStateOf(!vm.container.hasRemovedSet) }
     val pending = workout.pendingItems
     val current = workout.currentItem(pending)
     var assistantItem by rememberSaveable(id) { mutableStateOf<String?>(null) }
     if (current != null && assistantItem == current.row.id && onAssistantSettings != null) {
         com.emmah.inshape.feature.assistant.AssistantReview(
-            vm.container, data, workout, current, musicPlayback, onSettings = {
+            vm.container,
+            data,
+            workout,
+            current,
+            musicPlayback,
+            onSettings = {
                 assistantItem = null
                 onAssistantSettings()
             },
@@ -200,17 +205,7 @@ fun WorkoutScreen(
         if (savedPast != null && vm.consumeSubmission(savePastKey, savedPast)) showSavedWorkout()
     }
     var pastForm by remember(id) {
-        val draft = if (workout.isPastEntry) initialTimingDraft(workout.row, data, pastKey) else null
-        mutableStateOf(draft?.let {
-            val date = runCatching { LocalDate.parse(it.date) }.getOrNull()?.toString() ?: workout.row.journalDate
-            val zone = ZoneId.of(workout.row.zoneId)
-            val hasValidTimes = !it.unknownTimes && runCatching {
-                val start = resolveRecordedTime(it.startDate, it.startTime, zone, it.originalStart)
-                val end = resolveRecordedTime(it.endDate, it.endTime, zone, it.originalEnd)
-                end.isAfter(start)
-            }.getOrDefault(false)
-            it.copy(date = date, unknownTimes = !hasValidTimes)
-        })
+        mutableStateOf(pastWorkoutTiming(workout, data, pastKey))
     }
     var editMinutes by rememberSaveable(id) { mutableStateOf(false) }
     fun updatePast(form: TimingDraft) {
@@ -221,6 +216,11 @@ fun WorkoutScreen(
     val completingItem = submissions[durationKey]?.let { it.result == null } == true
     var duration by rememberSaveable(current?.row?.id) {
         mutableStateOf(data.drafts.find { it.id == durationKey }?.payload ?: "")
+    }
+    fun updateDuration(value: String) {
+        if (vm.isSubmitting(durationKey)) return
+        duration = value
+        vm.saveDraft(durationKey, "duration", value)
     }
     val scrollState = rememberScrollState()
     val setRequester = remember { BringIntoViewRequester() }
@@ -243,38 +243,22 @@ fun WorkoutScreen(
             .mapIndexed { index, item -> item.copy(id = "", position = index) }
         workout.routinePlanItems.mapIndexed { index, item -> item.routineTarget(routine.id, index) } != savedTargets
     } == true
-    val bottomAction: (@Composable () -> Unit)? = if (keyboardVisible) null else {
-        {
-            WorkoutBottomBar(workout, current != null && next.isNotEmpty(), addFirstExercise, completingItem || savingPast) {
-                val form = pastForm
-                when {
-                    form != null -> vm.submit(savePastKey) {
-                        val timing = form.toTiming(ZoneId.of(workout.row.zoneId))
-                        db.withTransaction {
-                            if (current != null && duration.isNotBlank()) {
-                                markItemDone(current.row.id, performedSeconds(duration), draftId = durationKey)
-                            }
-                            val row = snapshot().workout(id)?.row ?: throw UiException(R.string.workout_missing)
-                            if (row.state != "COMPLETED") {
-                                correctWorkout(id, row.revision, form.title, form.date, form.note, timing)
-                                finishWorkout(id, timing)
-                            }
-                            deleteEditorDraft(pastKey)
-                        }
-                        id
-                    }
-                    addFirstExercise -> picker = true
-                    current == null -> onFinish()
-                    else -> completeCurrentExercise(vm, current, durationKey, duration) {
-                        if (next.isEmpty()) onFinish()
-                    }
-                }
+    fun onPrimaryAction() {
+        val form = pastForm
+        when {
+            form != null -> savePastWorkout(vm, workout, form, current, duration, savePastKey, pastKey)
+            addFirstExercise -> picker = true
+            current == null -> onFinish()
+            else -> completeCurrentExercise(vm, current, durationKey, duration) {
+                if (next.isEmpty()) onFinish()
             }
         }
     }
     Page(
         modifier,
-        bottomBar = bottomAction,
+        bottomBar = if (keyboardVisible) null else {
+            { WorkoutBottomBar(workout, current != null && next.isNotEmpty(), addFirstExercise, completingItem || savingPast, ::onPrimaryAction) }
+        },
         topBar = {
             WorkoutHeader(workout, elapsed, musicPlayback, onBack, onFinish, onMusic)
         },
@@ -282,51 +266,39 @@ fun WorkoutScreen(
         scrollViewportModifier = Modifier.onGloballyPositioned { viewportTop = it.positionInRoot().y }
     ) {
         val form = pastForm
-        if (form != null) {
-            Text(form.title, style = MaterialTheme.typography.headlineLarge)
-            Text(LocalDate.parse(form.date).shortDate(), color = colors.textSecondary, style = MaterialTheme.typography.bodyMedium)
-        } else if (workout.items.isNotEmpty()) {
-            WorkoutBanner(workout, elapsed)
-        }
-        if (workout.items.isEmpty()) Text(stringResource(R.string.no_exercises), style = MaterialTheme.typography.titleLarge)
+        WorkoutContentHeader(form, workout, elapsed)
         current?.let { item ->
             val canUseAssistant = onAssistantSettings != null && workout.row.activeKey == 1 && !workout.isPastEntry
             CurrentWorkoutExercise(
-                item, data, id, vm, onExercise,
-                { titleTop = it }, { alternativeItemId = item.row.id }, { remove = item.row.id },
+                item,
+                data,
+                vm,
+                onExercise,
+                { titleTop = it },
+                { alternativeItemId = item.row.id },
+                { remove = item.row.id },
                 onAssistant = if (canUseAssistant) ({ assistantItem = item.row.id }) else null
             ) {
-                if (canUseAssistant) {
-                    com.emmah.inshape.feature.assistant.WorkoutSpeech(id, item, vm.container.assistant, musicPlayback)
-                }
-                com.emmah.inshape.feature.assistant.AssistantMemories(
-                    data.assistantMemories.filter {
-                        it.exerciseId == item.row.exerciseId && it.acknowledgedAt == null && it.creationWorkoutId != id
-                    },
-                    vm,
-                    acknowledge = true
-                )
-                com.emmah.inshape.feature.program.ProgramProgressionReview(data, workout, item, vm)
+                WorkoutExerciseGuidance(data, workout, item, vm, canUseAssistant, musicPlayback)
                 WorkoutSetEditor(
-                    item, vm, firstIncomplete, setRequester,
-                    showRemoveSetHint && item == workout.items.firstOrNull(),
-                    { showRemoveSetHint = false }, duration, completingItem
-                ) {
-                    if (!vm.isSubmitting(durationKey)) {
-                        duration = it
-                        vm.saveDraft(durationKey, "duration", it)
-                    }
-                }
-                if (form != null) {
-                    TextAction(stringResource(R.string.exercise_done), {
-                        completeCurrentExercise(vm, item, durationKey, duration) {}
-                    }, icon = Icons.Outlined.Check, enabled = !completingItem && !savingPast)
+                    item,
+                    vm,
+                    firstIncomplete,
+                    setRequester,
+                    duration,
+                    completingItem,
+                    ::updateDuration
+                )
+                PastWorkoutExerciseAction(form != null, !completingItem && !savingPast) {
+                    completeCurrentExercise(vm, item, durationKey, duration) {}
                 }
             }
         }
         RemainingWorkoutItems(workout, next, vm)
         if (!addFirstExercise) {
-            TextAction(stringResource(R.string.add_exercise), { picker = true }, Modifier.padding(top = Dimens.sectionGap), icon = Icons.Outlined.Add)
+            TextAction(stringResource(R.string.add_exercise), {
+                picker = true
+            }, Modifier.padding(top = Dimens.sectionGap), icon = Icons.Outlined.Add)
         }
         if (form != null) {
             KeyValueRow(
@@ -339,44 +311,25 @@ fun WorkoutScreen(
             TextField(form.note, stringResource(R.string.note), { updatePast(form.copy(note = it)) }, enabled = !savingPast)
         }
         if (!addFirstExercise) {
-            ListCard {
-                if (form == null) {
-                    item {
-                        ListRow(stringResource(R.string.add_check_in), onClick = onCheckIn,
-                            leading = { Icon(Icons.Outlined.FavoriteBorder, null, tint = colors.textSecondary) })
+            WorkoutEntryActions(
+                isPastEntry = form != null,
+                onCheckIn = onCheckIn,
+                onAdaptWorkout = onAdaptWorkout,
+                onUpdateRoutine = savedRoutine?.takeIf { canUpdateRoutine }?.let { routine ->
+                    {
+                        routineSaveRevision = routine.revision
+                        routineSave = true
                     }
-                    if (onAdaptWorkout != null) item {
-                        ListRow(stringResource(R.string.adapt_workout), onClick = onAdaptWorkout,
-                            leading = { Icon(Icons.Outlined.Edit, null, tint = colors.textSecondary) })
-                    }
-                    if (canUpdateRoutine) item {
-                        ListRow(stringResource(R.string.save_changes_routine), onClick = {
-                            routineSaveRevision = savedRoutine?.revision
-                            routineSave = true
-                        }, leading = { Icon(Icons.Outlined.Save, null, tint = colors.textSecondary) }, showChevron = false)
-                    }
-                }
-                item {
-                    ListRow(stringResource(R.string.discard_workout), onClick = { discard = true },
-                        leading = { Icon(Icons.Outlined.Delete, null, tint = colors.error) },
-                        titleColor = colors.error, showChevron = false)
-                }
-            }
+                },
+                onDiscard = { discard = true }
+            )
         }
     }
     val form = pastForm
     if (editMinutes && form != null) {
-        var entered by rememberSaveable { mutableStateOf(form.duration) }
-        val valid = entered == form.duration || runCatching { performedSeconds(entered) }.isSuccess
-        EditorSheet(stringResource(R.string.duration), { editMinutes = false }) {
-            NumberField(entered, { entered = it }, stringResource(R.string.minutes))
-            ActionRow(Modifier.align(Alignment.End)) {
-                DialogAction(stringResource(R.string.cancel), { editMinutes = false })
-                DialogAction(stringResource(R.string.done), {
-                    updatePast(form.copy(duration = entered))
-                    editMinutes = false
-                }, enabled = valid)
-            }
+        PastWorkoutDurationEditor(form.duration, onDismiss = { editMinutes = false }) {
+            updatePast(form.copy(duration = it))
+            editMinutes = false
         }
     }
     if (picker) {
@@ -398,7 +351,7 @@ fun WorkoutScreen(
         WorkoutAlternativeSheet(data, current, vm) { alternativeItemId = null }
     }
     if (discard) {
-        ConfirmDialog(stringResource(R.string.discard_workout_question), stringResource(R.string.discard_workout_message), stringResource(R.string.discard), destructive = true, {
+        ConfirmDialog(stringResource(R.string.discard_workout_question), null, stringResource(R.string.discard), destructive = true, {
             vm.write {
                 deleteWorkout(id)
                 onDelete()
@@ -410,7 +363,7 @@ fun WorkoutScreen(
     remove?.let { item ->
         ConfirmDialog(
             stringResource(R.string.delete_recorded_work_question),
-            stringResource(R.string.delete_recorded_work_message),
+            null,
             stringResource(R.string.delete),
             destructive = true,
             {
@@ -434,6 +387,146 @@ fun WorkoutScreen(
             },
             { routineSave = false }
         )
+    }
+}
+
+@Composable
+private fun WorkoutContentHeader(form: TimingDraft?, workout: Workout, elapsed: Long?) {
+    if (form != null) {
+        Text(form.title, style = MaterialTheme.typography.headlineLarge)
+        Text(LocalDate.parse(form.date).shortDate(), color = InShapeTheme.colors.textSecondary, style = MaterialTheme.typography.bodyMedium)
+    } else if (workout.items.isNotEmpty()) {
+        WorkoutBanner(workout, elapsed)
+    }
+    if (workout.items.isEmpty()) Text(stringResource(R.string.no_exercises), style = MaterialTheme.typography.titleLarge)
+}
+
+@Composable
+private fun PastWorkoutExerciseAction(isPastEntry: Boolean, enabled: Boolean, onDone: () -> Unit) {
+    if (isPastEntry) TextAction(stringResource(R.string.exercise_done), onDone, icon = Icons.Outlined.Check, enabled = enabled)
+}
+
+@Composable
+private fun ColumnScope.WorkoutExerciseGuidance(
+    data: JournalSnapshot,
+    workout: Workout,
+    item: WorkoutItem,
+    vm: JournalViewModel,
+    canUseAssistant: Boolean,
+    musicPlayback: MusicPlayback?
+) {
+    val id = workout.row.id
+    if (canUseAssistant) WorkoutSpeech(id, item, vm.container.assistant, musicPlayback)
+    com.emmah.inshape.feature.assistant.AssistantMemories(
+        data.assistantMemories.filter {
+            it.exerciseId == item.row.exerciseId && it.acknowledgedAt == null && it.creationWorkoutId != id
+        },
+        vm,
+        acknowledge = true
+    )
+    ProgramProgressionReview(data, workout, item, vm)
+}
+
+private fun pastWorkoutTiming(workout: Workout, data: JournalSnapshot, draftKey: String): TimingDraft? {
+    if (!workout.isPastEntry) return null
+    val draft = initialTimingDraft(workout.row, data, draftKey)
+    val date = runCatching { LocalDate.parse(draft.date) }.getOrNull()?.toString() ?: workout.row.journalDate
+    val zone = ZoneId.of(workout.row.zoneId)
+    val hasValidTimes = !draft.unknownTimes && runCatching {
+        val start = resolveRecordedTime(draft.startDate, draft.startTime, zone, draft.originalStart)
+        val end = resolveRecordedTime(draft.endDate, draft.endTime, zone, draft.originalEnd)
+        end.isAfter(start)
+    }.getOrDefault(false)
+    return draft.copy(date = date, unknownTimes = !hasValidTimes)
+}
+
+private fun savePastWorkout(
+    vm: JournalViewModel,
+    workout: Workout,
+    form: TimingDraft,
+    current: WorkoutItem?,
+    duration: String,
+    savePastKey: String,
+    pastKey: String
+) {
+    val id = workout.row.id
+    vm.submit(savePastKey) {
+        val timing = form.toTiming(ZoneId.of(workout.row.zoneId))
+        db.withTransaction {
+            if (current != null && duration.isNotBlank()) {
+                markItemDone(current.row.id, performedSeconds(duration), draftId = "duration:${current.row.id}")
+            }
+            val row = snapshot().workout(id)?.row ?: throw UiException(R.string.workout_missing)
+            if (row.state != "COMPLETED") {
+                correctWorkout(id, row.revision, form.title, form.date, form.note, timing)
+                finishWorkout(id, timing)
+            }
+            deleteEditorDraft(pastKey)
+        }
+        id
+    }
+}
+
+@Composable
+private fun WorkoutEntryActions(
+    isPastEntry: Boolean,
+    onCheckIn: () -> Unit,
+    onAdaptWorkout: (() -> Unit)?,
+    onUpdateRoutine: (() -> Unit)?,
+    onDiscard: () -> Unit
+) {
+    val colors = InShapeTheme.colors
+    ListCard {
+        if (!isPastEntry) {
+            item {
+                ListRow(
+                    stringResource(R.string.add_check_in),
+                    onClick = onCheckIn,
+                    leading = { Icon(Icons.Outlined.FavoriteBorder, null, tint = colors.textSecondary) }
+                )
+            }
+            if (onAdaptWorkout != null) {
+                item {
+                    ListRow(
+                        stringResource(R.string.adapt_workout),
+                        onClick = onAdaptWorkout,
+                        leading = { Icon(Icons.Outlined.Edit, null, tint = colors.textSecondary) }
+                    )
+                }
+            }
+            if (onUpdateRoutine != null) {
+                item {
+                    ListRow(
+                        stringResource(R.string.save_changes_routine),
+                        onClick = onUpdateRoutine,
+                        leading = { Icon(Icons.Outlined.Save, null, tint = colors.textSecondary) },
+                        showChevron = false
+                    )
+                }
+            }
+        }
+        item {
+            ListRow(
+                stringResource(R.string.discard_workout),
+                onClick = onDiscard,
+                leading = { Icon(Icons.Outlined.Delete, null, tint = colors.error) },
+                titleColor = colors.error,
+                showChevron = false
+            )
+        }
+    }
+}
+
+@Composable
+private fun PastWorkoutDurationEditor(initial: String, onDismiss: () -> Unit, onDone: (String) -> Unit) {
+    var entered by rememberSaveable { mutableStateOf(initial) }
+    val valid = entered == initial || runCatching { performedSeconds(entered) }.isSuccess
+    EditorSheet(stringResource(R.string.duration), onDismiss) {
+        NumberField(entered, { entered = it }, stringResource(R.string.minutes))
+        ActionRow(Modifier.align(Alignment.End)) {
+            DialogAction(stringResource(R.string.cancel), onDismiss)
+            DialogAction(stringResource(R.string.done), { onDone(entered) }, enabled = valid)
+        }
     }
 }
 
@@ -494,12 +587,16 @@ private fun WorkoutHeader(
     PushedHeader(
         onBack,
         trailingText = !workout.isPastEntry,
-        titleContent = if (workout.isPastEntry) null else {
+        titleContent = if (workout.isPastEntry) {
+            null
+        } else {
             {
                 BoxWithConstraints {
                     val clock = elapsed?.let(::formatElapsed) ?: "–"
                     val textMeasurer = rememberTextMeasurer()
-                    val clockStyle = if (textMeasurer.measure(clock, InShapeType.workoutClock, softWrap = false).size.width <= constraints.maxWidth) {
+                    val clockStyle = if (textMeasurer.measure(clock, InShapeType.workoutClock, softWrap = false).size.width <=
+                        constraints.maxWidth
+                    ) {
                         InShapeType.workoutClock
                     } else {
                         InShapeType.workoutClockCompact
@@ -533,7 +630,7 @@ private fun WorkoutHeader(
             val label = stringResource(if (playback.song != null) R.string.now_playing else R.string.music)
             if (playback.playing) {
                 IconButton(onMusic, Modifier.size(Dimens.touch).semantics { contentDescription = label }) {
-                    PlaybackBars(playing = true, Modifier.size(Dimens.icon))
+                    PlaybackBars(playing = true, inHeader = true)
                 }
             } else {
                 HeaderIconButton(Icons.Outlined.MusicNote, label, onMusic)
@@ -584,7 +681,6 @@ private fun WorkoutBanner(workout: Workout, elapsed: Long?) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.textSecondary
                 )
-                Text(stringResource(R.string.review_workout_timing), style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
             }
         }
     }
@@ -611,9 +707,12 @@ internal fun workoutSetupLabels(context: Context, setup: String, settings: List<
         val lastToken = entry.substringAfterLast(' ')
         when {
             separator >= 0 -> setting(entry.take(separator).trim(), entry.drop(separator + 1).trim())
+
             legacyLabel != null -> setting(legacyLabel, entry.drop(legacyLabel.length + 1).trim())
+
             lastToken != entry && (lastToken.replace(',', '.').toBigDecimalOrNull() != null || lastToken.length <= 8) ->
                 setting(entry.substringBeforeLast(' ').trimEnd(), lastToken)
+
             else -> setting(null, entry)
         }
     }
@@ -685,13 +784,10 @@ private fun ColumnScope.WorkoutSetEditor(
     vm: JournalViewModel,
     firstIncomplete: String?,
     setRequester: BringIntoViewRequester,
-    showRemoveSetHint: Boolean,
-    onRemoveSet: () -> Unit,
     duration: String,
     completingItem: Boolean,
     onDurationChange: (String) -> Unit
 ) {
-    val colors = InShapeTheme.colors
     item.sets.mapNotNull { it.plannedReps }.distinct().forEach { reps ->
         Text(stringResource(R.string.rep_target, reps.localizedDisplay(LocalContext.current)), style = MaterialTheme.typography.bodySmall)
     }
@@ -706,17 +802,9 @@ private fun ColumnScope.WorkoutSetEditor(
                 modifier = Modifier.testTag("workout-set-${index + 1}").then(
                     if (set.id == firstIncomplete) Modifier.bringIntoViewRequester(setRequester) else Modifier
                 ),
-                highlighted = set.id == firstIncomplete,
-                onRemove = onRemoveSet
+                highlighted = set.id == firstIncomplete
             )
         }
-    }
-    if (showRemoveSetHint && item.sets.isNotEmpty()) {
-        Text(
-            stringResource(R.string.tap_set_remove),
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.textSecondary
-        )
     }
     TextAction(stringResource(R.string.add_set), {
         vm.write { addSet(item.row.id) }
@@ -732,12 +820,11 @@ private fun ColumnScope.WorkoutSetEditor(
 private fun CurrentWorkoutExercise(
     item: WorkoutItem,
     data: JournalSnapshot,
-    id: String,
     vm: JournalViewModel,
     onExercise: (String, String) -> Unit,
-    onTitlePositioned: (Float) -> Unit,
+    onTitlePositionChange: (Float) -> Unit,
     onSwap: () -> Unit,
-    onRemoveRecorded: () -> Unit,
+    onRemoveWithResults: () -> Unit,
     onAssistant: (() -> Unit)?,
     setEditor: @Composable ColumnScope.() -> Unit
 ) {
@@ -759,7 +846,7 @@ private fun CurrentWorkoutExercise(
     }
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
         Row(
-            Modifier.fillMaxWidth().onGloballyPositioned { onTitlePositioned(it.positionInRoot().y) },
+            Modifier.fillMaxWidth().onGloballyPositioned { onTitlePositionChange(it.positionInRoot().y) },
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -772,7 +859,12 @@ private fun CurrentWorkoutExercise(
             Box {
                 IconButton({
                     menu = true
-                }) { Icon(Icons.Outlined.MoreVert, stringResource(R.string.named_options, item.row.name.exerciseDisplayName(LocalContext.current))) }
+                }) {
+                    Icon(
+                        Icons.Outlined.MoreVert,
+                        stringResource(R.string.named_options, item.row.name.exerciseDisplayName(LocalContext.current))
+                    )
+                }
                 AppMenu(menu, { menu = false }) {
                     if (onAssistant != null) {
                         MenuAction(stringResource(R.string.workout_assistant), Icons.Outlined.Mic, {
@@ -780,11 +872,21 @@ private fun CurrentWorkoutExercise(
                             onAssistant()
                         })
                     }
-                    MenuAction(if (exerciseNote.isBlank()) stringResource(R.string.add_note) else stringResource(R.string.edit_note), Icons.Outlined.EditNote, {
-                        menu = false
-                        expanded = true
-                        focusNote = true
-                    })
+                    MenuAction(
+                        if (exerciseNote.isBlank()) {
+                            stringResource(
+                                R.string.add_note
+                            )
+                        } else {
+                            stringResource(R.string.edit_note)
+                        },
+                        Icons.Outlined.EditNote,
+                        {
+                            menu = false
+                            expanded = true
+                            focusNote = true
+                        }
+                    )
                     MenuAction(stringResource(R.string.swap_exercise), Icons.Outlined.SwapHoriz, {
                         menu = false
                         onSwap()
@@ -796,20 +898,20 @@ private fun CurrentWorkoutExercise(
                     HorizontalDivider(color = colors.divider)
                     MenuAction(stringResource(R.string.remove_exercise), Icons.Outlined.Delete, {
                         menu = false
-                        if (item.hasPerformedWork) onRemoveRecorded() else vm.write { removeItem(item.row.id) }
+                        if (item.hasPerformedWork) onRemoveWithResults() else vm.write { removeItem(item.row.id) }
                     }, destructive = true)
                 }
             }
         }
         val settings = data.exercises.firstOrNull { it.id == item.row.exerciseId && it.equipmentId == item.row.equipmentId }?.settings
         WorkoutSetup(item.row.setup, settings.orEmpty())
-        PreviousWorkoutResult(data, id, item)
+        PreviousWorkoutResult(data, item.row.workoutId, item)
         setEditor()
         if (expanded) {
             TextField(exerciseNote, stringResource(R.string.note), {
                 exerciseNote = it
                 vm.write { saveItemNote(item.row.id, note = it) }
-            }, modifier = Modifier.focusRequester(focus), placeholder = stringResource(R.string.for_this_exercise))
+            }, modifier = Modifier.focusRequester(focus))
             ListRow(stringResource(R.string.discomfort_example), trailing = {
                 Checkbox(item.row.discomfort, { value ->
                     vm.write { saveItemNote(item.row.id, discomfort = value) }
@@ -839,9 +941,7 @@ private fun ColumnScope.RemainingWorkoutItems(workout: Workout, next: List<Worko
             next.forEach { nextItem ->
                 item {
                     val summary = plannedItemSummary(LocalContext.current, nextItem)
-                    ListRow(nextItem.row.name.exerciseDisplayName(LocalContext.current), trailingValue = if (summary.isNotEmpty()) ({
-                        Text(summary, style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
-                    }) else null)
+                    ListRow(nextItem.row.name.exerciseDisplayName(LocalContext.current), subtitle = summary.takeIf(String::isNotEmpty))
                 }
             }
         }
@@ -852,17 +952,23 @@ private fun ColumnScope.RemainingWorkoutItems(workout: Workout, next: List<Worko
         ListCard {
             done.forEach { doneItem ->
                 item {
-                    ListRow(doneItem.row.name.exerciseDisplayName(LocalContext.current), subtitle = itemSummary(LocalContext.current, doneItem), trailing = {
-                        IconButton({
-                            vm.write { reopenItem(doneItem.row.id) }
-                        }) {
-                            Icon(
-                                Icons.Filled.CheckCircle,
-                                stringResource(R.string.reopen_named, doneItem.row.name.exerciseDisplayName(LocalContext.current)),
-                                tint = colors.ink
-                            )
+                    ListRow(
+                        doneItem.row.name.exerciseDisplayName(
+                            LocalContext.current
+                        ),
+                        subtitle = itemSummary(LocalContext.current, doneItem),
+                        trailing = {
+                            IconButton({
+                                vm.write { reopenItem(doneItem.row.id) }
+                            }) {
+                                Icon(
+                                    Icons.Filled.CheckCircle,
+                                    stringResource(R.string.reopen_named, doneItem.row.name.exerciseDisplayName(LocalContext.current)),
+                                    tint = colors.ink
+                                )
+                            }
                         }
-                    })
+                    )
                 }
             }
         }
@@ -875,7 +981,13 @@ private fun ColumnScope.RemainingWorkoutItems(workout: Workout, next: List<Worko
                 item {
                     ListRow(
                         skippedItem.row.name.exerciseDisplayName(LocalContext.current),
-                        subtitle = if (skippedItem.hasPerformedWork) stringResource(R.string.remainder_skipped) else stringResource(R.string.skipped_today),
+                        subtitle = if (skippedItem.hasPerformedWork) {
+                            stringResource(
+                                R.string.remainder_skipped
+                            )
+                        } else {
+                            stringResource(R.string.skipped_today)
+                        },
                         trailing = {
                             TextAction(stringResource(R.string.reopen), {
                                 vm.write { reopenItem(skippedItem.row.id) }
@@ -902,19 +1014,30 @@ private fun WorkoutAlternativeSheet(data: JournalSnapshot, current: WorkoutItem,
         }
         Page {
             val source = data.workouts.find { it.id == current.row.workoutId }?.program
-            val planned = source?.let { vm.container.programs.session(it.programId, it.day) }?.exercises
+            val planned = current.row.plan?.sourceSlot ?: source?.let { vm.container.programs.session(it.programId, it.day) }?.exercises
                 ?.find { it.exerciseId == current.row.plan?.originalCatalogExerciseId }
             if (planned != null && planned.alternatives.isNotEmpty()) {
                 SectionHeader(stringResource(R.string.program_alternatives))
                 ListCard {
                     planned.alternatives.filter { it.exerciseId != current.row.plan?.catalogExerciseId }.forEach { alternative ->
-                        val linked = data.programLinks.filter { it.catalogExerciseId == alternative.exerciseId }.map { it.exerciseId }.toSet()
+                        val linked = data.programLinks.filter {
+                            it.catalogExerciseId == alternative.exerciseId
+                        }.map { it.exerciseId }.toSet()
                         data.exercises.filter { it.id in linked && it.id != currentId && !it.archived }.forEach { exercise ->
                             item {
-                                ListRow(exercise.name.exerciseDisplayName(LocalContext.current), subtitle = listOf(exercise.location.locationLabel(LocalContext.current), exercise.equipmentName.exerciseDisplayName(LocalContext.current)).joinToString(", "), onClick = {
-                                    vm.write { useProgramAlternative(current.row.id, planned, alternative, exercise.id) }
-                                    onDismiss()
-                                })
+                                ListRow(
+                                    exercise.name.exerciseDisplayName(
+                                        LocalContext.current
+                                    ),
+                                    subtitle = listOf(
+                                        exercise.location.locationLabel(LocalContext.current),
+                                        exercise.equipmentName.exerciseDisplayName(LocalContext.current)
+                                    ).joinToString(", "),
+                                    onClick = {
+                                        vm.write { useProgramAlternative(current.row.id, planned, alternative, exercise.id) }
+                                        onDismiss()
+                                    }
+                                )
                             }
                         }
                         item {
@@ -926,12 +1049,21 @@ private fun WorkoutAlternativeSheet(data: JournalSnapshot, current: WorkoutItem,
                     }
                 }
             }
-            SectionHeader(stringResource(R.string.your_alternatives))
-            if (saved.isEmpty()) Text(stringResource(R.string.edit_alternatives_hint))
-            ListCard {
-                saved.forEach { exercise ->
-                    item {
-                        ListRow(exercise.name.exerciseDisplayName(LocalContext.current), subtitle = exercise.category.categoryLabel(LocalContext.current), onClick = { swap(exercise.id) })
+            if (saved.isNotEmpty()) {
+                SectionHeader(stringResource(R.string.your_alternatives))
+                ListCard {
+                    saved.forEach { exercise ->
+                        item {
+                            ListRow(
+                                exercise.name.exerciseDisplayName(
+                                    LocalContext.current
+                                ),
+                                subtitle = exercise.category.categoryLabel(LocalContext.current),
+                                onClick = {
+                                    swap(exercise.id)
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -953,6 +1085,7 @@ private fun ScrollToWorkoutProgress(
     scrollTarget: () -> Int?
 ) {
     val dragging by scrollState.interactionSource.collectIsDraggedAsState()
+    val latestScrollTarget by rememberUpdatedState(scrollTarget)
     var previousItemId by rememberSaveable(id) { mutableStateOf<String?>(null) }
     var previousSetId by rememberSaveable(id) { mutableStateOf<String?>(null) }
     LaunchedEffect(current?.row?.id, firstIncomplete) {
@@ -963,7 +1096,7 @@ private fun ScrollToWorkoutProgress(
         if (current != null && !keyboardVisible && !dragging) {
             withFrameNanos { }
             if (itemChanged && doneCount > 0) {
-                val target = snapshotFlow(scrollTarget).filterNotNull().first()
+                val target = snapshotFlow { latestScrollTarget() }.filterNotNull().first()
                 if (!dragging) scrollState.animateScrollTo(target)
             }
             val hasRecordedProgress = doneCount > 0 || current.completedSets.isNotEmpty()

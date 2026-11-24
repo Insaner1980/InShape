@@ -1,25 +1,12 @@
 package com.emmah.inshape.feature.library
 
-import com.emmah.inshape.feature.library.groupTypeLabel
-import androidx.compose.ui.platform.LocalContext
-import com.emmah.inshape.ui.requireUi
-import com.emmah.inshape.ui.UiException
-import com.emmah.inshape.ui.theme.finnishLocale
-import androidx.compose.ui.res.stringResource
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.LaunchedEffect
-import com.emmah.inshape.ui.theme.formatDuration
-import com.emmah.inshape.feature.workout.setSummary
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -33,6 +20,7 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -51,11 +39,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.emmah.inshape.JournalViewModel
 import com.emmah.inshape.R
 import com.emmah.inshape.data.Exercise
@@ -69,14 +65,17 @@ import com.emmah.inshape.data.SetTarget
 import com.emmah.inshape.data.newId
 import com.emmah.inshape.data.parseWholeMinutesToSeconds
 import com.emmah.inshape.data.validatedSetValues
+import com.emmah.inshape.feature.library.groupTypeLabel
+import com.emmah.inshape.feature.workout.setSummary
+import com.emmah.inshape.ui.UiException
+import com.emmah.inshape.ui.components.ActionRow
 import com.emmah.inshape.ui.components.AppMenu
 import com.emmah.inshape.ui.components.ArtworkHeader
 import com.emmah.inshape.ui.components.ButtonSize
 import com.emmah.inshape.ui.components.ConfirmDialog
-import com.emmah.inshape.ui.components.ActionRow
-import com.emmah.inshape.ui.components.HeaderIconButton
-import com.emmah.inshape.ui.components.EditorSheet
 import com.emmah.inshape.ui.components.DialogAction
+import com.emmah.inshape.ui.components.EditorSheet
+import com.emmah.inshape.ui.components.HeaderIconButton
 import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListRow
 import com.emmah.inshape.ui.components.MenuAction
@@ -91,10 +90,13 @@ import com.emmah.inshape.ui.components.SelectField
 import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.components.TextField
 import com.emmah.inshape.ui.components.reorderActions
+import com.emmah.inshape.ui.requireUi
 import com.emmah.inshape.ui.theme.ArtworkWash
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
+import com.emmah.inshape.ui.theme.finnishLocale
+import com.emmah.inshape.ui.theme.formatDuration
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -148,6 +150,39 @@ private const val MAX_UNIFORM_ROUTINE_SETS = 999
     val items: List<RoutineItemDraft> = emptyList()
 )
 
+internal fun RoutineDraft.withContiguousGroups(): RoutineDraft {
+    val broken = items.withIndex().groupBy { it.value.plan?.group?.key }.filter { (key, members) ->
+        key != null && (members.size < 2 || members.last().index - members.first().index + 1 != members.size)
+    }.keys
+    if (broken.isEmpty()) return this
+    val normalized = items.map { item ->
+        val plan = item.plan
+        if (plan?.group?.key in broken) item.copy(plan = plan?.copy(group = null)) else item
+    }
+    return copy(items = normalized)
+}
+
+private fun List<RoutineItemDraft>.groupRange(index: Int): IntRange {
+    val key = this[index].plan?.group?.key ?: return index..index
+    val first = indexOfFirst { it.plan?.group?.key == key }
+    val last = indexOfLast { it.plan?.group?.key == key }
+    return first..last
+}
+
+internal fun RoutineDraft.moveItem(index: Int, offset: Int): RoutineDraft {
+    if (index !in items.indices || offset == 0) return this
+    val group = items.groupRange(index)
+    val edge = if (offset < 0) group.first else group.last
+    val target = (edge + offset).coerceIn(items.indices)
+    if (target in group) return this
+    val destination = items.groupRange(target)
+    val insertion = if (offset < 0) destination.first else destination.last + 1 - group.count()
+    val moving = items.slice(group)
+    val remaining = items.filterIndexed { position, _ -> position !in group }.toMutableList()
+    remaining.addAll(insertion, moving)
+    return copy(items = remaining)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RoutineEditor(
@@ -155,7 +190,7 @@ fun RoutineEditor(
     data: JournalSnapshot,
     vm: JournalViewModel,
     onClose: () -> Unit,
-    onCreated: (String) -> Unit,
+    onCreate: (String) -> Unit,
     onStart: (String) -> Unit,
     onCreateExercise: () -> Unit,
     modifier: Modifier = Modifier
@@ -165,13 +200,9 @@ fun RoutineEditor(
     val origin = rememberSaveable(id) { newId() }
     val submissions by vm.submissions.collectAsStateWithLifecycle()
     val submission = submissions[key]
-    val creatingRoutine = submission?.result == null && submission != null
-    val notifyCreated by rememberUpdatedState(onCreated)
-    val createdId = submission?.result?.takeIf { result -> data.routines.any { it.id == result } }
-    LaunchedEffect(submission, createdId) {
-        if (submission != null && createdId != null && vm.consumeSubmission(key, submission) && submission.origin == origin) {
-            notifyCreated(createdId)
-        }
+    val creatingRoutine = submission?.let { it.result == null } == true
+    NotifyEditorCreation(vm, key, origin, submission, onCreate) { result ->
+        data.routines.any { it.id == result }
     }
     val saved = remember(id, data.routines, data.routineItems) {
         data.routines.find { it.id == id }?.let { routine ->
@@ -201,7 +232,7 @@ fun RoutineEditor(
         }
     }
     var draft by remember(id) {
-        mutableStateOf(
+        val initial =
             data.drafts.find { it.id == "routine:$id" }
                 ?.let { runCatching { Json.decodeFromString<RoutineDraft>(it.payload) }.getOrNull() }
                 ?.let { restored ->
@@ -213,7 +244,7 @@ fun RoutineEditor(
                 }
                 ?: saved
                 ?: RoutineDraft()
-        )
+        mutableStateOf(initial.withContiguousGroups())
     }
     var picker by remember { mutableStateOf(false) }
     var removing by remember { mutableStateOf(false) }
@@ -238,21 +269,18 @@ fun RoutineEditor(
             }
         )
     )
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val resources = LocalResources.current
     fun move(itemId: String, offset: Int) {
-        val items = draft.items.toMutableList()
-        val from = items.indexOfFirst { it.id == itemId }
-        val target = (
-            from +
-                offset
-            ).coerceIn(items.indices)
-        val item = items.removeAt(from)
-        items.add(target, item)
-        edit(draft.copy(items = items))
+        val from = draft.items.indexOfFirst { it.id == itemId }
+        val updated = draft.moveItem(from, offset)
+        if (updated === draft) return
+        val item = updated.items.first { it.id == itemId }
+        val target = updated.items.indexOf(item)
+        edit(updated)
         movement =
-            context.getString(
+            resources.getString(
                 R.string.moved_to_position,
-                data.exercises.find { it.id == item.exerciseId }?.name ?: context.getString(R.string.exercise),
+                data.exercises.find { it.id == item.exerciseId }?.name ?: resources.getString(R.string.exercise),
                 target + 1
             )
     }
@@ -377,25 +405,25 @@ fun RoutineEditor(
             }
             ListCard {
                 draft.items.forEachIndexed { index, entry ->
+                    val group = draft.items.groupRange(index)
                     item {
                         key(entry.id) {
                             RoutineExerciseRow(
                                 entry,
                                 data.exercises.find { it.id == entry.exerciseId },
-                                canMoveUp = index > 0,
-                                canMoveDown = index < draft.items.lastIndex,
+                                canMoveUp = group.first > 0,
+                                canMoveDown = group.last < draft.items.lastIndex,
                                 menuOpen = menu == entry.id,
                                 onMenuChange = { open -> menu = entry.id.takeIf { open } },
                                 onMove = { move(entry.id, it) },
                                 onEdit = { editingItem = entry.id },
-                                onRemove = { edit(draft.copy(items = draft.items.filter { it.id != entry.id })) }
+                                onRemove = { edit(draft.copy(items = draft.items.filter { it.id != entry.id }).withContiguousGroups()) }
                             )
                         }
                     }
                 }
             }
             TextAction(stringResource(R.string.add_exercise), { picker = true }, icon = Icons.Outlined.Add)
-
         }
     }
     if (details) {
@@ -440,22 +468,35 @@ fun RoutineEditor(
         }
     }
     if (removing) {
-        ConfirmDialog(stringResource(R.string.remove_routine_question), stringResource(R.string.remove_routine_message), stringResource(R.string.remove), destructive = true, {
-            vm.write {
-                removeRoutine(id)
-                deleteEditorDraft("routine:$id")
-                onClose()
-            }
-            removing =
-                false
-        }, { removing = false })
+        ConfirmDialog(
+            stringResource(
+                R.string.remove_routine_question
+            ),
+            stringResource(R.string.remove_routine_message),
+            stringResource(R.string.remove),
+            destructive = true,
+            {
+                vm.write {
+                    removeRoutine(id)
+                    deleteEditorDraft("routine:$id")
+                    onClose()
+                }
+                removing =
+                    false
+            },
+            { removing = false }
+        )
     }
 }
 
 private fun RoutineDraft.toRoutine(): Pair<Routine, List<RoutineItem>> {
     requireUi(title.isNotBlank(), R.string.routine_name_required)
-    val minutes = if (duration.isBlank()) null else duration.toIntOrNull()?.takeIf { it > 0 }
-        ?: throw UiException(R.string.positive_duration)
+    val minutes = if (duration.isBlank()) {
+        null
+    } else {
+        duration.toIntOrNull()?.takeIf { it > 0 }
+            ?: throw UiException(R.string.positive_duration)
+    }
     val routine = Routine(id, title, description, minutes)
     val targets = items.map { item ->
         RoutineItem(
@@ -466,8 +507,11 @@ private fun RoutineDraft.toRoutine(): Pair<Routine, List<RoutineItem>> {
             durationSeconds = item.plannedDurationSeconds(),
             note = item.note,
             sets = item.sets.map { target ->
-                if (target.load.isBlank() && target.reps.isBlank()) SetTarget(plannedReps = target.plannedReps)
-                else validatedSetValues(target.load, target.reps).let { SetTarget(it.first, it.second, target.plannedReps) }
+                if (target.load.isBlank() && target.reps.isBlank()) {
+                    SetTarget(plannedReps = target.plannedReps)
+                } else {
+                    validatedSetValues(target.load, target.reps).let { SetTarget(it.first, it.second, target.plannedReps) }
+                }
             },
             plan = item.plan
         )
@@ -491,7 +535,9 @@ private fun RoutineExerciseRow(
         exercise?.name?.exerciseDisplayName(LocalContext.current) ?: stringResource(R.string.archived_exercise),
         modifier = Modifier.semantics(mergeDescendants = true) {}.reorderActions(canMoveUp, canMoveDown, onMove),
         subtitle = when (entry.mode) {
-            "DURATION" -> runCatching { entry.plannedDurationSeconds() }.getOrNull()?.let(::formatDuration) ?: stringResource(R.string.no_targets)
+            "DURATION" -> runCatching { entry.plannedDurationSeconds() }.getOrNull()?.let(::formatDuration)
+                ?: stringResource(R.string.no_targets)
+
             "QUICK" -> null
 
             else -> setSummary(
@@ -513,7 +559,10 @@ private fun RoutineExerciseRow(
                 }) {
                     Icon(
                         Icons.Outlined.MoreVert,
-                        stringResource(R.string.named_options, exercise?.name?.exerciseDisplayName(LocalContext.current) ?: stringResource(R.string.exercise).lowercase())
+                        stringResource(
+                            R.string.named_options,
+                            exercise?.name?.exerciseDisplayName(LocalContext.current) ?: stringResource(R.string.exercise).lowercase()
+                        )
                     )
                 }
                 AppMenu(menuOpen, { onMenuChange(false) }) {
@@ -554,7 +603,7 @@ private fun RoutineDetailsSheet(
                 { title = it },
                 singleLine = true,
                 error = stringResource(R.string.routine_name_required).takeIf { showNameError && title.isBlank() },
-                focusRequester = nameFocus
+                modifier = Modifier.focusRequester(nameFocus)
             )
             TextField(description, stringResource(R.string.description_optional), { description = it })
             NumberField(duration, { duration = it }, stringResource(R.string.estimated_minutes_optional))
@@ -642,7 +691,7 @@ private fun RoutineItemTargetsSheet(
 }
 
 @Composable
-internal fun RoutineSetTargets(item: RoutineItemDraft, basis: MeasurementBasis, onChange: (RoutineItemDraft) -> Unit) {
+internal fun ColumnScope.RoutineSetTargets(item: RoutineItemDraft, basis: MeasurementBasis, onChange: (RoutineItemDraft) -> Unit) {
     var varies by rememberSaveable(item.id) { mutableStateOf(item.sets.distinct().size > 1) }
     val loadLabel = if (basis != MeasurementBasis.Bodyweight) {
         stringResource(basis.columnLabel)
@@ -650,7 +699,9 @@ internal fun RoutineSetTargets(item: RoutineItemDraft, basis: MeasurementBasis, 
         stringResource(R.string.load).takeIf { item.sets.any { set -> set.load.isNotBlank() } }
     }
     if (item.plan?.restSeconds != null) Text(stringResource(R.string.rest_duration, item.plan.restSeconds))
-    item.plan?.group?.let { Text(stringResource(R.string.rounds_group, it.type.groupTypeLabel(LocalContext.current), it.rounds)) }
+    item.plan?.group?.let {
+        Text(pluralStringResource(R.plurals.rounds_group, it.rounds, it.type.groupTypeLabel(LocalContext.current), it.rounds))
+    }
     if (varies) {
         item.sets.forEachIndexed { index, set ->
             fun update(value: RoutineSetDraft) {
@@ -665,8 +716,10 @@ internal fun RoutineSetTargets(item: RoutineItemDraft, basis: MeasurementBasis, 
                     Text(stringResource(R.string.set_number, index + 1), style = MaterialTheme.typography.bodySmall)
                     ResponsiveRow {
                         NumberField(
-                            set.reps, { update(set.copy(reps = it, plannedReps = null)) },
-                            set.plannedReps?.localizedDisplay(LocalContext.current) ?: stringResource(R.string.reps), Modifier.weight(1f)
+                            set.reps,
+                            { update(set.copy(reps = it, plannedReps = null)) },
+                            set.plannedReps?.localizedDisplay(LocalContext.current) ?: stringResource(R.string.reps),
+                            Modifier.weight(1f)
                         )
                         loadLabel?.let { label ->
                             NumberField(set.load, { update(set.copy(load = it)) }, label, Modifier.weight(1f), decimal = true)
@@ -710,8 +763,10 @@ private fun UniformRoutineTargets(item: RoutineItemDraft, loadLabel: String?, on
             }
         }, stringResource(R.string.sets), Modifier.weight(1f))
         NumberField(
-            target.reps, { updateTarget(target.copy(reps = it, plannedReps = null)) },
-            target.plannedReps?.localizedDisplay(LocalContext.current) ?: stringResource(R.string.reps), Modifier.weight(1f)
+            target.reps,
+            { updateTarget(target.copy(reps = it, plannedReps = null)) },
+            target.plannedReps?.localizedDisplay(LocalContext.current) ?: stringResource(R.string.reps),
+            Modifier.weight(1f)
         )
         loadLabel?.let { label ->
             NumberField(target.load, { updateTarget(target.copy(load = it)) }, label, Modifier.weight(1f), decimal = true)

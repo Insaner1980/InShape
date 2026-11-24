@@ -12,6 +12,8 @@ internal val musicMigration1To2 = object : Migration(1, 2) {
                 "workoutId TEXT, startedAt TEXT NOT NULL, playedMs INTEGER NOT NULL)"
         )
         db.execSQL("CREATE INDEX IF NOT EXISTS index_ListeningEvent_workoutId ON ListeningEvent(workoutId)")
-        db.execSQL("CREATE TABLE IF NOT EXISTS PlaylistReceipt (id TEXT NOT NULL PRIMARY KEY, digest TEXT NOT NULL, playlistId TEXT NOT NULL)")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS PlaylistReceipt (id TEXT NOT NULL PRIMARY KEY, digest TEXT NOT NULL, playlistId TEXT NOT NULL)"
+        )
     }
 }

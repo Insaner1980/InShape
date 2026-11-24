@@ -1,64 +1,82 @@
 package com.emmah.inshape.transfer
 
-import android.graphics.Paint
-import com.emmah.inshape.ui.theme.longDate
-import com.emmah.inshape.ui.requireUi
-import com.emmah.inshape.feature.library.exerciseDisplayName
-import com.emmah.inshape.feature.library.categoryLabel
 import android.content.Context
-import com.emmah.inshape.R
-import com.emmah.inshape.feature.workout.setSummary
-import com.emmah.inshape.data.SetTarget
-import com.emmah.inshape.data.MeasurementBasis
-import com.emmah.inshape.feature.workout.workoutTimeRange
-import com.emmah.inshape.ui.theme.displayedDurationSeconds
-import com.emmah.inshape.ui.theme.formatDuration
-import com.emmah.inshape.feature.workout.itemSummary
-import java.time.ZoneId
-import java.time.Instant
-import java.time.LocalDate
-import com.emmah.inshape.feature.checkin.effortLevelOf
-import com.emmah.inshape.ui.theme.workoutTime
-import com.emmah.inshape.ui.theme.energyText
-import com.emmah.inshape.ui.theme.dateTime
-import androidx.compose.ui.graphics.toArgb
-import com.emmah.inshape.ui.theme.LightColors
+import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
+import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.withClip
+import com.emmah.inshape.R
 import com.emmah.inshape.data.BodyObservation
 import com.emmah.inshape.data.CheckIn
 import com.emmah.inshape.data.JournalSnapshot
+import com.emmah.inshape.data.MeasurementBasis
+import com.emmah.inshape.data.SetTarget
 import com.emmah.inshape.data.Workout
 import com.emmah.inshape.data.WorkoutItem
+import com.emmah.inshape.feature.checkin.effortLevelOf
+import com.emmah.inshape.feature.library.categoryLabel
+import com.emmah.inshape.feature.library.exerciseDisplayName
+import com.emmah.inshape.feature.workout.itemSummary
+import com.emmah.inshape.feature.workout.setSummary
+import com.emmah.inshape.feature.workout.workoutTimeRange
+import com.emmah.inshape.ui.requireUi
+import com.emmah.inshape.ui.theme.LightColors
+import com.emmah.inshape.ui.theme.dateTime
+import com.emmah.inshape.ui.theme.displayedDurationSeconds
+import com.emmah.inshape.ui.theme.energyText
+import com.emmah.inshape.ui.theme.formatDuration
+import com.emmah.inshape.ui.theme.longDate
 import com.emmah.inshape.ui.theme.observationText
 import com.emmah.inshape.ui.theme.shortDate
+import com.emmah.inshape.ui.theme.workoutTime
 import java.io.OutputStream
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 private const val PDF_FONT_FAMILY = "sans-serif"
+
+internal interface PdfContent {
+    val context: Context
+    fun paragraph(text: String, heading: Boolean = false)
+    fun addSectionSpacing()
+}
 
 object PdfExporter {
     fun write(context: Context, data: JournalSnapshot, selection: ExportSelection, output: OutputStream) {
         val workouts = selectedWorkouts(data, selection)
-        val observationsByCheckIn = if (selection.includeCheckIns) data.observations.groupBy { it.checkInId } else emptyMap()
         PdfPages(context, workouts.size).use { pages ->
-            workouts.forEach { workout ->
-                pages.writeWorkout(workout, selection.includeNotes)
-                if (selection.includeCheckIns) {
-                    workout.checkIns.sortedBy { it.observedAt }.forEach { check ->
-                        pages.writeCheckIn(check, workout.row.journalDate, observationsByCheckIn[check.id].orEmpty(), selection.includeNotes)
-                    }
-                }
-                pages.addSectionSpacing()
-            }
+            writeContent(workouts, data.observations, selection, pages)
             pages.writeTo(output)
         }
     }
 
-    private fun PdfPages.writeWorkout(workout: Workout, includeNotes: Boolean) {
+    internal fun writeContent(workouts: List<Workout>, observations: List<BodyObservation>, selection: ExportSelection, content: PdfContent) {
+        val observationsByCheckIn = if (selection.includeCheckIns) observations.groupBy { it.checkInId } else emptyMap()
+        workouts.forEach { workout ->
+            content.writeWorkout(workout, selection.includeNotes)
+            if (selection.includeCheckIns) {
+                content.writeWorkoutCheckIns(workout, observationsByCheckIn, selection.includeNotes)
+            }
+            content.addSectionSpacing()
+        }
+    }
+
+    private fun PdfContent.writeWorkoutCheckIns(
+        workout: Workout,
+        observationsByCheckIn: Map<String, List<BodyObservation>>,
+        includeNotes: Boolean
+    ) {
+        workout.checkIns.sortedBy { it.observedAt }.forEach { check ->
+            writeCheckIn(check, workout.row.journalDate, observationsByCheckIn[check.id].orEmpty(), includeNotes)
+        }
+    }
+
+    private fun PdfContent.writeWorkout(workout: Workout, includeNotes: Boolean) {
         val row = workout.row
         paragraph("${LocalDate.parse(row.journalDate).longDate()} ${row.title}", heading = true)
         paragraph(
@@ -73,8 +91,11 @@ object PdfExporter {
             val zone = ZoneId.of(row.zoneId)
             val range = workoutTimeRange(Instant.parse(row.start), Instant.parse(row.end), zone)
             paragraph(
-                if (zone == ZoneId.systemDefault()) context.getString(R.string.export_actual_interval, range)
-                else context.getString(R.string.export_actual_interval_with_zone, range, row.zoneId)
+                if (zone == ZoneId.systemDefault()) {
+                    context.getString(R.string.export_actual_interval, range)
+                } else {
+                    context.getString(R.string.export_actual_interval_with_zone, range, row.zoneId)
+                }
             )
         }
         if (includeNotes && row.note.isNotBlank()) {
@@ -85,12 +106,22 @@ object PdfExporter {
         workout.items.filter { it.hasPerformedWork }.forEach { writeExercise(it, includeNotes) }
     }
 
-    private fun PdfPages.writeExercise(item: WorkoutItem, includeNotes: Boolean) {
+    private fun PdfContent.writeExercise(item: WorkoutItem, includeNotes: Boolean) {
         val row = item.row
         paragraph(row.name.exerciseDisplayName(context), heading = true)
         paragraph("${row.category.categoryLabel(context)}, ${context.getString(MeasurementBasis.fromKey(row.basis).optionLabel)}")
         if (row.disposition != "DONE") {
-            paragraph(context.getString(if (row.disposition == "SKIPPED") R.string.export_skipped_exercise else R.string.export_partial_exercise))
+            paragraph(
+                context.getString(
+                    if (row.disposition ==
+                        "SKIPPED"
+                    ) {
+                        R.string.export_skipped_exercise
+                    } else {
+                        R.string.export_partial_exercise
+                    }
+                )
+            )
         }
         paragraph(itemSummary(context, item))
         val sets = item.completedSets
@@ -109,12 +140,7 @@ object PdfExporter {
         if (row.discomfort) paragraph(context.getString(R.string.discomfort_noted))
     }
 
-    private fun PdfPages.writeCheckIn(
-        check: CheckIn,
-        workoutDate: String,
-        observations: List<BodyObservation>,
-        includeNotes: Boolean
-    ) {
+    private fun PdfContent.writeCheckIn(check: CheckIn, workoutDate: String, observations: List<BodyObservation>, includeNotes: Boolean) {
         paragraph(
             when (check.phase) {
                 "BEFORE" -> context.getString(R.string.before_workout)
@@ -126,8 +152,11 @@ object PdfExporter {
         val instant = Instant.parse(check.observedAt)
         val zone = ZoneId.of(check.zoneId)
         paragraph(
-            if (instant.atZone(zone).toLocalDate().toString() == workoutDate) instant.workoutTime(zone, true)
-            else dateTime(instant, zone, true)
+            if (instant.atZone(zone).toLocalDate().toString() == workoutDate) {
+                instant.workoutTime(zone, true)
+            } else {
+                dateTime(instant, zone, true)
+            }
         )
         listOfNotNull(effortLevelOf(check.effort)?.let { context.getString(it.label) }, energyText(context, check.energy))
             .takeIf { it.isNotEmpty() }?.let { paragraph(it.joinToString(", ")) }
@@ -140,7 +169,7 @@ object PdfExporter {
     }
 }
 
-private class PdfPages(val context: Context, private val workoutCount: Int) : AutoCloseable {
+private class PdfPages(override val context: Context, private val workoutCount: Int) : AutoCloseable, PdfContent {
     private val document = PdfDocument()
     private var page: PdfDocument.Page? = null
     private var pageNumber = 0
@@ -170,7 +199,7 @@ private class PdfPages(val context: Context, private val workoutCount: Int) : Au
         y = 76
     }
 
-    fun paragraph(text: String, heading: Boolean = false) {
+    override fun paragraph(text: String, heading: Boolean) {
         if (text.isEmpty()) return
         if (page == null) newPage()
         val layout = paragraphLayout(text, heading)
@@ -207,7 +236,7 @@ private class PdfPages(val context: Context, private val workoutCount: Int) : Au
             .build()
     }
 
-    fun addSectionSpacing() {
+    override fun addSectionSpacing() {
         y += 12
     }
 

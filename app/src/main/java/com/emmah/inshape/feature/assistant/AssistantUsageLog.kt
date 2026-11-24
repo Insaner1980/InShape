@@ -7,13 +7,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 @Serializable
-internal data class UsageEntry(
-    val operation: String,
-    val model: String,
-    val at: String,
-    val input: Int?,
-    val output: Int?
-)
+internal data class UsageEntry(val operation: String, val model: String, val at: String, val input: Int?, val output: Int?)
 
 internal class AssistantUsageLog(context: Context) {
     private val prefs = context.getSharedPreferences("assistant_usage", Context.MODE_PRIVATE)

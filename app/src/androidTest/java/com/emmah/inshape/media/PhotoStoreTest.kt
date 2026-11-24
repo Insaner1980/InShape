@@ -1,7 +1,5 @@
 package com.emmah.inshape.media
 
-import com.emmah.inshape.R
-import com.emmah.inshape.quantity
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
@@ -11,11 +9,13 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.emmah.inshape.AppContainer
 import com.emmah.inshape.JournalViewModel
+import com.emmah.inshape.R
 import com.emmah.inshape.SaveState
 import com.emmah.inshape.data.Exercise
 import com.emmah.inshape.data.JournalDatabase
 import com.emmah.inshape.data.newId
 import com.emmah.inshape.feature.library.importExercisePhotos
+import com.emmah.inshape.quantity
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filterIsInstance

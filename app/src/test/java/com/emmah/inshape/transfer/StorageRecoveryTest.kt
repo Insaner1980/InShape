@@ -1,6 +1,5 @@
 package com.emmah.inshape.transfer
 
-import com.emmah.inshape.R
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -11,15 +10,19 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
 import com.emmah.inshape.AppContainer
+import com.emmah.inshape.R
 import com.emmah.inshape.data.Exercise
+import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.PhotoAsset
 import com.emmah.inshape.data.newId
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.RandomAccessFile
+import java.time.Instant
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.SerializationException
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -181,6 +184,35 @@ class StorageRecoveryTest {
         assertEquals(lastBackupAt, restored.preferences.lastBackupAt)
         assertFalse(originalFile.exists())
         assertTrue(stagingRoot.list().orEmpty().isEmpty())
+    }
+
+    @Test fun readFailureDuringRestoreRollsBackReplacement() = runBlocking {
+        val incoming = Exercise(name = "Incoming")
+        val journal = JournalSnapshot(exercises = listOf(incoming))
+        val archive = ByteArrayOutputStream()
+        BackupArchive.write(journal, { error("No photos") }, archive, Instant.now().toString(), "test")
+        val uri = Uri.parse("content://storage/backup-read-failure")
+        val resolver = shadowOf(context.contentResolver)
+        val database = container.database.openHelper.writableDatabase
+        val before = container.repository.snapshot()
+        database.execSQL(
+            "CREATE TRIGGER fail_restore_read AFTER INSERT ON Exercise WHEN NEW.name = 'Incoming' BEGIN " +
+                "UPDATE Exercise SET settings = 'null' WHERE id = NEW.id; END"
+        )
+        resolver.registerInputStream(uri, ByteArrayInputStream(archive.toByteArray()))
+        val backup = container.backups.validateBackup(uri)
+        assertThrows(SerializationException::class.java) {
+            runBlocking { container.backups.replaceJournal(backup, backup.identity) }
+        }
+        assertEquals(before, container.repository.snapshot())
+        assertFalse(backup.staged.directory.exists())
+        assertFalse(File(container.photos.root, "restore-${backup.identity}").exists())
+
+        database.execSQL("DROP TRIGGER fail_restore_read")
+        resolver.registerInputStream(uri, ByteArrayInputStream(archive.toByteArray()))
+        val retry = container.backups.validateBackup(uri)
+        container.backups.replaceJournal(retry, retry.identity)
+        assertEquals(listOf(incoming), container.repository.snapshot().exercises)
     }
 
     @Test fun failedPhotoDeletionIsReportedAndStartupRecoveryRetriesIt() = runBlocking {

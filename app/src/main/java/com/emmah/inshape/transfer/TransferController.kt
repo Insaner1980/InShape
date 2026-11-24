@@ -1,10 +1,10 @@
 package com.emmah.inshape.transfer
 
-import com.emmah.inshape.ui.UiException
-import com.emmah.inshape.ui.uiMessage
-import com.emmah.inshape.R
 import android.net.Uri
 import com.emmah.inshape.AppContainer
+import com.emmah.inshape.R
+import com.emmah.inshape.ui.UiException
+import com.emmah.inshape.ui.uiMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -69,7 +69,7 @@ class TransferController(
             val backup = container.backups.validateBackup(uri)
             mutableState.value = mutableState.value.copy(backup = backup)
         }
-        container.context.getString(R.string.backup_checked)
+        ""
     }
     fun restore(backup: ValidatedBackup) = run(container.context.getString(R.string.backup_restoring)) {
         try {
@@ -107,7 +107,8 @@ class TransferController(
     fun exportCancelled(id: String?, format: String) {
         if (mutableState.value.busy) return
         id?.let { container.exports.release(it, format) }
-        mutableState.value = mutableState.value.copy(prepared = null, message = container.context.getString(R.string.export_cancelled), isError = false)
+        mutableState.value =
+            mutableState.value.copy(prepared = null, message = container.context.getString(R.string.export_cancelled), isError = false)
     }
 
     fun savePickerFailed() {

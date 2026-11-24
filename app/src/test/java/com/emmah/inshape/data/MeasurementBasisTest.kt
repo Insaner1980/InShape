@@ -2,13 +2,13 @@ package com.emmah.inshape.data
 
 import com.emmah.inshape.R
 import com.emmah.inshape.quantity
-import com.emmah.inshape.ui
 import com.emmah.inshape.testContext
-import org.robolectric.RobolectricTestRunner
-import org.junit.runner.RunWith
+import com.emmah.inshape.ui
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
 class MeasurementBasisTest {

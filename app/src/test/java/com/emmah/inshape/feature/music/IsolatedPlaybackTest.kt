@@ -1,6 +1,8 @@
 package com.emmah.inshape.feature.music
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class IsolatedPlaybackTest {
@@ -37,6 +39,21 @@ class IsolatedPlaybackTest {
         player.seek(6_000, oldEntry)
         assertEquals(current, player.state.value.song)
         assertEquals(1_000L, player.state.value.position)
+    }
+
+    @Test fun firstQueuedSongStaysPausedAndRepeatModeCycles() {
+        val playback = IsolatedPlayback(emptyList())
+        playback.playAfterCurrent(track("first"))
+        assertEquals("first", playback.state.value.song?.id)
+        assertFalse(playback.state.value.playing)
+        playback.toggleShuffle()
+        assertTrue(playback.state.value.shuffle)
+        for (repeat in listOf(MusicRepeat.All, MusicRepeat.One, MusicRepeat.Off)) {
+            playback.cycleRepeat()
+            assertEquals(repeat, playback.state.value.repeat)
+        }
+        playback.stop()
+        assertEquals(PlaybackState(), playback.state.value)
     }
 
     private fun track(id: String) = MusicTrack(id, "tree", "uri", id, "Artist", 30_000)

@@ -1,7 +1,5 @@
 package com.emmah.inshape.feature.settings
 
-import com.emmah.inshape.ui.theme.finnishLocale
-import androidx.compose.ui.res.stringResource
 import android.Manifest
 import android.content.Intent
 import android.os.Build
@@ -41,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
@@ -69,6 +68,7 @@ import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.InShapeType
 import com.emmah.inshape.ui.theme.ThemeMode
+import com.emmah.inshape.ui.theme.finnishLocale
 import com.emmah.inshape.ui.theme.hasArtworkColumns
 import com.emmah.inshape.ui.theme.workoutTime
 import java.time.DayOfWeek
@@ -100,40 +100,55 @@ fun SettingsScreen(
         notificationsAllowed = scheduler.allowed()
     }
     Page(modifier) {
-        if (onAssistant != null) ListCard {
-            item { ListRow(stringResource(R.string.assistant), subtitle = stringResource(R.string.assistant_connection), onClick = onAssistant) }
+        if (onAssistant != null) {
+            ListCard {
+                item {
+                    ListRow(
+                        stringResource(R.string.assistant),
+                        subtitle = stringResource(R.string.assistant_connection),
+                        onClick = onAssistant
+                    )
+                }
+            }
         }
         SectionHeader(stringResource(R.string.goals_and_reminders))
         ListCard {
             item {
                 ListRow(
                     stringResource(R.string.weekly_goal),
-                    subtitle = if (preferences.weeklyGoal == null) stringResource(R.string.no_weekly_goal) else stringResource(R.string.workouts_per_week),
+                    subtitle = if (preferences.weeklyGoal ==
+                        null
+                    ) {
+                        stringResource(R.string.no_weekly_goal)
+                    } else {
+                        stringResource(R.string.workouts_per_week)
+                    },
                     trailing = {
-                    Stepper((preferences.weeklyGoal ?: 0).toString(), {
-                        vm.write {
-                            val value = snapshot().preferences
-                            updatePreferences(
-                                value.copy(
-                                    weeklyGoal = value.weeklyGoal?.takeIf {
-                                        it >
-                                            1
-                                    }?.minus(1)
+                        Stepper((preferences.weeklyGoal ?: 0).toString(), {
+                            vm.write {
+                                val value = snapshot().preferences
+                                updatePreferences(
+                                    value.copy(
+                                        weeklyGoal = value.weeklyGoal?.takeIf {
+                                            it >
+                                                1
+                                        }?.minus(1)
+                                    )
                                 )
-                            )
-                        }
-                    }, {
-                        vm.write {
-                            val value = snapshot().preferences
-                            updatePreferences(
-                                value.copy(
-                                    weeklyGoal =
-                                        Math.addExact(value.weeklyGoal ?: 0, 1)
+                            }
+                        }, {
+                            vm.write {
+                                val value = snapshot().preferences
+                                updatePreferences(
+                                    value.copy(
+                                        weeklyGoal =
+                                            Math.addExact(value.weeklyGoal ?: 0, 1)
+                                    )
                                 )
-                            )
-                        }
-                    }, preferences.weeklyGoal != null, stringResource(R.string.decrease_goal), stringResource(R.string.increase_goal))
-                })
+                            }
+                        }, preferences.weeklyGoal != null, stringResource(R.string.decrease_goal), stringResource(R.string.increase_goal))
+                    }
+                )
             }
         }
         SettingsReminderCard(
@@ -195,8 +210,11 @@ private fun SettingsReminderCard(
         days.isEmpty() -> stringResource(R.string.choose_at_least_one_day)
 
         else -> {
-            val labels = if (days.size == 1) days.single()
-            else stringResource(R.string.day_join, days.dropLast(1).joinToString(", "), days.last())
+            val labels = if (days.size == 1) {
+                days.single()
+            } else {
+                stringResource(R.string.day_join, days.dropLast(1).joinToString(", "), days.last())
+            }
             stringResource(R.string.format_rest_days, labels, LocalTime.parse(preferences.reminderTime).workoutTime(true))
         }
     }
@@ -222,7 +240,9 @@ private fun SettingsReminderCard(
             ListRow(
                 stringResource(R.string.workout_reminders),
                 subtitle = subtitle,
-                trailing = { InShapeSwitch(preferences.remindersEnabled && !held, ::setReminders, stringResource(R.string.enable_workout_reminders)) }
+                trailing = {
+                    InShapeSwitch(preferences.remindersEnabled && !held, ::setReminders, stringResource(R.string.enable_workout_reminders))
+                }
             )
         }
         if (preferences.remindersEnabled && !preferences.remindersHeld) {
@@ -317,7 +337,11 @@ private fun ThemePreviews(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(Dimens.innerTiny)
                     ) {
-                        Image(painterResource(artwork), null, Modifier.widthIn(max = Dimens.themePreviewWidth).fillMaxWidth().aspectRatio(160f / 124f))
+                        Image(
+                            painterResource(artwork),
+                            null,
+                            Modifier.widthIn(max = Dimens.themePreviewWidth).fillMaxWidth().aspectRatio(160f / 124f)
+                        )
                         Text(stringResource(mode.label()))
                     }
                 }

@@ -1,13 +1,5 @@
 package com.emmah.inshape.feature.library
 
-import com.emmah.inshape.ui.UiException
-import androidx.compose.ui.res.stringResource
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.ShowChart
-import com.emmah.inshape.feature.workout.machineSettingsSummary
-import com.emmah.inshape.data.WorkoutItem
-import com.emmah.inshape.data.Workout
-import com.emmah.inshape.ui.components.TextAction
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -32,10 +24,12 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.automirrored.outlined.ShowChart
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AddAPhoto
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Star
@@ -61,7 +55,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
@@ -70,8 +66,12 @@ import com.emmah.inshape.R
 import com.emmah.inshape.data.Exercise
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.PhotoAsset
+import com.emmah.inshape.data.Workout
+import com.emmah.inshape.data.WorkoutItem
 import com.emmah.inshape.feature.workout.itemSummary
+import com.emmah.inshape.feature.workout.machineSettingsSummary
 import com.emmah.inshape.media.PhotoStore
+import com.emmah.inshape.ui.UiException
 import com.emmah.inshape.ui.components.ActionRow
 import com.emmah.inshape.ui.components.AppMenu
 import com.emmah.inshape.ui.components.ConfirmDialog
@@ -85,13 +85,14 @@ import com.emmah.inshape.ui.components.Page
 import com.emmah.inshape.ui.components.Pill
 import com.emmah.inshape.ui.components.PushedHeader
 import com.emmah.inshape.ui.components.SectionHeader
+import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.theme.ArtworkWash
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.LightColors
-import com.emmah.inshape.ui.theme.shortDate
 import com.emmah.inshape.ui.theme.hasArtworkColumns
+import com.emmah.inshape.ui.theme.shortDate
 import java.time.LocalDate
 
 // This screen exposes distinct navigation actions plus the standard layout modifier.
@@ -115,7 +116,7 @@ fun ExerciseScreen(
     if (exercise == null &&
         historical == null
     ) {
-        Page(modifier, topBar = { PushedHeader(onBack) }) { EmptyState(stringResource(R.string.exercise_missing), stringResource(R.string.exercise_missing_restore)) }
+        Page(modifier, topBar = { PushedHeader(onBack) }) { EmptyState(stringResource(R.string.exercise_missing)) }
         return
     }
     val photos = data.photos.filter { it.exerciseId == id }
@@ -160,7 +161,10 @@ fun ExerciseScreen(
             TextAction(stringResource(R.string.edit), onEdit, icon = Icons.Outlined.Edit, enabled = exercise != null)
         }
     }) {
-        Text((historical?.name ?: exercise!!.name).exerciseDisplayName(LocalContext.current), style = MaterialTheme.typography.headlineLarge)
+        Text(
+            (historical?.name ?: exercise!!.name).exerciseDisplayName(LocalContext.current),
+            style = MaterialTheme.typography.headlineLarge
+        )
         val guide = historical?.plan?.catalogExerciseId ?: data.programLinks.firstOrNull { it.exerciseId == id }?.catalogExerciseId
         if (guide != null && com.emmah.inshape.feature.program.programArtwork(guide) != null) {
             OutlineButton(stringResource(R.string.movement_guide), { onGuide(guide) })
@@ -236,18 +240,25 @@ fun ExerciseScreen(
             }
         }
         val none = stringResource(R.string.none)
-    SectionHeader(stringResource(R.string.machine_settings))
+        SectionHeader(stringResource(R.string.machine_settings))
         Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
             if (historical !=
                 null
             ) {
                 Text(stringResource(R.string.setup_saved))
                 Text(machineSettingsSummary(historical.setup).ifBlank { stringResource(R.string.no_settings_recorded) })
-            } else if (exercise!!.settings.none { it.value.isNotBlank() && !it.value.equals(none, ignoreCase = true) && !it.value.equals("None", ignoreCase = true) }) {
-                Text(stringResource(R.string.add_settings_hint), color = InShapeTheme.colors.textSecondary)
+            } else if (exercise!!.settings.none {
+                    it.value.isNotBlank() && !it.value.equals(none, ignoreCase = true) &&
+                        !it.value.equals("None", ignoreCase = true)
+                }
+            ) {
+                Text(stringResource(R.string.no_settings_recorded), color = InShapeTheme.colors.textSecondary)
             } else {
                 ListCard {
-                    exercise.settings.filter { it.value.isNotBlank() && !it.value.equals(none, ignoreCase = true) && !it.value.equals("None", ignoreCase = true) }.forEach { setting ->
+                    exercise.settings.filter {
+                        it.value.isNotBlank() && !it.value.equals(none, ignoreCase = true) &&
+                            !it.value.equals("None", ignoreCase = true)
+                    }.forEach { setting ->
                         item {
                             KeyValueRow(setting.label.settingLabel(LocalContext.current), setting.value.settingValue(LocalContext.current))
                         }
@@ -261,13 +272,9 @@ fun ExerciseScreen(
             if (notes.isEmpty()) Text(stringResource(R.string.no_notes)) else notes.forEach { Text(it) }
         }
         ExerciseLinks(exercise, linkError, onError = { linkError = it })
-        SectionHeader(stringResource(R.string.alternatives))
-        Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
-            val alternatives = data.exercises.filter {
-                it.id in
-                    (exercise?.alternatives ?: emptyList())
-            }
-            if (alternatives.isEmpty()) Text(stringResource(R.string.choose_alternatives_hint))
+        val alternatives = data.exercises.filter { it.id in exercise?.alternatives.orEmpty() }
+        if (alternatives.isNotEmpty()) {
+            SectionHeader(stringResource(R.string.alternatives))
             ListCard {
                 alternatives.forEach { alternative ->
                     item { ListRow(alternative.name, onClick = { onExercise(alternative.id) }) }
@@ -290,7 +297,7 @@ fun ExerciseScreen(
         }
     }
     removal?.let { photo ->
-        ConfirmDialog(stringResource(R.string.remove_photo_question), stringResource(R.string.remove_photo_message), stringResource(R.string.remove), destructive = true, {
+        ConfirmDialog(stringResource(R.string.remove_photo_question), null, stringResource(R.string.remove), destructive = true, {
             vm.write { vm.container.photos.removePhoto(photo.id) }
             removal =
                 null
@@ -337,6 +344,7 @@ private fun ExercisePhotoPlaceholder(@DrawableRes artwork: Int, canAddPhoto: Boo
 @Composable
 private fun ExerciseLinks(exercise: Exercise?, linkError: String?, onError: (String) -> Unit) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     exercise?.links?.takeIf { it.isNotEmpty() }?.let { links ->
         SectionHeader(stringResource(R.string.links))
         ListCard {
@@ -359,9 +367,9 @@ private fun ExerciseLinks(exercise: Exercise?, linkError: String?, onError: (Str
                             try {
                                 context.startActivity(Intent(Intent.ACTION_VIEW, uri))
                             } catch (_: android.content.ActivityNotFoundException) {
-                                onError(context.getString(R.string.link_no_app))
+                                onError(resources.getString(R.string.link_no_app))
                             } catch (_: SecurityException) {
-                                onError(context.getString(R.string.link_open_failed))
+                                onError(resources.getString(R.string.link_open_failed))
                             }
                         }
                     )
@@ -375,7 +383,7 @@ private fun ExerciseLinks(exercise: Exercise?, linkError: String?, onError: (Str
 @Composable
 private fun ExerciseHistory(id: String, data: JournalSnapshot, onChart: () -> Unit, onWorkout: (String) -> Unit) {
     SectionHeader(stringResource(R.string.history), trailing = {
-        TextAction(stringResource(R.string.see_chart), onChart, icon = Icons.Outlined.ShowChart)
+        TextAction(stringResource(R.string.see_chart), onChart, icon = Icons.AutoMirrored.Outlined.ShowChart)
     })
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)) {
         val history = data.history.mapNotNull { workout ->
@@ -387,8 +395,10 @@ private fun ExerciseHistory(id: String, data: JournalSnapshot, onChart: () -> Un
         }
         if (history.isEmpty()) Text(stringResource(R.string.no_performed_exercise))
         Column {
-            history.sortedWith(compareByDescending<Pair<Workout, WorkoutItem>> { it.first.row.journalDate }
-                .thenByDescending { it.first.row.createdAt }).take(5).forEach { (workout, item) ->
+            history.sortedWith(
+                compareByDescending<Pair<Workout, WorkoutItem>> { it.first.row.journalDate }
+                    .thenByDescending { it.first.row.createdAt }
+            ).take(5).forEach { (workout, item) ->
                 Column(
                     Modifier.fillMaxWidth().clickable(onClickLabel = stringResource(R.string.view_workout)) {
                         onWorkout(workout.row.id)

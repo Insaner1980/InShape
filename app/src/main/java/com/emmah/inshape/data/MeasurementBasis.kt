@@ -1,8 +1,8 @@
 package com.emmah.inshape.data
 
-import com.emmah.inshape.R
 import android.content.Context
 import androidx.annotation.StringRes
+import com.emmah.inshape.R
 import com.emmah.inshape.ui.theme.decimalDisplay
 
 enum class MeasurementBasis(

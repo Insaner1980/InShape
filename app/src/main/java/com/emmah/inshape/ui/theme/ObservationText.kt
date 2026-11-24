@@ -1,7 +1,7 @@
 package com.emmah.inshape.ui.theme
 
-import com.emmah.inshape.R
 import android.content.Context
+import com.emmah.inshape.R
 import com.emmah.inshape.data.BodyObservation
 import com.emmah.inshape.feature.checkin.BodyLevel
 import com.emmah.inshape.feature.checkin.EnergyLevel
@@ -28,13 +28,18 @@ fun observationSummary(context: Context, observation: BodyObservation): String {
         stiffnessText(context, observation.stiffness).takeIf { (observation.stiffness ?: 0) > 0 }
     )
     if (symptoms.isNotEmpty()) return symptoms.joinToString(", ")
-    return context.getString(when {
-        observation.pain != null && observation.stiffness != null -> R.string.no_pain_or_stiffness
-        observation.pain != null -> R.string.no_pain
-        observation.stiffness != null -> R.string.no_stiffness
-        else -> R.string.not_recorded
-    })
+    return context.getString(
+        when {
+            observation.pain != null && observation.stiffness != null -> R.string.no_pain_or_stiffness
+            observation.pain != null -> R.string.no_pain
+            observation.stiffness != null -> R.string.no_stiffness
+            else -> R.string.not_recorded
+        }
+    )
 }
 
-fun observationText(context: Context, observation: BodyObservation): String =
-    context.getString(R.string.body_area_metric, context.getString(bodyRegionLabel(observation.region)), observationSummary(context, observation))
+fun observationText(context: Context, observation: BodyObservation): String = context.getString(
+    R.string.body_area_metric,
+    context.getString(bodyRegionLabel(observation.region)),
+    observationSummary(context, observation)
+)

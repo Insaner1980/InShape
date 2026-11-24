@@ -4,8 +4,8 @@
 package com.emmah.inshape.data
 
 import com.emmah.inshape.R
-import com.emmah.inshape.ui.requireUi
 import com.emmah.inshape.ui.UiException
+import com.emmah.inshape.ui.requireUi
 import java.math.BigDecimal
 
 sealed interface NumericInputResult {

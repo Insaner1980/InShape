@@ -1,6 +1,5 @@
 package com.emmah.inshape.feature.checkin
 
-import com.emmah.inshape.ui.theme.BodyArtworkColors
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +17,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import com.emmah.inshape.data.BodyObservation
+import com.emmah.inshape.ui.theme.BodyArtworkColors
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeTheme
 import kotlin.math.abs
@@ -53,12 +53,7 @@ private fun bodyOrigin(width: Float, height: Float, scale: Float) =
     Offset((width - BODY_WIDTH * scale) / 2f, (height - BODY_HEIGHT * scale) / 2f)
 
 @Composable
-fun BodyMap(
-    back: Boolean,
-    observations: List<BodyObservation>,
-    onSelect: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
+fun BodyMap(back: Boolean, observations: List<BodyObservation>, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
     val colors = InShapeTheme.colors
     val select by rememberUpdatedState(onSelect)
     Canvas(
@@ -124,5 +119,4 @@ fun BodyMap(
             }
         }
     }
-
 }

@@ -59,8 +59,7 @@ fun finishDraft(payload: String?, now: Instant, note: String): FinishDraft {
 
 fun workoutTimeRange(start: Instant, end: Instant, zone: ZoneId, uses24Hours: Boolean = true): String {
     val crossesMidnight = start.atZone(zone).toLocalDate() != end.atZone(zone).toLocalDate()
-    fun label(time: Instant): String =
-        if (crossesMidnight) dateTime(time, zone, uses24Hours) else time.workoutTime(zone, uses24Hours)
+    fun label(time: Instant): String = if (crossesMidnight) dateTime(time, zone, uses24Hours) else time.workoutTime(zone, uses24Hours)
     return "${label(start)}–${label(end)}"
 }
 

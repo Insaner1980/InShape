@@ -54,28 +54,25 @@ class PhotoStore(
         }
     }
 
-    internal suspend fun <T> withNewPhotos(
-        exerciseId: String,
-        uris: List<Uri>,
-        write: suspend (List<PhotoAsset>) -> T
-    ): T = assetLock.withLock {
-        withContext(ioDispatcher) {
-            val photos = mutableListOf<PhotoAsset>()
-            var committed = false
-            try {
-                val firstPosition = db.journal().photos().filter { it.exerciseId == exerciseId }.maxOfOrNull { it.position } ?: -1
-                uris.forEachIndexed { index, uri ->
-                    photos.add(stagePhoto(exerciseId, uri, firstPosition + index + 1, newId()))
+    internal suspend fun <T> withNewPhotos(exerciseId: String, uris: List<Uri>, write: suspend (List<PhotoAsset>) -> T): T =
+        assetLock.withLock {
+            withContext(ioDispatcher) {
+                val photos = mutableListOf<PhotoAsset>()
+                var committed = false
+                try {
+                    val firstPosition = db.journal().photos().filter { it.exerciseId == exerciseId }.maxOfOrNull { it.position } ?: -1
+                    uris.forEachIndexed { index, uri ->
+                        photos.add(stagePhoto(exerciseId, uri, firstPosition + index + 1, newId()))
+                    }
+                    currentCoroutineContext().ensureActive()
+                    withContext(NonCancellable) {
+                        db.withTransaction { write(photos) }.also { committed = true }
+                    }
+                } finally {
+                    if (!committed) photos.forEach { removeUnusedFile(file(it)) }
                 }
-                currentCoroutineContext().ensureActive()
-                withContext(NonCancellable) {
-                    db.withTransaction { write(photos) }.also { committed = true }
-                }
-            } finally {
-                if (!committed) photos.forEach { removeUnusedFile(file(it)) }
             }
         }
-    }
 
     internal suspend fun uploadDerivative(uri: Uri, cropCenter: Boolean = false): ByteArray = withContext(ioDispatcher) {
         val temporary = File.createTempFile("inshape-image-", ".tmp", context.cacheDir)

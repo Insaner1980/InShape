@@ -1,27 +1,24 @@
 package com.emmah.inshape.feature.assistant
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import kotlinx.coroutines.cancelAndJoin
-import com.emmah.inshape.ui.uiMessage
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
-import com.emmah.inshape.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -30,7 +27,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import com.emmah.inshape.AppContainer
+import com.emmah.inshape.R
 import com.emmah.inshape.data.AssistantDraft
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.MeasurementBasis
@@ -44,8 +45,10 @@ import com.emmah.inshape.ui.components.PrimaryButton
 import com.emmah.inshape.ui.components.TextField
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeTheme
+import com.emmah.inshape.ui.uiMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
@@ -97,17 +100,23 @@ internal fun AssistantReview(
                 val proposal = workoutProposal(answer.proposal, item)
                 if (proposal.kind == "clarification") {
                     problem = proposal.question ?: container.context.getString(R.string.assistant_clarify)
+                    return@launch
+                }
+                val next = WorkoutReviewDraft(
+                    workout.row.revision,
+                    workout.row.id,
+                    item.row.id,
+                    exercise?.let { fingerprint(Json.encodeToString(it)) },
+                    proposal
+                )
+                if (container.repository.saveAssistantReview(attempt, next)) {
+                    review = next
                 } else {
-                    val next = WorkoutReviewDraft(
-                        workout.row.revision, workout.row.id, item.row.id,
-                        exercise?.let { fingerprint(Json.encodeToString(it)) }, proposal
-                    )
-                    if (container.repository.saveAssistantReview(attempt, next)) review = next
-                    else problem = container.context.getString(R.string.journal_changed_resend)
+                    problem = container.context.getString(R.string.journal_changed_resend)
                 }
             } catch (failure: AssistantFailure) {
                 problem = container.context.getString(failure.kind.message)
-                needsKey = failure.kind in setOf(AssistantFailureKind.NO_KEY, AssistantFailureKind.UNREADABLE_KEY)
+                needsKey = failure.kind.requiresCredentialSettings
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (invalid: IllegalArgumentException) {
@@ -138,13 +147,19 @@ internal fun AssistantReview(
         }
     }
 
+    val canEditReview = !applying && !closing
     ModalBottomSheet(
         onDismissRequest = { close(onDismiss) },
         containerColor = InShapeTheme.colors.background,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        sheetState = rememberBottomSheetState(
+            initialValue = SheetValue.Hidden,
+            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded)
+        )
     ) {
         Column(
-            Modifier.fillMaxWidth().imePadding().navigationBarsPadding().verticalScroll(rememberScrollState()).padding(Dimens.screenPadding),
+            Modifier.fillMaxWidth().imePadding().navigationBarsPadding().verticalScroll(
+                rememberScrollState()
+            ).padding(Dimens.screenPadding),
             verticalArrangement = Arrangement.spacedBy(Dimens.itemGap)
         ) {
             Text(stringResource(R.string.workout_assistant), style = MaterialTheme.typography.titleLarge)
@@ -155,63 +170,117 @@ internal fun AssistantReview(
                     review = version
                     draft?.let { pending -> scope.launch { container.repository.saveAssistantReview(pending, version) } }
                 }
-                if (current.proposal.kind == "future") Text(stringResource(R.string.next_use_note_message))
-                PrimaryButton(stringResource(R.string.save), modifier = Modifier.fillMaxWidth(), enabled = !applying && !closing, onClick = {
-                    val pending = draft ?: return@PrimaryButton
-                    applying = true
-                    problem = null
-                    scope.launch {
-                        try {
-                            container.repository.confirmWorkoutReview(pending, current)
-                            onDismiss()
-                        } catch (failure: IllegalArgumentException) {
-                            problem = failure.uiMessage(container.context, R.string.review_current_workout)
-                        } catch (cancelled: CancellationException) {
-                            throw cancelled
-                        } catch (_: Exception) {
-                            problem = container.context.getString(R.string.review_save_failed)
-                        } finally {
-                            applying = false
+                PrimaryButton(
+                    stringResource(R.string.save),
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = canEditReview,
+                    onClick = {
+                        val pending = draft ?: return@PrimaryButton
+                        applying = true
+                        problem = null
+                        scope.launch {
+                            try {
+                                problem = container.saveWorkoutReview(pending, current, onDismiss)
+                            } finally {
+                                applying = false
+                            }
                         }
                     }
-                })
-                OutlineButton(stringResource(R.string.edit_request), modifier = Modifier.fillMaxWidth(), enabled = !applying && !closing, onClick = { review = null })
-            } else {
-                AssistantMicrophone(
-                    container.assistant, item.row.name, sending != null || !loaded || closing, music,
-                    content = { microphone ->
-                        TextField(
-                            input, stringResource(R.string.write_request), { input = it.take(4000) },
-                            enabled = loaded && sending == null && !closing,
-                            placeholder = stringResource(R.string.workout_assistant_hint),
-                            trailingIcon = if (sending == null) microphone else {
-                                {
-                                    IconButton({ sending?.cancel() }) {
-                                        Icon(Icons.Outlined.Close, stringResource(R.string.cancel_request))
-                                    }
-                                }
-                            }
-                        )
+                )
+                OutlineButton(
+                    stringResource(
+                        R.string.edit_request
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = canEditReview,
+                    onClick = {
+                        review =
+                            null
                     }
-                ) { result, error ->
-                    if (result != null) input = result
-                    problem = error
-                }
-                PrimaryButton(
-                    stringResource(R.string.send_for_review), modifier = Modifier.fillMaxWidth(),
-                    enabled = loaded && input.isNotBlank() && sending == null && !closing, onClick = ::send
+                )
+            } else {
+                AssistantReviewInput(
+                    container.assistant,
+                    item.row.name,
+                    music,
+                    input,
+                    sending = sending != null,
+                    blocked = !loaded || closing,
+                    onEdit = { input = it.take(4000) },
+                    onResult = { result, error ->
+                        result?.let { input = it }
+                        problem = error
+                    },
+                    onCancel = { sending?.cancel() },
+                    onSend = ::send
                 )
             }
             problem?.let { Text(it, color = InShapeTheme.colors.error) }
             if (needsKey) {
-                OutlineButton(stringResource(R.string.assistant_settings), { close(onSettings) }, Modifier.fillMaxWidth(), enabled = !closing)
+                OutlineButton(stringResource(R.string.assistant_settings), {
+                    close(onSettings)
+                }, Modifier.fillMaxWidth(), enabled = !closing)
             }
         }
     }
 }
 
+private suspend fun AppContainer.saveWorkoutReview(
+    pending: AssistantDraft,
+    current: WorkoutReviewDraft,
+    onDismiss: () -> Unit
+): String? = try {
+    repository.confirmWorkoutReview(pending, current)
+    onDismiss()
+    null
+} catch (failure: IllegalArgumentException) {
+    failure.uiMessage(context, R.string.review_current_workout)
+} catch (cancelled: CancellationException) {
+    throw cancelled
+} catch (_: Exception) {
+    context.getString(R.string.review_save_failed)
+}
+
 @Composable
-private fun ReviewWorkoutProposal(item: WorkoutItem, proposal: WorkoutReview, onEdit: (WorkoutReview) -> Unit) {
+private fun AssistantReviewInput(
+    gateway: AssistantGateway,
+    exerciseName: String,
+    music: MusicPlayback?,
+    input: String,
+    sending: Boolean,
+    blocked: Boolean,
+    onEdit: (String) -> Unit,
+    onResult: (String?, String?) -> Unit,
+    onCancel: () -> Unit,
+    onSend: () -> Unit
+) {
+    AssistantMicrophone(gateway, exerciseName, blocked || sending, music, onResult) { microphone ->
+        TextField(
+            input,
+            stringResource(R.string.write_request),
+            onEdit,
+            enabled = !blocked && !sending,
+            trailingIcon = if (sending) {
+                {
+                    IconButton(onCancel) {
+                        Icon(Icons.Outlined.Close, stringResource(R.string.cancel_request))
+                    }
+                }
+            } else {
+                microphone
+            }
+        )
+    }
+    PrimaryButton(
+        stringResource(R.string.send_for_review),
+        modifier = Modifier.fillMaxWidth(),
+        enabled = !blocked && !sending && input.isNotBlank(),
+        onClick = onSend
+    )
+}
+
+@Composable
+private fun ColumnScope.ReviewWorkoutProposal(item: WorkoutItem, proposal: WorkoutReview, onEdit: (WorkoutReview) -> Unit) {
     val context = LocalContext.current
     if (proposal.kind == "duration") {
         Text(stringResource(R.string.performed_time), style = MaterialTheme.typography.titleMedium)
@@ -254,7 +323,9 @@ private fun ReviewWorkoutProposal(item: WorkoutItem, proposal: WorkoutReview, on
                         original.reps?.let { stringResource(R.string.rep_value, it) }
                     ).joinToString(", ")
                 )
+
                 slot != null -> stringResource(R.string.fill_planned_set, slot.position + 1)
+
                 else -> stringResource(R.string.add_set)
             },
             style = MaterialTheme.typography.titleMedium
@@ -267,7 +338,17 @@ private fun ReviewWorkoutProposal(item: WorkoutItem, proposal: WorkoutReview, on
         if (basis != MeasurementBasis.Bodyweight) {
             NumberField(set.load.orEmpty(), { update(set.copy(load = it)) }, stringResource(basis.columnLabel), decimal = true)
         }
-        NumberField(set.reps.orEmpty(), { update(set.copy(reps = it)) }, if (set.perSide == true) stringResource(R.string.reps_per_side) else stringResource(R.string.reps))
-        set.rir?.let { Text(stringResource(R.string.reported_rir, it)) }
+        NumberField(
+            set.reps.orEmpty(),
+            { update(set.copy(reps = it)) },
+            if (set.perSide ==
+                true
+            ) {
+                stringResource(R.string.reps_per_side)
+            } else {
+                stringResource(R.string.reps)
+            }
+        )
+        set.rir?.let { Text(pluralStringResource(R.plurals.reported_rir, it, it)) }
     }
 }

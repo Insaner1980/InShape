@@ -13,6 +13,7 @@ import com.emmah.inshape.data.Exercise
 import com.emmah.inshape.data.HealthOutbox
 import com.emmah.inshape.data.HealthShareState
 import com.emmah.inshape.data.Preferences
+import com.emmah.inshape.data.ProgramDayOverride
 import com.emmah.inshape.data.StartSource
 import com.emmah.inshape.data.newId
 import java.io.File
@@ -111,6 +112,12 @@ class RestoreRecoveryTest {
         target.database.journal().put(
             HealthOutbox(tombstoneId, "inshape:workout:$tombstoneId", 2, "DELETE")
         )
+        val program = source.programs.programs.first()
+        val day = program.sessions.first().let { it.copy(exercises = it.exercises.reversed()) }
+        source.database.journal().put(ProgramDayOverride(source.programs.schemaVersion, program.id, day.id, day))
+        val otherProgram = target.programs.programs.last()
+        val otherDay = otherProgram.sessions.last()
+        target.database.journal().put(ProgramDayOverride(target.programs.schemaVersion, otherProgram.id, otherDay.id, otherDay))
         val archive = File(scratch, "journal.inshape-backup")
         source.backups.createBackup(Uri.fromFile(archive))
         image.delete()
@@ -126,6 +133,7 @@ class RestoreRecoveryTest {
         }
         target.backups.replaceJournal(staged, staged.identity)
         val actual = target.repository.snapshot()
+        assertEquals(source.database.journal().programDayOverrides(), actual.programDayOverrides)
         assertEquals("Incoming", actual.exercises.single().name)
         assertNotNull(actual.active)
         assertEquals("27,", actual.sets.last().rawLoad)

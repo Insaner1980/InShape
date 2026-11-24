@@ -8,5 +8,5 @@ ktlint_function_naming_ignore_when_annotated_with = Composable
 compose_allowed_forwarding_of_types = JournalViewModel
 
 [app/src/main/java/com/emmah/inshape/ui/components/Controls.kt]
-# Pages share the navigation host's snackbar queue.
-compose_allowed_composition_locals = LocalPageSnackbar
+# Pages share the navigation host's snackbar queue and header visibility.
+compose_allowed_composition_locals = LocalPageSnackbar,LocalPageHasNavigationHeader

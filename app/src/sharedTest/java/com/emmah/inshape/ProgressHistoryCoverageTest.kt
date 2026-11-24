@@ -96,20 +96,29 @@ class ProgressHistoryCoverageTest {
         compose.clickText(ui(R.string.pain_and_stiffness))
         assertEquals(6, compose.onAllNodesWithText(ui(R.string.before_workout)).fetchSemanticsNodes().size)
         assertEquals(6, compose.onAllNodesWithText(ui(R.string.after_workout)).fetchSemanticsNodes().size)
-        compose.onAllNodesWithText(ui(R.string.symptom_status, ui(R.string.pain), ui(R.string.body_level_mild).lowercase()) + ", " + ui(R.string.symptom_status, ui(R.string.stiffness), ui(R.string.body_level_medium).lowercase())).onFirst().assertExists()
-        compose.onAllNodesWithText(ui(R.string.symptom_status, ui(R.string.pain), ui(R.string.body_level_medium).lowercase()) + ", " + ui(R.string.symptom_status, ui(R.string.stiffness), ui(R.string.body_level_strong).lowercase())).onFirst().assertExists()
+        compose.onAllNodesWithText(
+            ui(R.string.symptom_status, ui(R.string.pain), ui(R.string.body_level_mild).lowercase()) + ", " +
+                ui(R.string.symptom_status, ui(R.string.stiffness), ui(R.string.body_level_medium).lowercase())
+        ).onFirst().assertExists()
+        compose.onAllNodesWithText(
+            ui(R.string.symptom_status, ui(R.string.pain), ui(R.string.body_level_medium).lowercase()) + ", " +
+                ui(R.string.symptom_status, ui(R.string.stiffness), ui(R.string.body_level_strong).lowercase())
+        ).onFirst().assertExists()
         val oldDate = LocalDate.of(2026, 9, 25).shortDate()
         compose.onNodeWithText(oldDate).assertDoesNotExist()
 
         compose.clickText(ui(R.string.show_all))
         compose.onAllNodesWithText(oldDate).onFirst().assertExists()
         select(ui(R.string.body_area) + ", " + ui(R.string.region_lower_back), ui(R.string.region_neck))
-        compose.onNodeWithText(ui(R.string.no_area_observations, ui(R.string.region_neck).lowercase())).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(
+            ui(R.string.no_area_observations, ui(R.string.region_neck).lowercase())
+        ).performScrollTo().assertIsDisplayed()
         compose.onNodeWithText(ui(R.string.show_all)).assertDoesNotExist()
     }
 
     @Test fun calendarSeparatesMissingDurationFromNoteOnlyWorkout() {
-        launch("HistoryNovember", ui(R.string.duration_coverage, 4, 5)) { app ->
+        val resources = testContext().resources
+        launch("HistoryNovember", resources.getQuantityString(R.plurals.duration_coverage, 5, 4, 5)) { app ->
             val dao = app.database.journal()
             val completed = app.repository.snapshot().workouts.single { it.id == DemoFixtures.id("november:4") }
             dao.put(
@@ -139,7 +148,7 @@ class ProgressHistoryCoverageTest {
         }
         compose.onNodeWithContentDescription(LocalDate.of(2026, 11, 4).shortDate() + ", " + ui(R.string.workout_recorded))
             .performScrollTo().performClick().assertIsSelected()
-        compose.onNodeWithText(ui(R.string.duration_coverage, 0, 1)).assertExists()
+        compose.onNodeWithText(resources.getQuantityString(R.plurals.duration_coverage, 1, 0, 1)).assertExists()
         compose.onNode(hasText("Recovery notes") and hasText(LocalDate.of(2026, 11, 4).shortDate())).assertExists()
 
         compose.clickText("Recovery notes")

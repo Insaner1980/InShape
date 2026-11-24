@@ -1,7 +1,7 @@
 package com.emmah.inshape
 
 import android.content.Context
-import androidx.core.content.edit
+import android.util.Log
 import androidx.room.Room
 import com.emmah.inshape.data.JournalDatabase
 import com.emmah.inshape.data.JournalRepository
@@ -10,17 +10,23 @@ import com.emmah.inshape.feature.workout.ActiveWorkoutNotifier
 import com.emmah.inshape.feature.workout.activeNotice
 import java.io.File
 import java.time.Clock
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
 
 private const val JOURNAL_DATABASE_NAME = "journal.db"
+private const val INTEGRATION_RETRY_DELAY_MILLIS = 15_000L
 
 class AppContainer(
     val context: Context,
@@ -30,12 +36,6 @@ class AppContainer(
     assistantFixture: com.emmah.inshape.feature.assistant.AssistantGateway? = null,
     assistantCredentialsFixture: com.emmah.inshape.feature.assistant.AssistantCredentials? = null
 ) {
-    private val uiPreferences = context.getSharedPreferences("ui_settings", Context.MODE_PRIVATE)
-    val hasRemovedSet: Boolean get() = uiPreferences.getBoolean("has_removed_set", false)
-
-    fun markSetRemoved() {
-        uiPreferences.edit { putBoolean("has_removed_set", true) }
-    }
 
     val themeSettings = com.emmah.inshape.ui.theme.ThemeSettings(context)
     private val assistantKeyStore = if (integrationsEnabled) com.emmah.inshape.feature.assistant.AssistantKeyStore(context) else null
@@ -55,7 +55,11 @@ class AppContainer(
         File(context.filesDir, "isolated-${databaseName.replace(Regex("[^A-Za-z0-9.-]"), "_")}")
     }
     val database = Room.databaseBuilder(context, JournalDatabase::class.java, databaseName)
-        .addMigrations(com.emmah.inshape.data.journalMigration1To2)
+        .addMigrations(
+            com.emmah.inshape.data.journalMigration1To2,
+            com.emmah.inshape.data.journalMigration2To3,
+            com.emmah.inshape.data.journalMigration3To4
+        )
         .build()
     val repository = JournalRepository(database, clock, context)
     val photos = com.emmah.inshape.media.PhotoStore(context, database, File(storageRoot, "photos"))
@@ -72,50 +76,71 @@ class AppContainer(
     init {
         if (integrationsEnabled) {
             scope.launch { com.emmah.inshape.widget.WidgetUpdater.publishPreview(context) }
-            scope.launch {
-                repository.changes.map { it.activeNotice() }.distinctUntilChanged().collect {
-                    ActiveWorkoutNotifier(context).reconcile(it)
-                }
+            observeIntegration("active workout", repository.changes.map { it.activeNotice() }.distinctUntilChanged()) {
+                ActiveWorkoutNotifier(context).reconcile(it)
             }
-            scope.launch {
-                repository.changes.map { it.preferences }.distinctUntilChanged { a, b ->
-                    a.remindersEnabled ==
-                        b.remindersEnabled &&
-                        a.remindersHeld == b.remindersHeld &&
-                        a.reminderDays == b.reminderDays &&
-                        a.reminderTime == b.reminderTime
-                }.collect {
-                    com.emmah.inshape.reminders.ReminderScheduler(context).reconcile { repository.snapshot().preferences }
-                }
+            val reminders = repository.changes.map { it.preferences }.distinctUntilChanged { a, b ->
+                a.remindersEnabled == b.remindersEnabled &&
+                    a.remindersHeld == b.remindersHeld &&
+                    a.reminderDays == b.reminderDays &&
+                    a.reminderTime == b.reminderTime
             }
-            scope.launch {
-                repository.changes.map {
-                    com.emmah.inshape.widget.widgetState(context, it, java.time.LocalDate.now(clock))
-                }.distinctUntilChanged().collect {
-                    com.emmah.inshape.widget.WidgetUpdater.enqueue(context)
-                }
+            observeIntegration("reminders", reminders) {
+                com.emmah.inshape.reminders.ReminderScheduler(context).reconcile { repository.snapshot().preferences }
             }
-            scope.launch {
-                repository.changes.map {
-                    it.outbox.map { row -> Triple(row.workoutId, row.revision, row.operation) }
-                }.distinctUntilChanged().collect {
-                    if (it.isNotEmpty()) {
-                        com.emmah.inshape.health.HealthSyncWorker.enqueue(context, retryNow = it.any { row -> row.third == "DELETE" })
-                    }
+            val widget = repository.changes.map {
+                com.emmah.inshape.widget.widgetState(context, it, java.time.LocalDate.now(clock))
+            }.distinctUntilChanged()
+            observeIntegration("widget", widget) { com.emmah.inshape.widget.WidgetUpdater.enqueue(context) }
+            val outbox = repository.changes.map {
+                it.outbox.map { row -> Triple(row.workoutId, row.revision, row.operation) }
+            }.distinctUntilChanged()
+            observeIntegration("health sync", outbox) {
+                if (it.isNotEmpty()) {
+                    com.emmah.inshape.health.HealthSyncWorker.enqueue(context, retryNow = it.any { row -> row.third == "DELETE" })
                 }
             }
         }
     }
+
+    private fun <T> observeIntegration(name: String, changes: Flow<T>, reconcile: suspend (T) -> Unit) {
+        scope.launch {
+            changes.onEach(reconcile).retryWhen { failure, _ ->
+                if (failure is CancellationException || failure !is Exception) throw failure
+                logIntegrationFailure(name, failure)
+                delay(INTEGRATION_RETRY_DELAY_MILLIS)
+                true
+            }.collect()
+        }
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun launchIntegration(name: String, reconcile: suspend () -> Unit) {
+        scope.launch {
+            try {
+                reconcile()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                logIntegrationFailure(name, failure)
+            }
+        }
+    }
+
+    private fun logIntegrationFailure(name: String, failure: Exception) {
+        Log.w("AppContainer", "Could not update $name (${failure.javaClass.simpleName})")
+    }
+
     fun onForeground() {
         if (!integrationsEnabled) return
-        scope.launch { ActiveWorkoutNotifier(context).reconcile(repository.snapshot().activeNotice()) }
-        scope.launch {
+        launchIntegration("active workout") { ActiveWorkoutNotifier(context).reconcile(repository.snapshot().activeNotice()) }
+        launchIntegration("reminders") {
             com.emmah.inshape.reminders.ReminderScheduler(
                 context
             ).reconcile { repository.snapshot().preferences }
         }
         com.emmah.inshape.widget.WidgetUpdater.enqueue(context)
-        scope.launch {
+        launchIntegration("health sync") {
             if (repository.snapshot().outbox.isNotEmpty()) {
                 com.emmah.inshape.health.HealthSyncWorker.enqueue(
                     context,

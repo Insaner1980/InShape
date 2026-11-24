@@ -53,10 +53,12 @@ class AssistantSettingsFlowTest {
                 override suspend fun interpret(instructions: String, input: String, schema: JsonObject): AssistantAnswer =
                     error("This page does not interpret text")
                 override suspend fun extract(
-                    instructions: String, input: String, images: List<AssistantImage>, schema: JsonObject
+                    instructions: String,
+                    input: String,
+                    images: List<AssistantImage>,
+                    schema: JsonObject
                 ): AssistantAnswer = error("This page does not upload images")
-                override suspend fun transcribe(clip: ByteArray, exerciseHint: String): String =
-                    error("This page does not record audio")
+                override suspend fun transcribe(clip: ByteArray, exerciseHint: String): String = error("This page does not record audio")
             }
         )
         ui.setContent { InShapeTheme { AppNavigation(container, initialRoute = "AssistantSettings") } }

@@ -1,10 +1,10 @@
 package com.emmah.inshape.feature.assistant
 
-import com.emmah.inshape.testContext
 import com.emmah.inshape.data.AssistantDraft
 import com.emmah.inshape.data.JournalRepository
 import com.emmah.inshape.data.createTestDatabase
 import com.emmah.inshape.data.newId
+import com.emmah.inshape.testContext
 import java.time.Clock
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json

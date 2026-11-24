@@ -3,9 +3,6 @@
 
 package com.emmah.inshape.feature.workout
 
-import com.emmah.inshape.ui.UiException
-import androidx.compose.ui.res.stringResource
-import com.emmah.inshape.R
 import android.text.format.DateFormat
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -25,9 +22,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.room.withTransaction
 import com.emmah.inshape.JournalViewModel
+import com.emmah.inshape.R
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.Workout
 import com.emmah.inshape.data.WorkoutEntity
@@ -35,6 +34,7 @@ import com.emmah.inshape.data.WorkoutTiming
 import com.emmah.inshape.data.newId
 import com.emmah.inshape.data.parseWholeMinutesToSeconds
 import com.emmah.inshape.data.resolveRecordedTime
+import com.emmah.inshape.ui.UiException
 import com.emmah.inshape.ui.components.EditorSheet
 import com.emmah.inshape.ui.components.InShapeCard
 import com.emmah.inshape.ui.components.KeyValueRow
@@ -49,12 +49,12 @@ import com.emmah.inshape.ui.components.TextAction
 import com.emmah.inshape.ui.components.TextField
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeTheme
-import com.emmah.inshape.ui.theme.formatDuration
 import com.emmah.inshape.ui.theme.dateTime
-import com.emmah.inshape.ui.theme.shortDate
-import com.emmah.inshape.ui.theme.workoutTime
 import com.emmah.inshape.ui.theme.displayedDurationSeconds
 import com.emmah.inshape.ui.theme.displayedIntervalSeconds
+import com.emmah.inshape.ui.theme.formatDuration
+import com.emmah.inshape.ui.theme.shortDate
+import com.emmah.inshape.ui.theme.workoutTime
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -85,13 +85,7 @@ data class TimingDraft(
 )
 
 @Composable
-fun WorkoutTimingEditor(
-    id: String,
-    data: JournalSnapshot,
-    vm: JournalViewModel,
-    onSave: () -> Unit,
-    modifier: Modifier = Modifier
-) {
+fun WorkoutTimingEditor(id: String, data: JournalSnapshot, vm: JournalViewModel, onSave: () -> Unit, modifier: Modifier = Modifier) {
     val workout = data.workout(id) ?: return
     val zone = ZoneId.of(workout.row.zoneId)
     val uses24Hours = DateFormat.is24HourFormat(LocalContext.current)
@@ -131,7 +125,6 @@ fun WorkoutTimingEditor(
         if (stale) {
             InShapeCard(inset = true) {
                 SectionHeader(stringResource(R.string.saved_values_changed))
-                Text(stringResource(R.string.review_saved_values))
                 Text("${workout.row.title}, ${dateLabel(workout.row.journalDate)}")
                 Text(stringResource(R.string.note_text, workout.row.note.ifBlank { stringResource(R.string.none) }))
                 KeyValueRow(
@@ -142,11 +135,20 @@ fun WorkoutTimingEditor(
                     stringResource(R.string.finished),
                     workout.row.end?.let { dateTime(Instant.parse(it), zone, uses24Hours) } ?: stringResource(R.string.not_recorded)
                 )
-                Text(stringResource(R.string.duration_text, workout.row.displayedDurationSeconds()?.let(::formatDuration) ?: stringResource(R.string.not_recorded)))
-                OutlineButton(stringResource(R.string.keep_draft), { edit(form.copy(revision = workout.row.revision)) }, enabled = !submitting)
+                Text(
+                    stringResource(
+                        R.string.duration_text,
+                        workout.row.displayedDurationSeconds()?.let(::formatDuration) ?: stringResource(R.string.not_recorded)
+                    )
+                )
+                OutlineButton(stringResource(R.string.keep_draft), {
+                    edit(form.copy(revision = workout.row.revision))
+                }, enabled = !submitting)
             }
         }
-        TextField(form.title, stringResource(R.string.workout_name), { edit(form.copy(title = it)) }, singleLine = true, enabled = !submitting)
+        TextField(form.title, stringResource(R.string.workout_name), {
+            edit(form.copy(title = it))
+        }, singleLine = true, enabled = !submitting)
         KeyValueRow(stringResource(R.string.workout_date), dateLabel(form.date), enabled = !submitting, onClick = { picker = WORKOUT_DATE })
         if (workout.row.timingNeedsReview) {
             Text(
@@ -164,11 +166,7 @@ fun WorkoutTimingEditor(
     }
 }
 
-internal fun initialTimingDraft(
-    row: WorkoutEntity,
-    data: JournalSnapshot,
-    key: String
-): TimingDraft {
+internal fun initialTimingDraft(row: WorkoutEntity, data: JournalSnapshot, key: String): TimingDraft {
     val zone = ZoneId.of(row.zoneId)
     val start = row.start?.let { Instant.parse(it).atZone(zone) }
     val end = row.end?.let { Instant.parse(it).atZone(zone) }
@@ -269,7 +267,12 @@ private fun RecordedTimingFields(
             ) {
                 onEndpoint(startLabel)
             }
-            KeyValueRow(stringResource(R.string.finished), "${dateLabel(form.endDate)}, ${timeLabel(form.endTime, uses24Hours)}", numeric = true, enabled = !submitting) {
+            KeyValueRow(
+                stringResource(R.string.finished),
+                "${dateLabel(form.endDate)}, ${timeLabel(form.endTime, uses24Hours)}",
+                numeric = true,
+                enabled = !submitting
+            ) {
                 onEndpoint(endLabel)
             }
             val elapsed = when {
@@ -348,11 +351,13 @@ private fun TimingPicker(
     }
     if (field.endsWith("date")) {
         RecordedDatePicker(
-            stringResource(when (field) {
-                START_DATE -> R.string.start_date
-                END_DATE -> R.string.end_date
-                else -> R.string.workout_date
-            }),
+            stringResource(
+                when (field) {
+                    START_DATE -> R.string.start_date
+                    END_DATE -> R.string.end_date
+                    else -> R.string.workout_date
+                }
+            ),
             when (field) {
                 START_DATE -> form.startDate
                 END_DATE -> form.endDate

@@ -35,8 +35,7 @@ fun ComposeContentTestRule.clickText(text: String) {
     waitForIdle()
 }
 
-internal fun testContext(): android.content.Context =
-    androidx.test.core.app.ApplicationProvider.getApplicationContext()
+internal fun testContext(): android.content.Context = androidx.test.core.app.ApplicationProvider.getApplicationContext()
 
 internal fun ui(id: Int, vararg args: Any): String = testContext().getString(id, *args)
 

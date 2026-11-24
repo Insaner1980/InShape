@@ -1,10 +1,5 @@
 package com.emmah.inshape.ui.components
 
-import com.emmah.inshape.ui.theme.longDate
-import java.util.Locale
-import com.emmah.inshape.ui.theme.finnishLocale
-import androidx.compose.ui.res.stringResource
-import com.emmah.inshape.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -48,12 +43,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.emmah.inshape.R
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
+import com.emmah.inshape.ui.theme.finnishLocale
+import com.emmah.inshape.ui.theme.longDate
 import com.emmah.inshape.ui.theme.monthTitle
 import com.emmah.inshape.ui.theme.shortDate
 import java.time.Instant
@@ -62,6 +61,7 @@ import java.time.LocalTime
 import java.time.OffsetTime
 import java.time.YearMonth
 import java.time.ZoneOffset
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -140,9 +140,11 @@ private fun calendarDateFormatter(): DatePickerFormatter {
     return remember(compact) {
         val defaults = DatePickerDefaults.dateFormatter(yearSelectionSkeleton = "yMMM")
         object : DatePickerFormatter by defaults {
-            override fun formatMonthYear(monthMillis: Long?, locale: Locale): String? =
-                if (compact) defaults.formatMonthYear(monthMillis, locale)
-                else monthMillis?.let { YearMonth.from(it.pickerDay()).monthTitle() }
+            override fun formatMonthYear(monthMillis: Long?, locale: Locale): String? = if (compact) {
+                defaults.formatMonthYear(monthMillis, locale)
+            } else {
+                monthMillis?.let { YearMonth.from(it.pickerDay()).monthTitle() }
+            }
 
             override fun formatDate(dateMillis: Long?, locale: Locale, forContentDescription: Boolean): String? =
                 dateMillis?.pickerDay()?.let { if (forContentDescription) it.longDate() else it.shortDate() }
@@ -254,7 +256,9 @@ fun RecordedDateRangePicker(
                     DateHeading(stringResource(R.string.select_period), listOfNotNull(selectedStart, selectedEnd))
                     if (onAllWorkouts != null && from != null && to != null) {
                         TextAction(
-                            stringResource(R.string.all_workouts), onAllWorkouts, Modifier.padding(horizontal = Dimens.screenPadding),
+                            stringResource(R.string.all_workouts),
+                            onAllWorkouts,
+                            Modifier.padding(horizontal = Dimens.screenPadding),
                             icon = Icons.Outlined.CalendarMonth
                         )
                     }

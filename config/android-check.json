@@ -16,7 +16,8 @@
         "main",
         "debug",
         "test",
-        "androidTest"
+        "androidTest",
+        "sharedTest"
       ]
     }
   ],

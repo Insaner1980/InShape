@@ -1,18 +1,17 @@
 package com.emmah.inshape.feature.assistant
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Mic
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.ui.res.stringResource
-import com.emmah.inshape.R
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.MediaRecorder
 import android.os.Build
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -22,15 +21,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
-import com.emmah.inshape.ui.components.ActionRow
-import com.emmah.inshape.ui.components.OutlineButton
+import com.emmah.inshape.R
 import com.emmah.inshape.data.newId
 import com.emmah.inshape.feature.music.MusicPlayback
+import com.emmah.inshape.ui.components.ActionRow
+import com.emmah.inshape.ui.components.OutlineButton
 import java.io.File
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -42,10 +45,12 @@ internal fun AssistantMicrophone(
     exerciseHint: String,
     blocked: Boolean,
     music: MusicPlayback?,
-    content: @Composable (trailingIcon: (@Composable () -> Unit)?) -> Unit,
-    onResult: (String?, String?) -> Unit
+    onResult: (String?, String?) -> Unit,
+    ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    content: @Composable (trailingIcon: (@Composable () -> Unit)?) -> Unit
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val recorder = remember(context) { WorkoutRecorder(context) }
     val owner = remember { newId() }
     var recording by remember { mutableStateOf(false) }
@@ -58,7 +63,7 @@ internal fun AssistantMicrophone(
             recording = false
             clipReady = recorder.finish()
             music?.assistantGain(owner, null)
-            if (!clipReady) onResult(null, context.getString(R.string.recording_save_failed))
+            if (!clipReady) onResult(null, resources.getString(R.string.recording_save_failed))
         }
     }
     fun activate() {
@@ -67,7 +72,7 @@ internal fun AssistantMicrophone(
         recording = recorder.start(::finish)
         if (!recording) {
             music?.assistantGain(owner, null)
-            onResult(null, context.getString(R.string.no_microphone))
+            onResult(null, resources.getString(R.string.no_microphone))
         }
     }
     fun cancel() {
@@ -78,7 +83,7 @@ internal fun AssistantMicrophone(
         clipReady = false
     }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        if (it) activate() else onResult(null, context.getString(R.string.microphone_denied))
+        if (it) activate() else onResult(null, resources.getString(R.string.microphone_denied))
     }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { cancel() }
     DisposableEffect(recorder) {
@@ -89,7 +94,9 @@ internal fun AssistantMicrophone(
     }
 
     content(
-        if (recording || transcribing != null || clipReady) null else {
+        if (recording || transcribing != null || clipReady) {
+            null
+        } else {
             {
                 IconButton(enabled = !blocked, onClick = {
                     if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
@@ -111,21 +118,23 @@ internal fun AssistantMicrophone(
                 OutlineButton(stringResource(R.string.cancel_recording), onClick = ::cancel)
             }
         }
+
         transcribing != null -> OutlineButton(stringResource(R.string.cancel_transcription), onClick = ::cancel)
+
         clipReady -> {
             ActionRow {
                 OutlineButton(stringResource(R.string.transcribe_recording), enabled = !blocked, onClick = {
                     transcribing = scope.launch {
                         try {
-                            val clip = withContext(Dispatchers.IO) { recorder.readClip() }
+                            val clip = withContext(ioDispatcher) { recorder.readClip() }
                             val text = gateway.transcribe(clip, exerciseHint)
                             onResult(text, null)
                         } catch (failure: AssistantFailure) {
-                            onResult(null, context.getString(failure.kind.message))
+                            onResult(null, resources.getString(failure.kind.message))
                         } catch (cancelled: CancellationException) {
                             throw cancelled
                         } catch (_: Exception) {
-                            onResult(null, context.getString(R.string.recording_unavailable))
+                            onResult(null, resources.getString(R.string.recording_unavailable))
                         } finally {
                             recorder.clear()
                             clipReady = false
@@ -136,7 +145,6 @@ internal fun AssistantMicrophone(
                 OutlineButton(stringResource(R.string.discard_recording), onClick = ::cancel)
             }
         }
-
     }
 }
 
@@ -200,7 +208,9 @@ private class WorkoutRecorder(private val context: Context) {
             it.release()
         }
         recorder = null
-        file?.delete()
+        file?.let { clip ->
+            if (!clip.delete() && clip.exists()) Log.w("WorkoutRecorder", "Could not delete temporary recording")
+        }
         file = null
     }
 }

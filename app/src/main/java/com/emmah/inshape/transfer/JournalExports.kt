@@ -1,12 +1,12 @@
 package com.emmah.inshape.transfer
 
-import com.emmah.inshape.feature.library.categoryLabel
-import com.emmah.inshape.feature.library.exerciseDisplayName
-import com.emmah.inshape.R
 import android.content.Context
-import com.emmah.inshape.feature.workout.itemSummary
+import com.emmah.inshape.R
 import com.emmah.inshape.data.Exercise
 import com.emmah.inshape.data.JournalSnapshot
+import com.emmah.inshape.feature.library.categoryLabel
+import com.emmah.inshape.feature.library.exerciseDisplayName
+import com.emmah.inshape.feature.workout.itemSummary
 import java.io.FilterOutputStream
 import java.io.OutputStream
 import java.util.zip.ZipEntry
@@ -89,7 +89,11 @@ object JournalExports {
                 items.asSequence().map { item ->
                     val row = item.row
                     listOf(
-                        row.id, row.workoutId, row.exerciseId, row.equipmentId, row.name.exerciseDisplayName(context), row.category.categoryLabel(context), row.basis, row.disposition,
+                        row.id, row.workoutId, row.exerciseId, row.equipmentId,
+                        row.name.exerciseDisplayName(
+                            context
+                        ),
+                        row.category.categoryLabel(context), row.basis, row.disposition,
                         if (item.completedSets.isEmpty()) "COMPLETION_ONLY" else "SETS",
                         row.durationSeconds,
                         row.note.takeIf { selection.includeNotes },
@@ -125,7 +129,27 @@ object JournalExports {
             )
             table(
                 "check_ins.csv",
-                listOf(context.getString(R.string.csv_check_in_id), context.getString(R.string.csv_workout_id), context.getString(R.string.csv_phase), context.getString(R.string.csv_observed_at), context.getString(R.string.csv_zone_id), context.getString(R.string.csv_energy), context.getString(R.string.csv_effort), context.getString(R.string.csv_feelings), context.getString(R.string.csv_note)),
+                listOf(
+                    context.getString(
+                        R.string.csv_check_in_id
+                    ),
+                    context.getString(
+                        R.string.csv_workout_id
+                    ),
+                    context.getString(
+                        R.string.csv_phase
+                    ),
+                    context.getString(
+                        R.string.csv_observed_at
+                    ),
+                    context.getString(
+                        R.string.csv_zone_id
+                    ),
+                    context.getString(
+                        R.string.csv_energy
+                    ),
+                    context.getString(R.string.csv_effort), context.getString(R.string.csv_feelings), context.getString(R.string.csv_note)
+                ),
                 checkIns.asSequence().map { check ->
                     listOf(
                         check.id,
@@ -142,7 +166,13 @@ object JournalExports {
             )
             table(
                 "body_observations.csv",
-                listOf(context.getString(R.string.csv_check_in_id), context.getString(R.string.csv_region_id), context.getString(R.string.csv_pain), context.getString(R.string.csv_stiffness), context.getString(R.string.csv_note)),
+                listOf(
+                    context.getString(R.string.csv_check_in_id),
+                    context.getString(R.string.csv_region_id),
+                    context.getString(R.string.csv_pain),
+                    context.getString(R.string.csv_stiffness),
+                    context.getString(R.string.csv_note)
+                ),
                 data.observations.asSequence().filter {
                     it.checkInId in
                         checkIds

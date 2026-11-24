@@ -2,6 +2,7 @@ package com.emmah.inshape.transfer
 
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.parseWorkoutInstant
+import com.emmah.inshape.data.validate
 import com.emmah.inshape.data.validatedSetValues
 import com.emmah.inshape.feature.workout.FinishDraft
 import java.net.URI
@@ -52,6 +53,27 @@ private fun validatePrograms(data: JournalSnapshot) {
     require(data.programLinks.distinct().size == data.programLinks.size)
     val exercises = data.exercises.map { it.id }.toSet()
     data.programLinks.forEach { require(it.catalogExerciseId.matches(catalogKey) && it.exerciseId in exercises) }
+    val days = data.programDayOverrides.map { Triple(it.catalogVersion, it.programId, it.dayId) }
+    require(days.distinct().size == days.size)
+    data.programDayOverrides.forEach { it.validate(exercises) }
+    validateAssistantMemories(data, exercises)
+    data.workouts.mapNotNull { it.program }.forEach { program ->
+        uuid(program.enrollmentId)
+        require(program.programId.matches(catalogKey) && program.catalogVersion > 0 && program.day.isNotBlank())
+        require(program.dayIndex in 0 until program.rotationSize && program.mode in setOf("STANDARD", "SHORT", "LIGHT"))
+    }
+    (data.items.mapNotNull { it.plan } + data.routineItems.mapNotNull { it.plan }).forEach { plan ->
+        plan.sourceSlot?.validate(exercises)
+        require(plan.restSeconds == null || plan.restSeconds > 0)
+        plan.group?.let { require(it.key.isNotBlank() && it.type.isNotBlank() && it.rounds > 0) }
+    }
+    data.sets.forEach { set ->
+        require(set.rir == null || (set.completedAt != null && set.rir in 0..20))
+        require(set.perSide == null || set.completedAt != null)
+    }
+}
+
+private fun validateAssistantMemories(data: JournalSnapshot, exercises: Set<String>) {
     ids(data.assistantMemories.map { it.id })
     data.assistantMemories.forEach { memory ->
         require(
@@ -60,19 +82,6 @@ private fun validatePrograms(data: JournalSnapshot) {
         )
         memory.creationWorkoutId?.let(::uuid)
         optionalInstant(memory.acknowledgedAt)
-    }
-    data.workouts.mapNotNull { it.program }.forEach { program ->
-        uuid(program.enrollmentId)
-        require(program.programId.matches(catalogKey) && program.catalogVersion > 0 && program.day.isNotBlank())
-        require(program.dayIndex in 0 until program.rotationSize && program.mode in setOf("STANDARD", "SHORT", "LIGHT"))
-    }
-    (data.items.mapNotNull { it.plan } + data.routineItems.mapNotNull { it.plan }).forEach { plan ->
-        require(plan.restSeconds == null || plan.restSeconds > 0)
-        plan.group?.let { require(it.key.isNotBlank() && it.type.isNotBlank() && it.rounds > 0) }
-    }
-    data.sets.forEach { set ->
-        require(set.rir == null || set.completedAt != null && set.rir in 0..20)
-        require(set.perSide == null || set.completedAt != null)
     }
 }
 

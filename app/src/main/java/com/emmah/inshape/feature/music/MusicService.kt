@@ -176,7 +176,9 @@ class MusicService(private val ioDispatcher: CoroutineDispatcher = Dispatchers.I
                 .build()
             val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
             if (ownController) {
-                commands.add(chooseQueue).add(playNext).add(endPlayback).add(jumpToOccurrence).add(seekInOccurrence).add(assistantGainChange)
+                commands.add(
+                    chooseQueue
+                ).add(playNext).add(endPlayback).add(jumpToOccurrence).add(seekInOccurrence).add(assistantGainChange)
             }
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
                 .setAvailablePlayerCommands(defaults)
@@ -191,19 +193,27 @@ class MusicService(private val ioDispatcher: CoroutineDispatcher = Dispatchers.I
             args: Bundle
         ): ListenableFuture<SessionResult> {
             val result = SettableFuture.create<SessionResult>()
-            if (controller.uid != Process.myUid()) {
-                result.set(SessionResult(SessionError.ERROR_PERMISSION_DENIED))
-                return result
-            }
-            if (command == assistantGainChange) {
-                val owner = args.getString("owner")
-                if (owner != null && owner.length <= 64) {
-                    if (args.containsKey("gain")) setAssistantGain(owner, args.getFloat("gain").coerceIn(0f, 1f))
-                    else releaseAssistantGain(owner)
+            when {
+                controller.uid != Process.myUid() -> result.set(SessionResult(SessionError.ERROR_PERMISSION_DENIED))
+
+                command == assistantGainChange -> {
+                    val owner = args.getString("owner")
+                    if (owner != null && owner.length <= 64) {
+                        if (args.containsKey("gain")) {
+                            setAssistantGain(owner, args.getFloat("gain").coerceIn(0f, 1f))
+                        } else {
+                            releaseAssistantGain(owner)
+                        }
+                    }
+                    result.set(SessionResult(SessionResult.RESULT_SUCCESS))
                 }
-                result.set(SessionResult(SessionResult.RESULT_SUCCESS))
-                return result
+
+                else -> dispatchQueueCommand(command, args, result)
             }
+            return result
+        }
+
+        private fun dispatchQueueCommand(command: SessionCommand, args: Bundle, result: SettableFuture<SessionResult>) {
             if (command == chooseQueue || command == endPlayback) selection++
             val request = selection
             scope.launch {
@@ -220,7 +230,6 @@ class MusicService(private val ioDispatcher: CoroutineDispatcher = Dispatchers.I
                     result.set(SessionResult(SessionError.ERROR_IO))
                 }
             }
-            return result
         }
     }
 
@@ -245,11 +254,7 @@ class MusicService(private val ioDispatcher: CoroutineDispatcher = Dispatchers.I
         player.volume = musicGain
     }
 
-    private data class ListeningInterval(
-        val event: ListeningEvent,
-        val occurrenceId: String,
-        val startedElapsed: Long
-    )
+    private data class ListeningInterval(val event: ListeningEvent, val occurrenceId: String, val startedElapsed: Long)
 
     private fun reconcileListening() {
         val workout = listeningWorkoutId
@@ -277,9 +282,13 @@ class MusicService(private val ioDispatcher: CoroutineDispatcher = Dispatchers.I
         if (request != selection && command != endPlayback) return
         when (command) {
             chooseQueue -> prepareSelection(args, request)
+
             playNext -> insertNext(args, request)
+
             jumpToOccurrence -> jumpTo(args)
+
             seekInOccurrence -> seekIn(args)
+
             endPlayback -> {
                 restoring = false
                 player.stop()

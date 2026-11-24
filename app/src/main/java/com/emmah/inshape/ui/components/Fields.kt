@@ -1,6 +1,5 @@
 package com.emmah.inshape.ui.components
 
-import com.emmah.inshape.ui.theme.decimalDisplay
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -18,6 +17,9 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
@@ -31,10 +33,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.contentDescription
@@ -45,6 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
+import com.emmah.inshape.ui.theme.decimalDisplay
 
 @Composable
 private fun fieldColors(container: Color): TextFieldColors = TextFieldDefaults.colors(
@@ -75,6 +78,24 @@ internal fun fieldBorder(focused: Boolean, isError: Boolean = false): BorderStro
 }
 
 @Composable
+private fun rememberControlledText(value: String, onChange: (String) -> Unit): TextFieldState {
+    val state = remember { TextFieldState(value) }
+    val currentValue by rememberUpdatedState(value)
+    val currentOnChange by rememberUpdatedState(onChange)
+    LaunchedEffect(state) {
+        snapshotFlow { state.text.toString() }.collect { text ->
+            if (text != currentValue) currentOnChange(text)
+        }
+    }
+    LaunchedEffect(value) {
+        if (state.text.toString() != value) state.setTextAndPlaceCursorAtEnd(value)
+    }
+    return state
+}
+
+data class TextFieldKeyboard(val options: KeyboardOptions = KeyboardOptions.Default, val actions: KeyboardActions = KeyboardActions.Default)
+
+@Composable
 fun TextField(
     value: String,
     label: String,
@@ -82,38 +103,30 @@ fun TextField(
     modifier: Modifier = Modifier,
     singleLine: Boolean = false,
     error: String? = null,
-    placeholder: String? = null,
     enabled: Boolean = true,
-    accessibilityLabel: String? = null,
-    focusRequester: FocusRequester? = null,
     trailingIcon: (@Composable () -> Unit)? = null,
-    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
-    keyboardActions: KeyboardActions = KeyboardActions.Default
+    keyboard: TextFieldKeyboard = TextFieldKeyboard()
 ) {
     val colors = InShapeTheme.colors
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val focusModifier = if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Dimens.innerTiny)) {
         MaterialTextField(
             value,
             onChange,
             Modifier.fillMaxWidth()
-                .then(focusModifier)
                 .border(fieldBorder(focused, isError = error != null), InShapeShapes.field)
                 .semantics {
-                    if (accessibilityLabel != null) contentDescription = accessibilityLabel
                     if (error != null) error(error)
                 },
             label = label.takeUnless(String::isBlank)?.let { title -> { Text(title, style = MaterialTheme.typography.labelSmall) } },
             enabled = enabled,
-            placeholder = placeholder?.let { hint -> { Text(hint) } },
             shape = InShapeShapes.field,
             singleLine = singleLine,
             isError = error != null,
             trailingIcon = trailingIcon,
-            keyboardOptions = keyboardOptions,
-            keyboardActions = keyboardActions,
+            keyboardOptions = keyboard.options,
+            keyboardActions = keyboard.actions,
             colors = fieldColors(colors.background),
             interactionSource = interaction
         )
@@ -153,6 +166,7 @@ fun NumberField(
     val keyboard =
         KeyboardOptions(keyboardType = if (decimal) KeyboardType.Decimal else KeyboardType.Number)
     if (compact) {
+        val state = rememberControlledText(displayedValue, onValueChange)
         Surface(
             fieldModifier.heightIn(min = Dimens.setField).then(border),
             color = if (highlighted) colors.background else colors.surface,
@@ -160,12 +174,12 @@ fun NumberField(
         ) {
             Box(Modifier.padding(Dimens.innerSmall), contentAlignment = Alignment.Center) {
                 BasicTextField(
-                    displayedValue, onValueChange,
-                    Modifier.fillMaxWidth().semantics {
+                    state,
+                    modifier = Modifier.fillMaxWidth().semantics {
                         contentDescription =
                             label
                     },
-                    readOnly = readOnly, singleLine = true,
+                    readOnly = readOnly, lineLimits = TextFieldLineLimits.SingleLine,
                     textStyle = com.emmah.inshape.ui.theme.InShapeType.setValue.copy(
                         color = InShapeTheme.colors.text,
                         textAlign = TextAlign.Center
@@ -195,6 +209,7 @@ fun NumberField(
 fun SearchField(value: String, onChange: (String) -> Unit, placeholder: String, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
+    val state = rememberControlledText(value, onChange)
     Surface(
         modifier.heightIn(min = Dimens.touch),
         color = InShapeTheme.colors.background,
@@ -213,21 +228,20 @@ fun SearchField(value: String, onChange: (String) -> Unit, placeholder: String, 
                 tint = InShapeTheme.colors.textSecondary
             )
             BasicTextField(
-                value,
-                onChange,
-                Modifier.weight(1f).semantics {
+                state,
+                modifier = Modifier.weight(1f).semantics {
                     contentDescription =
                         placeholder
                 },
                 enabled = enabled,
-                singleLine = true,
+                lineLimits = TextFieldLineLimits.SingleLine,
                 interactionSource = interaction,
                 textStyle = MaterialTheme.typography.bodyMedium.copy(
                     color = InShapeTheme.colors.text
                 ),
                 cursorBrush = SolidColor(InShapeTheme.colors.ink),
-                decorationBox = { field ->
-                    if (value.isEmpty()) {
+                decorator = { field ->
+                    if (state.text.isEmpty()) {
                         Text(
                             placeholder,
                             style = MaterialTheme.typography.bodyMedium,

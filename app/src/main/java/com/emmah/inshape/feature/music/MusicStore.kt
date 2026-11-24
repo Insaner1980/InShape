@@ -1,6 +1,5 @@
 package com.emmah.inshape.feature.music
 
-import com.emmah.inshape.R
 import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
@@ -12,7 +11,9 @@ import android.provider.DocumentsContract.Document
 import androidx.core.net.toUri
 import androidx.room.Room
 import androidx.room.withTransaction
+import com.emmah.inshape.R
 import java.io.IOException
+import java.io.InputStream
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -167,16 +168,15 @@ class MusicStore(
                 currentCoroutineContext().ensureActive()
                 val uri = DocumentsContract.buildDocumentUriUsingTree(tree, id)
                 val stableId = UUID.nameUUIDFromBytes(uri.toString().toByteArray()).toString()
-                if (stableId !in tracks) {
-                    val partial = Build.VERSION.SDK_INT >= 29 && flags and Document.FLAG_PARTIAL != 0
-                    val local = !partial && flags and Document.FLAG_VIRTUAL_DOCUMENT == 0
-                    val track = readTrack(tree, uri, stableId, name, local)
-                    tracks[stableId] = if (track.available) {
-                        val fingerprint = audioFingerprint(uri)
-                        track.copy(available = fingerprint != null, contentFingerprint = fingerprint)
-                    } else {
-                        track
-                    }
+                if (stableId in tracks) continue
+                val partial = Build.VERSION.SDK_INT >= 29 && flags and Document.FLAG_PARTIAL != 0
+                val local = !partial && flags and Document.FLAG_VIRTUAL_DOCUMENT == 0
+                val track = readTrack(tree, uri, stableId, name, local)
+                tracks[stableId] = if (track.available) {
+                    val fingerprint = audioFingerprint(uri)
+                    track.copy(available = fingerprint != null, contentFingerprint = fingerprint)
+                } else {
+                    track
                 }
             }
         }
@@ -184,21 +184,23 @@ class MusicStore(
     }
 
     private suspend fun audioFingerprint(uri: Uri): String? = try {
-        resolver.openInputStream(uri)?.use { stream ->
-            val digest = java.security.MessageDigest.getInstance("SHA-256")
-            val buffer = ByteArray(64 * 1024)
-            while (true) {
-                currentCoroutineContext().ensureActive()
-                val count = stream.read(buffer)
-                if (count < 0) break
-                digest.update(buffer, 0, count)
-            }
-            digest.digest().toHexString()
-        }
+        resolver.openInputStream(uri)?.use { hashAudio(it) }
     } catch (_: IOException) {
         null
     } catch (_: SecurityException) {
         null
+    }
+
+    private suspend fun hashAudio(stream: InputStream): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        val buffer = ByteArray(64 * 1024)
+        while (true) {
+            currentCoroutineContext().ensureActive()
+            val count = stream.read(buffer)
+            if (count < 0) break
+            digest.update(buffer, 0, count)
+        }
+        return digest.digest().toHexString()
     }
 
     private fun readTrack(tree: Uri, uri: Uri, id: String, name: String, local: Boolean): MusicTrack {
@@ -383,8 +385,14 @@ internal fun identifyScannedTrack(scanned: MusicTrack, previous: List<MusicTrack
     }
     val matching = previous.find { it.contentFingerprint == fingerprint }
         ?: previous.singleOrNull()?.takeIf { it.contentFingerprint == null }
-    if (matching != null) return scanned.copy(id = matching.id, energy = matching.energy)
-    if (previous.isEmpty()) return scanned
-    val id = UUID.nameUUIDFromBytes("${scanned.tree}\n${scanned.uri}\n$fingerprint".encodeToByteArray()).toString()
-    return scanned.copy(id = id)
+    return when {
+        matching != null -> scanned.copy(id = matching.id, energy = matching.energy)
+
+        previous.isEmpty() -> scanned
+
+        else -> {
+            val id = UUID.nameUUIDFromBytes("${scanned.tree}\n${scanned.uri}\n$fingerprint".encodeToByteArray()).toString()
+            scanned.copy(id = id)
+        }
+    }
 }

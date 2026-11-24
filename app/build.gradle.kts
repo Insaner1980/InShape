@@ -30,6 +30,7 @@ android {
         compose = true
         buildConfig = true
     }
+    bundle { language.enableSplit = false }
     buildTypes {
         debug {
             if (providers.gradleProperty("assistantTestInstall").orNull == "true") {

@@ -1,8 +1,5 @@
 package com.emmah.inshape.health
 
-import com.emmah.inshape.ui.requireUi
-import com.emmah.inshape.R
-import kotlinx.coroutines.CancellationException
 import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
@@ -15,12 +12,15 @@ import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
+import com.emmah.inshape.R
 import com.emmah.inshape.data.Preferences
 import com.emmah.inshape.data.WorkoutEntity
+import com.emmah.inshape.ui.requireUi
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import kotlinx.coroutines.CancellationException
 
 enum class HealthCapability(val label: Int, val permission: String) {
     SHARE(
@@ -143,12 +143,16 @@ class AndroidHealthGateway(private val context: Context) : HealthGateway {
         val granted = grants()
         val windows = healthWindows(now)
         val steps = value(preferences, granted, HealthCapability.STEPS) {
-            if (windows.dayStart == now.toInstant()) null else api.aggregate(
-                AggregateRequest(
-                    setOf(StepsRecord.COUNT_TOTAL),
-                    TimeRangeFilter.between(windows.dayStart, now.toInstant())
-                )
-            )[StepsRecord.COUNT_TOTAL]
+            if (windows.dayStart == now.toInstant()) {
+                null
+            } else {
+                api.aggregate(
+                    AggregateRequest(
+                        setOf(StepsRecord.COUNT_TOTAL),
+                        TimeRangeFilter.between(windows.dayStart, now.toInstant())
+                    )
+                )[StepsRecord.COUNT_TOTAL]
+            }
         }
         val sleep = value(preferences, granted, HealthCapability.SLEEP) {
             api.aggregate(

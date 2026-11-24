@@ -1,7 +1,5 @@
 package com.emmah.inshape.feature.music
 
-import com.emmah.inshape.ui.theme.Dimens
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.foundation.Canvas
@@ -22,9 +20,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.onVisibilityChanged
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeTheme
 import kotlin.math.PI
 import kotlin.math.cos
@@ -34,18 +34,24 @@ private const val PREVIEW_PHASE = 0.7f
 private val FullTurn = (2 * PI).toFloat()
 
 @Composable
-internal fun PlaybackBars(playing: Boolean, modifier: Modifier = Modifier) {
+internal fun PlaybackBars(playing: Boolean, modifier: Modifier = Modifier, inHeader: Boolean = false) {
     val restingColor = InShapeTheme.colors.textTertiary
-    PlaybackCanvas(playing, 1_600, modifier.size(Dimens.button)) { color, phase, amplitude ->
-        val scale = size.minDimension / Dimens.button.toPx()
-        val barWidth = Dimens.innerTiny.toPx() * scale
-        val stride = Dimens.playbackBarStride.toPx() * scale
-        val startX = (size.width - Dimens.iconLarge.toPx() * scale) / 2f
-        val baseline = Dimens.playbackBarBaseline.toPx() * scale
-        Dimens.playbackBarHeights.forEachIndexed { index, peak ->
+    val canvasSize = if (inHeader) Dimens.buttonIcon else Dimens.button
+    val width = if (inHeader) Dimens.headerPlaybackBarWidth else Dimens.innerTiny
+    val spacing = if (inHeader) Dimens.headerPlaybackBarStride else Dimens.playbackBarStride
+    val bottom = if (inHeader) Dimens.headerPlaybackBarBaseline else Dimens.playbackBarBaseline
+    val peaks = if (inHeader) Dimens.headerPlaybackBarHeights else Dimens.playbackBarHeights
+    PlaybackCanvas(playing, 1_600, modifier.size(canvasSize)) { color, phase, amplitude ->
+        val scale = size.minDimension / canvasSize.toPx()
+        val barWidth = width.toPx() * scale
+        val stride = spacing.toPx() * scale
+        val startX = (size.width - (stride * peaks.lastIndex + barWidth)) / 2f
+        val baseline = bottom.toPx() * scale
+        peaks.forEachIndexed { index, peak ->
             val motion = 0.5f + 0.5f * cos(phase - PREVIEW_PHASE + (index - 2) * 0.8f)
             val fullHeight = peak.toPx() * scale - barWidth
-            val height = barWidth + fullHeight * (.55f * (1 - amplitude) + amplitude * motion)
+            val fraction = if (inHeader) 0.55f + 0.45f * motion else motion
+            val height = barWidth + fullHeight * (.55f * (1 - amplitude) + amplitude * fraction)
             drawRoundRect(
                 lerp(restingColor, color, amplitude),
                 topLeft = Offset(startX + index * stride, baseline - height),

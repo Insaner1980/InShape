@@ -1,7 +1,5 @@
 package com.emmah.inshape.demo
 
-import androidx.compose.ui.res.stringResource
-import com.emmah.inshape.R
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.List
@@ -10,7 +8,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import com.emmah.inshape.R
 import com.emmah.inshape.ui.components.ActionRow
 import com.emmah.inshape.ui.components.EmptyState
 import com.emmah.inshape.ui.components.FilterPill
@@ -102,7 +102,7 @@ fun ComponentPreview(mode: ThemeMode, modifier: Modifier = Modifier) {
                 InShapeSwitch(true, {}, "Muistutus")
                 Stepper("3", {}, {}, true, "Vähennä", "Lisää")
                 ProgressSegments(ProgressState.entries, "1/3 tehty")
-                EmptyState("Ei treenejä", "Aloita, kun olet valmis", action = stringResource(R.string.create_routine), onAction = {})
+                EmptyState(stringResource(R.string.no_workouts_period), action = stringResource(R.string.create_routine), onAction = {})
             }
         }
     }

@@ -1,16 +1,16 @@
 package com.emmah.inshape.feature.music
 
 import android.content.Context
-import com.emmah.inshape.ui.requireUi
 import com.emmah.inshape.R
 import com.emmah.inshape.feature.assistant.schemaArray
 import com.emmah.inshape.feature.assistant.schemaObject
 import com.emmah.inshape.feature.assistant.schemaValue
 import com.emmah.inshape.feature.assistant.text
+import com.emmah.inshape.ui.requireUi
+import kotlin.math.abs
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlin.math.abs
 
 internal fun String?.energyLabel(): Int = when (this) {
     "calm" -> R.string.energy_calm
@@ -57,8 +57,12 @@ internal fun playlistRequest(result: JsonObject): PlaylistRequest {
     val minutes = (result["minutes"] as? JsonPrimitive)?.content?.toIntOrNull()
     requireUi(minutes == null || minutes in 1..240, R.string.playlist_target_range)
     return PlaylistRequest(
-        minutes, words("allowedArtists", 30).toSet(), words("excludedArtists", 30).toSet(),
-        result["excludePrevious"]?.toString() == "true", stages, result.text("name")?.take(120)
+        minutes,
+        words("allowedArtists", 30).toSet(),
+        words("excludedArtists", 30).toSet(),
+        result["excludePrevious"]?.toString() == "true",
+        stages,
+        result.text("name")?.take(120)
     )
 }
 
@@ -68,29 +72,42 @@ internal fun planPlaylist(context: Context, tracks: List<MusicTrack>, request: P
         return PlaylistPlan(emptyList(), listOf(context.getString(R.string.playlist_no_coverage)))
     }
     val unique = if (request.excludePrevious) eligible.filter { it.id !in heard.orEmpty() } else eligible
+    val candidates = if (request.minutes == null) unique else unique.filter { (it.durationMs ?: 0) > 0 }
     val messages = buildList {
-        if (request.minutes != null && unique.any { it.durationMs == null || it.durationMs <= 0 }) {
+        if (candidates.size < unique.size) {
             add(context.getString(R.string.playlist_unknown_lengths))
         }
         if (request.stages.isNotEmpty() && unique.any { it.energy == null }) add(context.getString(R.string.playlist_unlabeled_energy))
     }.toMutableList()
-    val candidates = if (request.minutes == null) unique else unique.filter { (it.durationMs ?: 0) > 0 }
     val target = request.minutes?.times(60_000L)
     val selected = if (request.stages.isEmpty()) {
         if (target == null) candidates.take(30) else bestDuration(candidates, target)
     } else {
-        val pool = candidates.toMutableList()
-        request.stages.flatMap { label ->
-            val matching = pool.filter { it.energy == label }
-            val chosen = if (target == null) matching.take(1) else bestDuration(matching, target / request.stages.size)
-            if (chosen.isEmpty()) messages.add(context.getString(R.string.playlist_no_stage_track, context.getString(label.energyLabel()).lowercase()))
-            val ids = chosen.map { it.id }.toSet()
-            pool.removeAll { it.id in ids }
-            chosen
-        }
+        selectStages(context, candidates, request.stages, target, messages)
     }
     if (selected.isEmpty()) messages.add(context.getString(R.string.playlist_no_matching_tracks))
     return PlaylistPlan(selected, messages.distinct())
+}
+
+private fun selectStages(
+    context: Context,
+    candidates: List<MusicTrack>,
+    stages: List<String>,
+    target: Long?,
+    messages: MutableList<String>
+): List<MusicTrack> {
+    val pool = candidates.toMutableList()
+    val stageDuration = target?.div(stages.size)
+    return stages.flatMap { label ->
+        val matching = pool.filter { it.energy == label }
+        val chosen = if (stageDuration == null) matching.take(1) else bestDuration(matching, stageDuration)
+        if (chosen.isEmpty()) {
+            messages.add(context.getString(R.string.playlist_no_stage_track, context.getString(label.energyLabel()).lowercase()))
+        }
+        val ids = chosen.map { it.id }.toSet()
+        pool.removeAll { it.id in ids }
+        chosen
+    }
 }
 
 internal fun artistMatches(track: MusicTrack, request: PlaylistRequest): Boolean =
@@ -111,7 +128,11 @@ private fun bestDuration(tracks: List<MusicTrack>, target: Long): List<MusicTrac
             if (total > longestUseful) return@forEach
             val bucket = total / 1000
             val existing = choices[bucket]
-            if (existing == null || abs(target - total) < abs(target - existing.total)) choices[bucket] = DurationChoice(total, track, choice)
+            if (existing == null ||
+                abs(target - total) < abs(target - existing.total)
+            ) {
+                choices[bucket] = DurationChoice(total, track, choice)
+            }
         }
     }
     val lowestError = choices.values.filter { it.track != null }.minWithOrNull(

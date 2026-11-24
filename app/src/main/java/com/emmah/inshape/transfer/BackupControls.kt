@@ -12,7 +12,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.emmah.inshape.JournalViewModel
@@ -35,7 +35,7 @@ fun ColumnScope.BackupControls(vm: JournalViewModel, lastBackupAt: String?, addi
     val zone = ZoneId.systemDefault()
     val snackbar = LocalPageSnackbar.current
     val transfer = vm.transfers
-    val context = LocalContext.current
+    val resources = LocalResources.current
     val state by transfer.state.collectAsStateWithLifecycle()
     val save =
         rememberLauncherForActivityResult(
@@ -62,7 +62,7 @@ fun ColumnScope.BackupControls(vm: JournalViewModel, lastBackupAt: String?, addi
     LaunchedEffect(transfer, snackbar) {
         if (snackbar == null) return@LaunchedEffect
         transfer.state.collect { result ->
-            if (result.message == context.getString(R.string.backup_saved) && transfer.consumeMessage(result)) {
+            if (result.message == resources.getString(R.string.backup_saved) && transfer.consumeMessage(result)) {
                 snackbar.showSnackbar(result.message)
             }
         }
@@ -90,7 +90,8 @@ fun ColumnScope.BackupControls(vm: JournalViewModel, lastBackupAt: String?, addi
         additionalRows()
     }
     if (state.busy) LinearProgressIndicator()
-    val alreadyReported = state.message == context.getString(R.string.backup_saved) || state.message == context.getString(R.string.export_cancelled)
+    val alreadyReported =
+        state.message == resources.getString(R.string.backup_saved) || state.message == resources.getString(R.string.export_cancelled)
     if (state.message.isNotBlank() && !alreadyReported && state.backup == null) {
         Text(
             state.message,
@@ -100,18 +101,9 @@ fun ColumnScope.BackupControls(vm: JournalViewModel, lastBackupAt: String?, addi
     }
     val backup = state.backup
     if (backup != null && !state.busy) {
-        val data = backup.staged.data
-        val workouts = data.workouts.size
-        val exercises = data.exercises.size
-        val routines = data.routines.size
         ConfirmDialog(
             stringResource(R.string.replace_journal_question),
-            stringResource(
-                R.string.backup_replace_message,
-                pluralStringResource(R.plurals.workout_count, workouts, workouts),
-                pluralStringResource(R.plurals.exercise_count, exercises, exercises),
-                pluralStringResource(R.plurals.routine_count, routines, routines)
-            ),
+            stringResource(R.string.backup_replace_message),
             stringResource(R.string.replace_journal),
             destructive = true,
             { transfer.restore(backup) },

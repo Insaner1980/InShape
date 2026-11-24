@@ -1,6 +1,5 @@
 package com.emmah.inshape
 
-import com.emmah.inshape.ui.theme.withFinnishLocale
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -15,6 +14,7 @@ import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.lifecycle.lifecycleScope
 import com.emmah.inshape.navigation.AppNavigation
 import com.emmah.inshape.ui.theme.ActivityTheme
+import com.emmah.inshape.ui.theme.withFinnishLocale
 import com.emmah.inshape.widget.InShapeWidgetReceiver
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch

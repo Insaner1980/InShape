@@ -1,8 +1,5 @@
 package com.emmah.inshape.feature.workout
 
-import com.emmah.inshape.ui.theme.decimalDisplay
-import androidx.compose.ui.res.stringResource
-import com.emmah.inshape.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -37,22 +34,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import com.emmah.inshape.JournalViewModel
+import com.emmah.inshape.R
 import com.emmah.inshape.data.MeasurementBasis
 import com.emmah.inshape.data.SessionSet
-import com.emmah.inshape.ui.components.AppMenu
 import com.emmah.inshape.ui.components.ActionRow
-import com.emmah.inshape.ui.components.EditorSheet
+import com.emmah.inshape.ui.components.AppMenu
 import com.emmah.inshape.ui.components.DialogAction
+import com.emmah.inshape.ui.components.EditorSheet
 import com.emmah.inshape.ui.components.MenuAction
 import com.emmah.inshape.ui.components.NumberField
 import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.InShapeType
+import com.emmah.inshape.ui.theme.decimalDisplay
 
 @Composable
 fun SetTableHeader(basis: String, modifier: Modifier = Modifier) {
@@ -92,15 +92,7 @@ fun SetTableHeader(basis: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun SetRow(
-    set: SessionSet,
-    number: Int,
-    basis: String,
-    vm: JournalViewModel,
-    modifier: Modifier = Modifier,
-    highlighted: Boolean = false,
-    onRemove: () -> Unit = {}
-) {
+fun SetRow(set: SessionSet, number: Int, basis: String, vm: JournalViewModel, modifier: Modifier = Modifier, highlighted: Boolean = false) {
     val complete = set.completedAt != null
     // Reopening a completed set starts from the saved values, including assistant changes.
     var load by rememberSaveable(set.id, set.suggestedLoad, complete) { mutableStateOf(set.rawLoad) }
@@ -132,11 +124,7 @@ fun SetRow(
             AppMenu(menu, { menu = false }) {
                 MenuAction(stringResource(R.string.remove_set_number, number), Icons.Outlined.Delete, {
                     menu = false
-                    vm.write {
-                        removeSet(set.id)
-                        vm.container.markSetRemoved()
-                        onRemove()
-                    }
+                    vm.write { removeSet(set.id) }
                 }, destructive = true)
             }
         }
@@ -175,8 +163,14 @@ fun SetRow(
             }
         } else {
             NumberField(
-                draftValue, onChange, label, modifier,
-                decimal = decimal, compact = compact, highlighted = highlighted, setTable = true
+                draftValue,
+                onChange,
+                label,
+                modifier,
+                decimal = decimal,
+                compact = compact,
+                highlighted = highlighted,
+                setTable = true
             )
         }
     }
@@ -190,36 +184,7 @@ fun SetRow(
         vm.write { saveSetDraft(set.id, load, it) }
     }
 
-    @Composable fun Done() {
-        Box(Modifier.size(Dimens.setField), contentAlignment = Alignment.Center) {
-            IconToggleButton(
-                complete,
-                {
-                    vm.write { setSetCompleted(set.id, it) }
-                },
-                Modifier.size(
-                    Dimens.check
-                ).background(if (complete) colors.ink else Color.Transparent, InShapeShapes.pill)
-                    .then(
-                        if (complete) {
-                            Modifier
-                        } else {
-                            Modifier.border(
-                                Dimens.chartOutline,
-                                colors.textSecondary,
-                                InShapeShapes.pill
-                            )
-                        }
-                    )
-            ) {
-                Icon(
-                    Icons.Outlined.Check,
-                    if (complete) stringResource(R.string.undo_set_number, number) else stringResource(R.string.complete_set_number, number),
-                    tint = if (complete) colors.onInk else colors.textSecondary
-                )
-            }
-        }
-    }
+    val changeCompletion: (Boolean) -> Unit = { vm.write { setSetCompleted(set.id, it) } }
     BoxWithConstraints(modifier) {
         if (maxWidth < Dimens.setFallback ||
             LocalDensity.current.fontScale >= 1.3f
@@ -228,11 +193,15 @@ fun SetRow(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Options()
                     Text(
-                        stringResource(R.string.set_number_status, number, stringResource(if (complete) R.string.done else R.string.not_completed).lowercase()),
+                        stringResource(
+                            R.string.set_number_status,
+                            number,
+                            stringResource(if (complete) R.string.done else R.string.not_completed).lowercase()
+                        ),
                         Modifier.weight(1f),
                         style = MaterialTheme.typography.bodySmall
                     )
-                    Done()
+                    SetCompletionControl(complete, number, changeCompletion)
                 }
                 SetValue(unit, set.load.orEmpty().decimalDisplay(), load, changeLoad, Modifier.fillMaxWidth(), decimal = true)
                 SetValue(stringResource(R.string.reps), set.reps?.toString().orEmpty(), reps, changeReps, Modifier.fillMaxWidth())
@@ -244,8 +213,15 @@ fun SetRow(
             ) {
                 Options(compact = true)
                 SetValue(unit, set.load.orEmpty().decimalDisplay(), load, changeLoad, Modifier.weight(1f), decimal = true, compact = true)
-                SetValue(stringResource(R.string.reps), set.reps?.toString().orEmpty(), reps, changeReps, Modifier.weight(1f), compact = true)
-                Done()
+                SetValue(
+                    stringResource(R.string.reps),
+                    set.reps?.toString().orEmpty(),
+                    reps,
+                    changeReps,
+                    Modifier.weight(1f),
+                    compact = true
+                )
+                SetCompletionControl(complete, number, changeCompletion)
             }
         }
     }
@@ -255,7 +231,17 @@ fun SetRow(
         var correctionRir by remember { mutableStateOf(set.rir?.toString() ?: "") }
         EditorSheet(stringResource(R.string.correct_set_number, number), { editing = false }) {
             NumberField(correctionLoad, { correctionLoad = it }, unit, decimal = true)
-            NumberField(correctionReps, { correctionReps = it }, if (set.perSide == true) stringResource(R.string.reps_per_side) else stringResource(R.string.reps))
+            NumberField(
+                correctionReps,
+                { correctionReps = it },
+                if (set.perSide ==
+                    true
+                ) {
+                    stringResource(R.string.reps_per_side)
+                } else {
+                    stringResource(R.string.reps)
+                }
+            )
             NumberField(correctionRir, { correctionRir = it }, stringResource(R.string.rir_optional))
             ActionRow(Modifier.align(Alignment.End)) {
                 DialogAction(stringResource(R.string.cancel), { editing = false })
@@ -267,12 +253,52 @@ fun SetRow(
                     vm.write {
                         correctCompletedSet(set.id, submittedLoad, submittedReps, submittedRir)
                         val sameDialog = editing && correctionSession == submittedSession
-                        if (sameDialog && correctionLoad == submittedLoad && correctionReps == submittedReps && correctionRir == submittedRir) {
+                        val unchanged = correctionLoad == submittedLoad && correctionReps == submittedReps &&
+                            correctionRir == submittedRir
+                        if (sameDialog && unchanged) {
                             editing = false
                         }
                     }
                 })
             }
+        }
+    }
+}
+
+@Composable
+private fun SetCompletionControl(complete: Boolean, number: Int, onChange: (Boolean) -> Unit) {
+    val colors = InShapeTheme.colors
+    Box(Modifier.size(Dimens.setField), contentAlignment = Alignment.Center) {
+        IconToggleButton(
+            complete,
+            onChange,
+            Modifier.size(
+                Dimens.check
+            ).background(if (complete) colors.ink else Color.Transparent, InShapeShapes.pill)
+                .then(
+                    if (complete) {
+                        Modifier
+                    } else {
+                        Modifier.border(
+                            Dimens.chartOutline,
+                            colors.textSecondary,
+                            InShapeShapes.pill
+                        )
+                    }
+                )
+        ) {
+            Icon(
+                Icons.Outlined.Check,
+                if (complete) {
+                    stringResource(
+                        R.string.undo_set_number,
+                        number
+                    )
+                } else {
+                    stringResource(R.string.complete_set_number, number)
+                },
+                tint = if (complete) colors.onInk else colors.textSecondary
+            )
         }
     }
 }

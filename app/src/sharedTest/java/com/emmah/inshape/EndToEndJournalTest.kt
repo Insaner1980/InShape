@@ -1,8 +1,8 @@
 package com.emmah.inshape
 
-import androidx.compose.ui.test.assertIsSelected
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -101,24 +101,7 @@ class EndToEndJournalTest {
                     .isEmpty()
             }
         )
-        compose.onAllNodesWithText(ui(R.string.library)).onLast().performClick()
-        click(ui(R.string.exercises))
-        compose.onNodeWithContentDescription(ui(R.string.new_exercise)).performClick()
-        compose.onNodeWithText(ui(R.string.new_exercise)).performClick()
-        input(ui(R.string.exercise_name), ui(R.string.exercise_lat_pulldown))
-        click(ui(R.string.add_setting))
-        input(ui(R.string.setting_number_name, 1), "Seat")
-        input(ui(R.string.setting_number_value, 1), "4")
-        click(ui(R.string.create_exercise))
-        compose.waitUntil(10_000) {
-            runBlocking {
-                container.repository
-                    .snapshot()
-                    .exercises.size == 1
-            }
-        }
-        compose.waitUntil(10_000) { compose.onAllNodesWithText(ui(R.string.edit_exercise)).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithContentDescription(ui(R.string.back)).performClick()
+        createLatPulldown()
         compose.onAllNodesWithText(ui(R.string.today)).onLast().performClick()
         click(ui(R.string.start_workout))
         compose.waitUntil(30_000) {
@@ -145,45 +128,8 @@ class EndToEndJournalTest {
                     ?.completedAt != null
             }
         }
-        compose.runOnIdle { testClock.time = testClock.time.plusSeconds(10) }
-        click(ui(R.string.finish))
-        compose.waitUntil(10_000) { runBlocking { container.repository.snapshot().drafts.any { it.id.startsWith("finish:") } } }
-        compose.onNodeWithContentDescription(ui(R.string.back)).performClick()
-        compose.waitUntil(10_000) { runBlocking { container.repository.snapshot().drafts.none { it.id.startsWith("finish:") } } }
-        compose.runOnIdle { testClock.time = testClock.time.plusSeconds(15) }
-        click(ui(R.string.finish))
-        compose.onNodeWithText(ui(R.string.workout_done)).assertExists()
-        compose.onNodeWithText("0").assertExists()
-        click(ui(R.string.effort_right))
-        click(ui(R.string.energy_and_notes))
-        input(ui(R.string.workout_note), "Keep this note after returning")
-        compose.onNodeWithContentDescription(ui(R.string.back)).performClick()
-        compose.waitUntil(10_000) { compose.onAllNodesWithText(ui(R.string.finish)).fetchSemanticsNodes().isNotEmpty() }
-        compose.runOnIdle { testClock.time = testClock.time.plusSeconds(5) }
-        click(ui(R.string.finish))
-        click(ui(R.string.energy_and_notes))
-        compose.onNodeWithText("Keep this note after returning").assertExists()
-        runBlocking {
-            val active = requireNotNull(container.repository.snapshot().active)
-            container.repository.saveWorkoutNote(active.row.id, "Note from another screen")
-        }
-        click(ui(R.string.use_draft_note))
-        compose.onNodeWithText(ui(R.string.effort_right)).assertIsSelected()
-        click(ui(R.string.save_workout))
-        compose.waitUntil(10_000) {
-            runBlocking {
-                container.repository
-                    .snapshot()
-                    .history.size == 1
-            }
-        }
-        val completed =
-            runBlocking {
-                container.repository
-                    .snapshot()
-                    .history
-                    .single()
-            }
+        finishWorkoutAfterReviewingDraft()
+        val completed = runBlocking { container.repository.snapshot().history.single() }
         assertEquals(
             "27.5",
             completed.items
@@ -220,6 +166,62 @@ class EndToEndJournalTest {
                     .count { it.qualifiesForAttendance }
             }
         )
+    }
+
+    private fun createLatPulldown() {
+        compose.onAllNodesWithText(ui(R.string.library)).onLast().performClick()
+        click(ui(R.string.exercises))
+        compose.onNodeWithContentDescription(ui(R.string.new_exercise)).performClick()
+        compose.onNodeWithText(ui(R.string.new_exercise)).performClick()
+        input(ui(R.string.exercise_name), ui(R.string.exercise_lat_pulldown))
+        click(ui(R.string.add_setting))
+        input(ui(R.string.setting_number_name, 1), "Seat")
+        input(ui(R.string.setting_number_value, 1), "4")
+        click(ui(R.string.create_exercise))
+        compose.waitUntil(10_000) {
+            runBlocking {
+                container.repository
+                    .snapshot()
+                    .exercises.size == 1
+            }
+        }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText(ui(R.string.edit_exercise)).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription(ui(R.string.back)).performClick()
+    }
+
+    private fun finishWorkoutAfterReviewingDraft() {
+        compose.runOnIdle { testClock.time = testClock.time.plusSeconds(10) }
+        click(ui(R.string.finish))
+        compose.waitUntil(10_000) { runBlocking { container.repository.snapshot().drafts.any { it.id.startsWith("finish:") } } }
+        compose.onNodeWithContentDescription(ui(R.string.back)).performClick()
+        compose.waitUntil(10_000) { runBlocking { container.repository.snapshot().drafts.none { it.id.startsWith("finish:") } } }
+        compose.runOnIdle { testClock.time = testClock.time.plusSeconds(15) }
+        click(ui(R.string.finish))
+        compose.onNodeWithText(ui(R.string.workout_done)).assertExists()
+        compose.onNodeWithText("0").assertExists()
+        click(ui(R.string.effort_right))
+        click(ui(R.string.energy_and_notes))
+        input(ui(R.string.workout_note), "Keep this note after returning")
+        compose.onNodeWithContentDescription(ui(R.string.back)).performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText(ui(R.string.finish)).fetchSemanticsNodes().isNotEmpty() }
+        compose.runOnIdle { testClock.time = testClock.time.plusSeconds(5) }
+        click(ui(R.string.finish))
+        click(ui(R.string.energy_and_notes))
+        compose.onNodeWithText("Keep this note after returning").assertExists()
+        runBlocking {
+            val active = requireNotNull(container.repository.snapshot().active)
+            container.repository.saveWorkoutNote(active.row.id, "Note from another screen")
+        }
+        click(ui(R.string.use_draft_note))
+        compose.onNodeWithText(ui(R.string.effort_right)).assertIsSelected()
+        click(ui(R.string.save_workout))
+        compose.waitUntil(10_000) {
+            runBlocking {
+                container.repository
+                    .snapshot()
+                    .history.size == 1
+            }
+        }
     }
 
     @Test fun emptyFinishAcceptsANoteAndManualDurationWithoutSharingUnknownTimes() {

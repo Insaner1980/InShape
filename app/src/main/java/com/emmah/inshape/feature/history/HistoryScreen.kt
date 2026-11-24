@@ -1,20 +1,5 @@
 package com.emmah.inshape.feature.history
 
-import androidx.compose.material.icons.outlined.QuestionAnswer
-import com.emmah.inshape.feature.library.exerciseDisplayName
-import com.emmah.inshape.feature.checkin.bodyRegionLabel
-import com.emmah.inshape.ui.theme.finnishLocale
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.material.icons.outlined.Replay
-import com.emmah.inshape.ui.theme.monthName
-import java.time.Instant
-import com.emmah.inshape.ui.theme.workoutTime
-import com.emmah.inshape.ui.components.ActionRow
-import com.emmah.inshape.feature.checkin.effortLevelOf
-import com.emmah.inshape.ui.theme.energyText
-import com.emmah.inshape.ui.theme.dateTime
-import com.emmah.inshape.ui.components.HeaderIconButton
-import com.emmah.inshape.ui.components.EditorSheet
 import android.text.format.DateFormat
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -24,6 +9,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -40,6 +27,8 @@ import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.QuestionAnswer
+import androidx.compose.material.icons.outlined.Replay
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,6 +39,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -57,15 +47,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
@@ -76,22 +67,24 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.emmah.inshape.JournalViewModel
 import com.emmah.inshape.R
-import com.emmah.inshape.data.BodyObservation
 import com.emmah.inshape.data.DateRange
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.Workout
 import com.emmah.inshape.data.monthGrid
 import com.emmah.inshape.data.newId
-import com.emmah.inshape.feature.checkin.BodyLevelPills
 import com.emmah.inshape.feature.checkin.bodyRegions
+import com.emmah.inshape.feature.library.exerciseDisplayName
 import com.emmah.inshape.feature.progress.ProgressScreen
 import com.emmah.inshape.feature.workout.SetRow
 import com.emmah.inshape.feature.workout.SetTableHeader
 import com.emmah.inshape.feature.workout.itemSummary
+import com.emmah.inshape.ui.components.ActionRow
 import com.emmah.inshape.ui.components.AppMenu
 import com.emmah.inshape.ui.components.ConfirmDialog
 import com.emmah.inshape.ui.components.DialogAction
+import com.emmah.inshape.ui.components.EditorSheet
 import com.emmah.inshape.ui.components.EmptyState
+import com.emmah.inshape.ui.components.HeaderIconButton
 import com.emmah.inshape.ui.components.KeyValueRow
 import com.emmah.inshape.ui.components.ListCard
 import com.emmah.inshape.ui.components.ListRow
@@ -111,13 +104,18 @@ import com.emmah.inshape.ui.theme.Dimens
 import com.emmah.inshape.ui.theme.InShapeShapes
 import com.emmah.inshape.ui.theme.InShapeTheme
 import com.emmah.inshape.ui.theme.InShapeType
+import com.emmah.inshape.ui.theme.dateTime
 import com.emmah.inshape.ui.theme.displayedDurationSeconds
+import com.emmah.inshape.ui.theme.finnishLocale
 import com.emmah.inshape.ui.theme.formatDuration
 import com.emmah.inshape.ui.theme.hasArtworkColumns
 import com.emmah.inshape.ui.theme.longDate
+import com.emmah.inshape.ui.theme.monthName
 import com.emmah.inshape.ui.theme.monthTitle
 import com.emmah.inshape.ui.theme.shortDate
+import com.emmah.inshape.ui.theme.workoutTime
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
@@ -202,7 +200,10 @@ fun HistoryScreen(
             header()
             val monthRecords = data.historyIn(DateRange(month.atDay(1), month.atEndOfMonth()))
             HistoryCalendar(
-                month, today, selected, monthRecords,
+                month,
+                today,
+                selected,
+                monthRecords,
                 onMonthChange = {
                     monthText = it.toString()
                     selected = null
@@ -228,8 +229,8 @@ fun HistoryScreen(
                 pastTitle,
                 stringResource(R.string.workout_name),
                 { pastTitle = it },
-                error = stringResource(R.string.workout_name_required).takeIf { showPastTitleError && pastTitle.isBlank() },
-                focusRequester = pastTitleFocus
+                modifier = Modifier.focusRequester(pastTitleFocus),
+                error = stringResource(R.string.workout_name_required).takeIf { showPastTitleError && pastTitle.isBlank() }
             )
             val keyboard = LocalSoftwareKeyboardController.current
             ActionRow(Modifier.align(Alignment.End)) {
@@ -260,14 +261,20 @@ fun HistoryScreen(
 
 @Composable
 private fun HistoryMonthSheet(selectedMonth: YearMonth, currentMonth: YearMonth, onDismiss: () -> Unit, onSelect: (YearMonth) -> Unit) {
-    var year by rememberSaveable { mutableStateOf(selectedMonth.year.coerceAtMost(currentMonth.year)) }
+    var year by rememberSaveable { mutableIntStateOf(selectedMonth.year.coerceAtMost(currentMonth.year)) }
     val labels = stringArrayResource(R.array.history_months)
     val colors = InShapeTheme.colors
     EditorSheet(stringResource(R.string.select_month), onDismiss) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             HeaderIconButton(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, stringResource(R.string.previous_year), { year-- })
             Text(year.toString(), style = MaterialTheme.typography.titleMedium)
-            HeaderIconButton(Icons.AutoMirrored.Outlined.KeyboardArrowRight, stringResource(R.string.next_year), { year++ }, enabled = year < currentMonth.year)
+            HeaderIconButton(
+                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                stringResource(R.string.next_year),
+                { year++ },
+                enabled =
+                    year < currentMonth.year
+            )
         }
         labels.toList().chunked(3).forEachIndexed { row, months ->
             Row(horizontalArrangement = Arrangement.spacedBy(Dimens.innerSmall)) {
@@ -288,7 +295,9 @@ private fun HistoryMonthSheet(selectedMonth: YearMonth, currentMonth: YearMonth,
                         },
                         border = if (month == currentMonth && !chosen) BorderStroke(Dimens.line, colors.outline) else null
                     ) {
-                        Box(Modifier.padding(Dimens.innerTiny), contentAlignment = Alignment.Center) { Text(label, style = MaterialTheme.typography.bodyMedium) }
+                        Box(Modifier.padding(Dimens.innerTiny), contentAlignment = Alignment.Center) {
+                            Text(label, style = MaterialTheme.typography.bodyMedium)
+                        }
                     }
                 }
             }
@@ -406,7 +415,7 @@ private fun RowScope.CalendarDay(
 }
 
 @Composable
-private fun CalendarMonthWorkouts(
+private fun ColumnScope.CalendarMonthWorkouts(
     data: JournalSnapshot,
     month: YearMonth,
     monthRecords: List<Workout>,
@@ -429,9 +438,16 @@ private fun CalendarMonthWorkouts(
         ListCard {
             drafts.forEach { draft ->
                 item {
-                    ListRow(draft.title, subtitle = stringResource(R.string.unfinished_date, LocalDate.parse(draft.journalDate).shortDate()), onClick = {
-                        onPast(draft.id)
-                    })
+                    ListRow(
+                        draft.title,
+                        subtitle = stringResource(
+                            R.string.unfinished_date,
+                            LocalDate.parse(draft.journalDate).shortDate()
+                        ),
+                        onClick = {
+                            onPast(draft.id)
+                        }
+                    )
                 }
             }
         }
@@ -469,14 +485,14 @@ private fun CalendarMonthWorkouts(
         qualifying.size
     ) {
         Text(
-            stringResource(R.string.duration_coverage, durations.size, qualifying.size),
+            pluralStringResource(R.plurals.duration_coverage, qualifying.size, durations.size, qualifying.size),
             style = MaterialTheme.typography.bodyMedium,
             color = colors.textSecondary
         )
     }
     SectionHeader(selected?.let { LocalDate.parse(it).shortDate() } ?: stringResource(R.string.month_workouts, month.monthName()))
     if (records.isEmpty()) {
-        EmptyState(stringResource(R.string.no_workouts_period), stringResource(R.string.pick_other_month))
+        EmptyState(stringResource(R.string.no_workouts_period))
     } else {
         ListCard {
             records.forEach { workout ->
@@ -484,12 +500,8 @@ private fun CalendarMonthWorkouts(
                     val date = LocalDate.parse(workout.row.journalDate)
                     ListRow(
                         workout.row.title,
-                        subtitle = date.shortDate(),
-                        trailingValue = {
-                            workout.row.durationSeconds?.let {
-                                Text(formatDuration(it), style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
-                            }
-                        },
+                        subtitle = listOfNotNull(date.shortDate(), workout.row.durationSeconds?.let(::formatDuration))
+                            .joinToString(", "),
                         onClick = { onOpen(workout.row.id) }
                     )
                 }
@@ -498,18 +510,18 @@ private fun CalendarMonthWorkouts(
     }
 }
 
+internal class WorkoutDetailMenu(val onRepeat: () -> Unit, val onTiming: () -> Unit, val onQuestions: (() -> Unit)?)
+
 @Composable
-fun WorkoutDetailScreen(
+internal fun WorkoutDetailScreen(
     id: String,
     data: JournalSnapshot,
     vm: JournalViewModel,
-    onRepeat: () -> Unit,
+    actions: WorkoutDetailMenu,
     onCheckIn: (String) -> Unit,
-    onTiming: () -> Unit,
     onDelete: () -> Unit,
     onExercise: (String, String) -> Unit,
-    modifier: Modifier = Modifier,
-    onQuestions: (() -> Unit)? = null
+    modifier: Modifier = Modifier
 ) {
     val workout = data.workout(id) ?: return
     val uses24Hours = DateFormat.is24HourFormat(LocalContext.current)
@@ -524,20 +536,30 @@ fun WorkoutDetailScreen(
                 AppMenu(menu, { menu = false }, inHeader = true) {
                     MenuAction(stringResource(R.string.repeat_workout), Icons.Outlined.Replay, {
                         menu = false
-                        onRepeat()
+                        actions.onRepeat()
                     })
                     MenuAction(stringResource(R.string.edit_workout), Icons.Outlined.Edit, {
                         menu = false
-                        onTiming()
+                        actions.onTiming()
                     })
-                    MenuAction(if (editing) stringResource(R.string.finish_edit_sets) else stringResource(R.string.edit_sets), Icons.Outlined.Edit, {
-                        menu = false
-                        editing = !editing
-                    })
-                    if (onQuestions != null) {
+                    MenuAction(
+                        if (editing) {
+                            stringResource(
+                                R.string.finish_edit_sets
+                            )
+                        } else {
+                            stringResource(R.string.edit_sets)
+                        },
+                        Icons.Outlined.Edit,
+                        {
+                            menu = false
+                            editing = !editing
+                        }
+                    )
+                    if (actions.onQuestions != null) {
                         MenuAction(stringResource(R.string.ask_workout), Icons.Outlined.QuestionAnswer, {
                             menu = false
-                            onQuestions()
+                            actions.onQuestions()
                         })
                     }
                 }
@@ -550,7 +572,10 @@ fun WorkoutDetailScreen(
             style = MaterialTheme.typography.bodyMedium,
             color = colors.textSecondary
         )
-        Text(workout.row.displayedDurationSeconds()?.let(::formatDuration) ?: stringResource(R.string.duration_not_recorded), style = MaterialTheme.typography.displaySmall)
+        Text(
+            workout.row.displayedDurationSeconds()?.let(::formatDuration) ?: stringResource(R.string.duration_not_recorded),
+            style = MaterialTheme.typography.displaySmall
+        )
         com.emmah.inshape.feature.workout.WorkoutMetrics(workout)
         if (!workout.hasPerformedWork) {
             Text(
@@ -563,7 +588,7 @@ fun WorkoutDetailScreen(
             Text(workout.row.note)
         }
         WorkoutDetailExercises(workout, vm, editing, onExercise)
-        WorkoutDetailCheckIns(workout, data.observations, uses24Hours, onCheckIn)
+        WorkoutDetailCheckIns(workout, uses24Hours, onCheckIn)
         com.emmah.inshape.health.WorkoutHealthControls(workout, data, vm)
         TextAction(stringResource(R.string.delete_workout), {
             deletion = true
@@ -589,12 +614,7 @@ fun WorkoutDetailScreen(
 }
 
 @Composable
-private fun WorkoutDetailExercises(
-    workout: Workout,
-    vm: JournalViewModel,
-    editing: Boolean,
-    onExercise: (String, String) -> Unit
-) {
+private fun WorkoutDetailExercises(workout: Workout, vm: JournalViewModel, editing: Boolean, onExercise: (String, String) -> Unit) {
     SectionHeader(stringResource(R.string.exercises))
     ListCard {
         workout.items.forEach { exercise ->
@@ -636,12 +656,7 @@ private fun WorkoutDetailExercises(
 }
 
 @Composable
-private fun WorkoutDetailCheckIns(
-    workout: Workout,
-    observations: List<BodyObservation>,
-    uses24Hours: Boolean,
-    onCheckIn: (String) -> Unit
-) {
+private fun WorkoutDetailCheckIns(workout: Workout, uses24Hours: Boolean, onCheckIn: (String) -> Unit) {
     SectionHeader(stringResource(R.string.check_ins))
     ListCard {
         listOf(
@@ -667,28 +682,11 @@ private fun WorkoutDetailCheckIns(
                     onClick = { onCheckIn(phase) },
                     details = {
                         if (check != null) {
-                            ActionRow {
-                                effortLevelOf(check.effort)?.let { Pill(stringResource(it.label)) }
-                                energyText(LocalContext.current, check.energy)?.let { Pill(it) }
-                            }
                             if (check.feelings.isNotBlank()) Text(check.feelings, style = MaterialTheme.typography.bodyMedium)
                             if (check.note.isNotBlank()) Text(check.note, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                 )
-                if (check != null) {
-                    observations.filter { it.checkInId == check.id }.forEach { observation ->
-                        val region = stringResource(bodyRegionLabel(observation.region))
-                            ?: observation.region.replace('_', ' ').replaceFirstChar(Char::titlecase)
-                        Column(
-                            Modifier.padding(bottom = Dimens.itemGap),
-                            verticalArrangement = Arrangement.spacedBy(Dimens.innerSmall)
-                        ) {
-                            Text(region, style = MaterialTheme.typography.bodyLarge)
-                            BodyLevelPills(observation.pain, observation.stiffness)
-                        }
-                    }
-                }
             }
         }
     }

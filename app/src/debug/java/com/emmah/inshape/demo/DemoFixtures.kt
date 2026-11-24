@@ -1,7 +1,9 @@
 package com.emmah.inshape.demo
 
+import android.content.Context
 import androidx.room.withTransaction
 import com.emmah.inshape.AppContainer
+import com.emmah.inshape.R
 import com.emmah.inshape.data.BodyObservation
 import com.emmah.inshape.data.CheckIn
 import com.emmah.inshape.data.Exercise
@@ -22,6 +24,7 @@ import java.util.UUID
 
 object DemoFixtures {
     const val FULL_BODY = "Koko vartalo A"
+    private const val PULLDOWN = "Ylätalja"
     private val durationExercises = setOf(0, 6, 7)
 
     val clock: Clock = Clock.fixed(
@@ -31,7 +34,7 @@ object DemoFixtures {
     fun id(label: String) = UUID.nameUUIDFromBytes("inshape-demo:$label".toByteArray()).toString()
     val activeId = id("active")
     val routineId = id("full-body")
-    val pulldownId = id("Ylätalja")
+    val pulldownId = id(PULLDOWN)
     val names =
         listOf(
             "TodayWithActiveWorkout",
@@ -75,7 +78,7 @@ object DemoFixtures {
         require(!container.integrationsEnabled && state in names)
         container.storageReady.await()
 
-        val exercises = demoExercises()
+        val exercises = demoExercises(container.context)
         val routines = listOf(
             Routine(routineId, FULL_BODY, durationMinutes = 50),
             Routine(id("short"), "Lyhyt 20 min", "Väsyneille päiville", 20),
@@ -95,24 +98,30 @@ object DemoFixtures {
         }
     }
 
-    private fun demoExercises(): List<Exercise> {
-        val names = listOf(
+    private fun demoExercises(context: Context): List<Exercise> {
+        // The old labels remain the keys used to generate existing exercise and equipment IDs.
+        val keys = listOf(
             "Lämmittelypyörä",
             "Jalkaprässi",
             "Vaakasoutu laitteessa",
             "Rintapunnerruslaite",
-            "Ylätalja",
+            PULLDOWN,
             "Reiden koukistus istuen",
             "Lonkan koukistajan venytys",
             "Olkapään liikkuvuus",
             "Avustettu leuanveto",
             "Ylätalja kuminauhalla"
         )
-        return names.mapIndexed { index, name ->
+        return keys.mapIndexed { index, key ->
             val exercise = Exercise(
-                id = id(name),
-                equipmentId = id("machine:$name"),
-                name = name,
+                id = id(key),
+                equipmentId = id("machine:$key"),
+                name = when (key) {
+                    "Lämmittelypyörä" -> context.getString(R.string.exercise_warm_up_bike)
+                    "Rintapunnerruslaite" -> context.getString(R.string.exercise_chest_press)
+                    "Ylätalja kuminauhalla" -> context.getString(R.string.exercise_band_pulldown)
+                    else -> key
+                },
                 category = when (index) {
                     0 -> "Warm-up"
                     6, 7 -> "Mobility"
@@ -127,7 +136,7 @@ object DemoFixtures {
             )
             if (index == 4) {
                 exercise.copy(
-                    equipmentName = "Ylätalja",
+                    equipmentName = PULLDOWN,
                     favorite = true,
                     muscles = "Selkä ja kädet",
                     settings = listOf(
@@ -137,7 +146,7 @@ object DemoFixtures {
                         Setting("Selkänoja", "Ei mitään")
                     ),
                     instructions = "Istu ryhdikkäästi. Vedä tanko ylärinnalle ja pidä kyynärpäät alaspäin. Palauta tanko hitaasti.",
-                    alternatives = listOf(id(names[8]), id(names[9])),
+                    alternatives = listOf(id(keys[8]), id(keys[9])),
                     links = listOf(SavedLink("Liikkeen tiedot", "https://www.nhs.uk/live-well/exercise/"))
                 )
             } else {
@@ -350,6 +359,7 @@ object DemoFixtures {
             dao.clearWorkouts()
             dao.clearProgramEnrollment()
             dao.clearProgramLinks()
+            dao.clearProgramDayOverrides()
             dao.clearRoutines()
             dao.clearPhotos()
             dao.clearExercises()
@@ -358,14 +368,18 @@ object DemoFixtures {
             dao.clearOutbox()
             val configured = state == "SettingsConfigured"
             dao.put(
-                if (state == "Empty") Preferences() else Preferences(
-                    name = "Emma",
-                    weeklyGoal = 3,
-                    remindersEnabled = configured,
-                    reminderDays = listOf(1, 3, 5),
-                    reminderTime = "17:30",
-                    remindersHeld = configured
-                )
+                if (state == "Empty") {
+                    Preferences()
+                } else {
+                    Preferences(
+                        name = "Emma",
+                        weeklyGoal = 3,
+                        remindersEnabled = configured,
+                        reminderDays = listOf(1, 3, 5),
+                        reminderTime = "17:30",
+                        remindersHeld = configured
+                    )
+                }
             )
             if (state == "Empty") return@withTransaction
 

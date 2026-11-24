@@ -1,5 +1,6 @@
 package com.emmah.inshape.transfer
 
+import com.emmah.inshape.data.AssistantMemory
 import com.emmah.inshape.data.BodyObservation
 import com.emmah.inshape.data.CheckIn
 import com.emmah.inshape.data.EditorDraft
@@ -9,8 +10,8 @@ import com.emmah.inshape.data.HealthShareState
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.PhotoAsset
 import com.emmah.inshape.data.Preferences
+import com.emmah.inshape.data.ProgramDayOverride
 import com.emmah.inshape.data.ProgramEnrollment
-import com.emmah.inshape.data.AssistantMemory
 import com.emmah.inshape.data.ProgramExerciseLink
 import com.emmah.inshape.data.Routine
 import com.emmah.inshape.data.RoutineItem
@@ -49,11 +50,12 @@ data class StagedBackup(val manifest: BackupManifest, val data: JournalSnapshot,
     val checkIns: List<CheckIn>,
     val observations: List<BodyObservation>,
     val drafts: List<EditorDraft>,
+    val assistantMemories: List<AssistantMemory> = emptyList(),
     val healthStates: List<HealthShareState>,
     val pendingDeletions: List<HealthOutbox> = emptyList(),
     val programEnrollment: ProgramEnrollment? = null,
     val programLinks: List<ProgramExerciseLink> = emptyList(),
-    val assistantMemories: List<AssistantMemory> = emptyList()
+    val programDayOverrides: List<ProgramDayOverride> = emptyList()
 )
 
 @Serializable private data class BackupLibrary(
@@ -79,11 +81,15 @@ object BackupArchive {
         "pendingDeletions" to data.outbox.count { it.operation == "DELETE" },
         "exercises" to data.exercises.size, "photos" to data.photos.size,
         "routines" to data.routines.size, "routineItems" to data.routineItems.size
-    ) + if (version == 2) mapOf(
-        "programEnrollment" to (if (data.programEnrollment == null) 0 else 1),
-        "programLinks" to data.programLinks.size,
-        "assistantMemories" to data.assistantMemories.size
-    ) else emptyMap()
+    ) + if (version >= 2) {
+        mapOf(
+            "programEnrollment" to (if (data.programEnrollment == null) 0 else 1),
+            "programLinks" to data.programLinks.size,
+            "assistantMemories" to data.assistantMemories.size
+        ) + if (version >= 3) mapOf("programDayOverrides" to data.programDayOverrides.size) else emptyMap()
+    } else {
+        emptyMap()
+    }
     fun write(data: JournalSnapshot, photoFile: (PhotoAsset) -> File, output: OutputStream, createdAt: String, appVersion: String) {
         validateBackupData(data)
         parseWorkoutInstant(createdAt)
@@ -112,10 +118,10 @@ object BackupArchive {
         ) { "Backup exceeds the 1 GB or 2000-photo limit" }
         val manifest = json.encodeToString(
             BackupManifest(
-                formatVersion = 2,
+                formatVersion = 3,
                 createdAt = createdAt,
                 appVersion = appVersion,
-                counts = counts(data, 2),
+                counts = counts(data, 3),
                 entries = entries
             )
         ).toByteArray(Charsets.UTF_8)
@@ -182,6 +188,7 @@ object BackupArchive {
                         data.checkIns,
                         data.observations,
                         data.drafts,
+                        data.assistantMemories,
                         data.healthStates,
                         data.outbox.filter {
                             it.operation ==
@@ -189,7 +196,7 @@ object BackupArchive {
                         },
                         data.programEnrollment,
                         data.programLinks,
-                        data.assistantMemories
+                        data.programDayOverrides
                     )
                 ).toByteArray(Charsets.UTF_8),
             LIBRARY_ENTRY to
@@ -232,7 +239,7 @@ object BackupArchive {
         val manifest = json.decodeFromString<BackupManifest>(
             readBounded(zip, 1024 * 1024).decodeToString(throwOnInvalidSequence = true)
         )
-        require(manifest.formatVersion in 1..2) {
+        require(manifest.formatVersion in 1..3) {
             "Unsupported backup version ${manifest.formatVersion}. Update InShape before restoring."
         }
         parseWorkoutInstant(manifest.createdAt)
@@ -335,9 +342,10 @@ object BackupArchive {
                 journal.drafts,
                 journal.healthStates,
                 journal.pendingDeletions,
-                if (manifest.formatVersion == 2) journal.programEnrollment else null,
-                if (manifest.formatVersion == 2) journal.programLinks else emptyList(),
-                if (manifest.formatVersion == 2) journal.assistantMemories else emptyList()
+                if (manifest.formatVersion >= 2) journal.programEnrollment else null,
+                if (manifest.formatVersion >= 2) journal.programLinks else emptyList(),
+                if (manifest.formatVersion >= 2) journal.assistantMemories else emptyList(),
+                if (manifest.formatVersion >= 3) journal.programDayOverrides else emptyList()
             )
         validateBackupData(data)
         require(counts(data, manifest.formatVersion) == manifest.counts) { "Backup record counts do not match" }

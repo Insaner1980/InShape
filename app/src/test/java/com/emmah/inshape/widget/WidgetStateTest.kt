@@ -1,22 +1,22 @@
 package com.emmah.inshape.widget
 
-import com.emmah.inshape.data.Routine
-import com.emmah.inshape.data.RoutineItem
-import com.emmah.inshape.quantity
-import com.emmah.inshape.ui
-import com.emmah.inshape.testContext
-import org.robolectric.RobolectricTestRunner
-import org.junit.runner.RunWith
 import com.emmah.inshape.data.Exercise
 import com.emmah.inshape.data.JournalSnapshot
 import com.emmah.inshape.data.Preferences
+import com.emmah.inshape.data.Routine
+import com.emmah.inshape.data.RoutineItem
 import com.emmah.inshape.data.SessionItem
 import com.emmah.inshape.data.WorkoutEntity
+import com.emmah.inshape.quantity
+import com.emmah.inshape.testContext
+import com.emmah.inshape.ui
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
 class WidgetStateTest {

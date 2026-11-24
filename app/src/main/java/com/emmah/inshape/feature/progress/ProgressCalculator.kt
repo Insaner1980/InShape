@@ -13,12 +13,7 @@ import java.time.temporal.ChronoUnit
 
 private const val MAX_ATTENDANCE_WEEKS = 260L
 
-data class ExerciseMetricQuery(
-    val exerciseId: String,
-    val equipmentId: String,
-    val basis: String,
-    val range: DateRange
-)
+data class ExerciseMetricQuery(val exerciseId: String, val equipmentId: String, val basis: String, val range: DateRange)
 data class MetricPoint(val workoutId: String, val date: LocalDate, val value: BigDecimal?)
 data class WeekCount(val week: LocalDate, val count: Int)
 fun calculateExerciseSeries(records: List<Workout>, query: ExerciseMetricQuery): List<MetricPoint> = records
@@ -34,8 +29,11 @@ fun calculateExerciseSeries(records: List<Workout>, query: ExerciseMetricQuery):
         val sets = items.flatMap { it.completedSets }
         val value = when (MeasurementBasis.fromKey(query.basis)) {
             MeasurementBasis.Weight, MeasurementBasis.MachineLevel -> sets.mapNotNull { it.load?.toBigDecimalOrNull() }.maxOrNull()
+
             MeasurementBasis.Assistance -> sets.mapNotNull { it.load?.toBigDecimalOrNull() }.minOrNull()
+
             MeasurementBasis.Bodyweight -> sets.mapNotNull { it.reps }.maxOrNull()?.toBigDecimal()
+
             MeasurementBasis.Time -> items.mapNotNull { item ->
                 item.row.durationSeconds?.toBigDecimal() ?: item.completedSets
                     .mapNotNull { it.load?.toBigDecimalOrNull()?.multiply(60.toBigDecimal()) }

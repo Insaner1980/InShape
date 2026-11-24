@@ -24,6 +24,10 @@ enum class AssistantFailureKind(val message: Int) {
 
 class AssistantFailure(val kind: AssistantFailureKind) : Exception()
 
+internal val AssistantFailureKind.requiresCredentialSettings: Boolean
+    get() = this == AssistantFailureKind.NO_KEY ||
+        this == AssistantFailureKind.UNREADABLE_KEY
+
 interface AssistantGateway {
     suspend fun checkConnection(): String
     suspend fun interpret(instructions: String, input: String, schema: JsonObject): AssistantAnswer
@@ -37,6 +41,7 @@ internal object DisabledAssistant : AssistantGateway {
 
     override suspend fun checkConnection(): String = missing()
     override suspend fun interpret(instructions: String, input: String, schema: JsonObject): AssistantAnswer = missing()
-    override suspend fun extract(instructions: String, input: String, images: List<AssistantImage>, schema: JsonObject): AssistantAnswer = missing()
+    override suspend fun extract(instructions: String, input: String, images: List<AssistantImage>, schema: JsonObject): AssistantAnswer =
+        missing()
     override suspend fun transcribe(clip: ByteArray, exerciseHint: String): String = missing()
 }
